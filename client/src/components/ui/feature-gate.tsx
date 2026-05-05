@@ -25,6 +25,7 @@ interface FeatureGateProps {
 interface Subscription {
     status: string;
     planId: number;
+    currentPeriodEnd?: string | Date | null;
 }
 interface SubscriptionPlan {
     name: string;
@@ -35,6 +36,43 @@ interface UserSubscription {
     plan: SubscriptionPlan | null;
 }
 
+const normalizePlanName = (name?: string | null) =>
+    (name ?? "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim()
+        .toLowerCase();
+
+const isPaidPlan = (plan?: SubscriptionPlan | null) => {
+    const planName = normalizePlanName(plan?.name);
+
+    if (!planName || planName === "gratuito") {
+        return false;
+    }
+
+    return planName.includes("vita") || planName !== "gratuito";
+};
+
+const isSubscriptionUsable = (subscription?: Subscription | null) => {
+    if (!subscription) {
+        return false;
+    }
+
+    const status = subscription.status?.toLowerCase();
+    const hasAccessStatus = status === "active" || status === "trialing";
+
+    if (!hasAccessStatus) {
+        return false;
+    }
+
+    if (!subscription.currentPeriodEnd) {
+        return true;
+    }
+
+    const periodEnd = new Date(subscription.currentPeriodEnd);
+    return Number.isNaN(periodEnd.getTime()) || periodEnd > new Date();
+};
+
 export const FeatureGate = React.forwardRef<HTMLDivElement, FeatureGateProps>(
     ({ children, feature: _feature, ...props }, ref) => {
         const [, setLocation] = useLocation();
@@ -44,12 +82,11 @@ export const FeatureGate = React.forwardRef<HTMLDivElement, FeatureGateProps>(
             staleTime: 5 * 60 * 1000, // Cache for 5 minutes
         });
 
-        // Determine if user has access (Plan is NOT "Gratuito" and subscription is active) OR user is admin
-        const isVitaPlan =
-            (subscriptionData?.subscription?.status === 'active' &&
-                subscriptionData?.plan?.name !== 'Gratuito');
+        const hasPremiumAccess =
+            isSubscriptionUsable(subscriptionData?.subscription) &&
+            isPaidPlan(subscriptionData?.plan);
 
-        if (isVitaPlan || isLoading) {
+        if (hasPremiumAccess || isLoading) {
             // Unlocked state: Forward ref and spread props using Slot to merge with children
             if (isLoading) return <Slot ref={ref} {...props}>{children}</Slot>;
             return <Slot ref={ref} {...props}>{children}</Slot>;
@@ -60,20 +97,20 @@ export const FeatureGate = React.forwardRef<HTMLDivElement, FeatureGateProps>(
                 ref={ref}
                 {...props}
                 className={cn(
-                    "relative block opacity-70 grayscale-[0.3]",
+                    "group relative inline-block opacity-70 grayscale-[0.3]",
                     "cursor-pointer",
                     (props as React.HTMLAttributes<HTMLDivElement>).className
                 )}
             >
                 <Badge
                     variant="default"
-                    className="absolute right-2 top-2 z-20 gap-1 bg-charcoal/95 text-pureWhite shadow-md backdrop-blur-sm"
+                    className="pointer-events-none absolute right-2 top-2 z-20 gap-1 bg-charcoal/95 text-pureWhite opacity-0 shadow-md backdrop-blur-sm transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
                 >
                     <Lock className="h-3 w-3" />
                     <span>Recurso Premium</span>
                 </Badge>
 
-                <div className="pointer-events-none">
+                <div className="pointer-events-none w-full">
                     {children}
                 </div>
             </div>

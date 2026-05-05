@@ -16,8 +16,6 @@ import { analyzeDocumentWithOpenAI } from './openai';
 import { storage } from '../storage';
 import { buildObjectiveMetricSummary, getObjectiveMetricStatus, normalizeHealthMetrics } from '../../shared/exam-normalizer';
 import logger from '../logger';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import { S3Service } from './s3.service';
 import { createUserNotification } from './user-notification.service';
 
@@ -25,12 +23,63 @@ const stripFileExtension = (value: string) => value.replace(/\.[^.]+$/, '');
 
 const normalizeDisplayName = (value: string) => {
   if (!value) return '';
-  return stripFileExtension(value).replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return stripFileExtension(value).replace(/_+/g, ' ').replace(/\s+/g, ' ').trim();
 };
 
 const capitalizeSentence = (value: string) => {
   if (!value) return value;
   return value.charAt(0).toUpperCase() + value.slice(1);
+};
+
+const normalizeComparableText = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+
+const isDateLikeTitlePart = (value: string) => {
+  const normalized = normalizeComparableText(value);
+  const monthPattern = '(jan|janeiro|fev|fevereiro|mar|marco|abr|abril|mai|maio|jun|junho|jul|julho|ago|agosto|set|setembro|out|outubro|nov|novembro|dez|dezembro)';
+
+  return (
+    /^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$/.test(normalized) ||
+    /^\d{1,2}[/-]\d{2,4}$/.test(normalized) ||
+    new RegExp(`^${monthPattern}[\\s/-]*\\d{2,4}$`).test(normalized) ||
+    new RegExp(`^\\d{2,4}[\\s/-]*${monthPattern}$`).test(normalized) ||
+    /^\d{4}$/.test(normalized)
+  );
+};
+
+const isGenericPurposeTitlePart = (value: string) => {
+  const normalized = normalizeComparableText(value);
+  return [
+    'acompanhamento',
+    'controle',
+    'rotina',
+    'seguimento',
+    'follow up',
+    'follow-up',
+    'retorno'
+  ].includes(normalized);
+};
+
+const stripTitleNoise = (value: string, laboratoryName?: string | null) => {
+  const lab = laboratoryName ? normalizeComparableText(laboratoryName) : '';
+  const parts = normalizeDisplayName(value)
+    .split(/\s+(?:[•|]|[-–—])\s+/)
+    .map(part => part.trim())
+    .filter(Boolean)
+    .filter(part => !isDateLikeTitlePart(part))
+    .filter(part => !isGenericPurposeTitlePart(part))
+    .filter(part => !lab || normalizeComparableText(part) !== lab);
+
+  const title = parts[0] || normalizeDisplayName(value);
+
+  return title
+    .replace(/\s*\((?:\d{1,2}[/-]\d{2,4}|\d{4})\)\s*$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 };
 
 const deriveNameFromMetrics = (metrics: any[]) => {
@@ -50,52 +99,30 @@ const deriveNameFromMetrics = (metrics: any[]) => {
 const buildExamDisplayName = (
   uploadedName: string,
   extractionResult: any,
-  normalizedMetrics: any[],
-  fallbackExamDate: string | null
+  normalizedMetrics: any[]
 ) => {
   const metadata = extractionResult?.examMetadata || {};
   const cleanedUpload = normalizeDisplayName(uploadedName);
   const metricBasedName = deriveNameFromMetrics(normalizedMetrics);
+  const laboratoryName =
+    extractionResult?.laboratoryName ||
+    metadata.laboratoryName ||
+    metadata.institutionName ||
+    null;
 
   const primaryCandidate = [
     metadata.documentTitle,
     extractionResult?.examType,
     metadata.examModality,
-    metadata.examPurpose,
     metricBasedName,
+    metadata.examPurpose,
     cleanedUpload,
     'Exame médico'
-  ].find(value => typeof value === 'string' && value.trim().length > 0) as string;
+  ]
+    .map(value => typeof value === 'string' ? stripTitleNoise(value, laboratoryName) : '')
+    .find(value => value && !isDateLikeTitlePart(value) && !isGenericPurposeTitlePart(value)) as string;
 
-  const uniqueParts: string[] = [];
-  const pushUnique = (value?: string | null) => {
-    if (!value) return;
-    const normalized = value.trim();
-    if (!normalized) return;
-    const lower = normalized.toLowerCase();
-    if (!uniqueParts.some(part => part.toLowerCase() === lower)) {
-      uniqueParts.push(capitalizeSentence(normalized));
-    }
-  };
-
-  pushUnique(primaryCandidate);
-
-  if (metadata.examPurpose && !primaryCandidate?.toLowerCase().includes(metadata.examPurpose.toLowerCase())) {
-    pushUnique(metadata.examPurpose);
-  }
-  if (extractionResult?.laboratoryName && !primaryCandidate?.toLowerCase().includes(extractionResult.laboratoryName.toLowerCase())) {
-    pushUnique(extractionResult.laboratoryName);
-  }
-
-  const examDate = extractionResult?.examDate || metadata.examDate || fallbackExamDate;
-  if (examDate) {
-    const parsed = new Date(examDate);
-    if (!Number.isNaN(parsed.getTime())) {
-      pushUnique(format(parsed, "MMM yyyy", { locale: ptBR }));
-    }
-  }
-
-  return uniqueParts.join(" • ");
+  return capitalizeSentence(primaryCandidate || 'Exame médico');
 };
 
 const safeText = (value: unknown) => {
@@ -352,7 +379,7 @@ export async function runAnalysisPipeline(examId: number): Promise<AnalysisResul
     const normalizedMetrics = normalizeHealthMetrics(extractionResult.healthMetrics || []);
 
     // Criar nome contextual para o exame
-    const examName = buildExamDisplayName(exam.name, extractionResult, normalizedMetrics, extractedExamDate);
+    const examName = buildExamDisplayName(exam.name, extractionResult, normalizedMetrics);
 
     // Atualizar exame com dados extraídos
     await storage.updateExam(examId, {
