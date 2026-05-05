@@ -756,6 +756,11 @@ export function ConsultationRecordingProvider({
         throw new Error(result.message || "Erro ao finalizar a consulta.");
       }
 
+      console.log("[Recording] Finalize concluido — setando completedResult", {
+        profileId: session?.profileId ?? null,
+        transcriptionLength: typeof result.transcription === "string" ? result.transcription.length : 0,
+        anamnesisLength: typeof result.anamnesis === "string" ? result.anamnesis.length : 0,
+      });
       setCompletedResult({
         profileId: session?.profileId ?? null,
         transcription: result.transcription,
@@ -921,6 +926,9 @@ export function ConsultationRecordingProvider({
           patientName: options?.patientName?.trim() || null,
           returnPath: options?.returnPath || "/atendimento",
         };
+        if (nextSession.profileId === null) {
+          console.warn("[Recording] startRecording chamado sem profileId — resultado sera anexado ao paciente ativo no momento da finalizacao");
+        }
         const isNativeIOSShell = isNativeIOSApp();
         const useNativeRecorder =
           isNativeIOSShell && isNativeAudioRecorderAvailable();
