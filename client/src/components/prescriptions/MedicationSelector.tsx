@@ -36,6 +36,36 @@ interface MedicationSelectorProps {
     onDeleteCustomMedication?: (id: number) => void;
 }
 
+const normalizePlanName = (name?: string | null) =>
+    (name ?? "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim()
+        .toLowerCase();
+
+const hasPremiumMedicationAccess = (subscriptionData: any) => {
+    const subscription = subscriptionData?.subscription;
+    const planName = normalizePlanName(subscriptionData?.plan?.name);
+
+    if (!subscription || !planName || planName === "gratuito") {
+        return false;
+    }
+
+    const status = String(subscription.status ?? "").toLowerCase();
+    const hasAccessStatus = status === "active" || status === "trialing";
+
+    if (!hasAccessStatus) {
+        return false;
+    }
+
+    if (!subscription.currentPeriodEnd) {
+        return true;
+    }
+
+    const periodEnd = new Date(subscription.currentPeriodEnd);
+    return Number.isNaN(periodEnd.getTime()) || periodEnd > new Date();
+};
+
 export function MedicationSelector({
     onAdd,
     searchValue,
@@ -61,20 +91,11 @@ export function MedicationSelector({
     const [patientWeight, setPatientWeight] = useState("");
     const [frequency, setFrequency] = useState("");
 
-    // Fetch user subscription to check for premium plan
     const { data: subscriptionData } = useQuery({
         queryKey: ['/api/user-subscription'],
-        // We don't need to block rendering if this fails, default to false (locked) or true depending on strategy.
-        // Safer to default to restricted if undefined, but let's see. 
-        // Actually, let's just fetch it.
     });
 
-    // Check if user has a premium plan (Vita)
-    const isPremium = useMemo(() => {
-        if (!subscriptionData || !(subscriptionData as any).plan) return false;
-        const planName = (subscriptionData as any).plan.name || "";
-        return planName.includes("Vita");
-    }, [subscriptionData]);
+    const isPremium = useMemo(() => hasPremiumMedicationAccess(subscriptionData), [subscriptionData]);
 
     // Find the selected item from the simplified list
     const selectedListItem = useMemo(() =>

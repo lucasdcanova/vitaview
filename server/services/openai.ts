@@ -1961,7 +1961,7 @@ export async function analyzeDocumentWithOpenAI(fileContent: string, fileType: s
                   ],
                   "suggestedDiagnoses": [],
                   "examMetadata": {
-                    "documentTitle": "título clínico amigável",
+                    "documentTitle": "título clínico curto e objetivo, sem data, laboratório, médico ou finalidade administrativa",
                     "examType": "tipo curto do exame",
                     "examCategory": "especialidade ou grupo clínico",
                     "examPurpose": "motivo provável do exame",
@@ -1992,7 +1992,9 @@ export async function analyzeDocumentWithOpenAI(fileContent: string, fileType: s
                 - Quando o desvio for discreto, use linguagem proporcional como "levemente acima do limite de referência" ou "levemente abaixo do limite inferior".
                 - Remova prefixos Dr./Dra. dos nomes dos médicos.
                 - Datas devem estar em YYYY-MM-DD.
-                - "documentTitle" e "examType" devem ser clínicos e específicos ao conteúdo do exame, nunca genéricos como "scan" ou "arquivo".`;
+                - "documentTitle" e "examType" devem ser clínicos e específicos ao conteúdo do exame, nunca genéricos como "scan" ou "arquivo".
+                - "documentTitle" deve ser simples para exibição em lista, sem repetir dados que já ficam em metadados: não inclua data, mês/ano, laboratório, instituição, médico, paciente, "acompanhamento", "rotina", "controle" ou "retorno".
+                - Exemplo correto de documentTitle: "Check-up metabólico e cardiovascular". Exemplo incorreto: "Check-up metabólico e cardiovascular - Julho/2025 • Acompanhamento • LabCruz".`;
 
   logger.info("[OpenAI] analyzeDocumentWithOpenAI start", {
     fileType,
