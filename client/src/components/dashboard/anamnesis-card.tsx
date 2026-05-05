@@ -441,22 +441,54 @@ export function AnamnesisCard() {
         };
     }) => {
         const normalizedAnamnesis = normalizeClinicalContent(result.anamnesis);
-        setAnamnesisText(normalizedAnamnesis);
+        const normalizedTranscription = normalizeClinicalContent(result.transcription);
+        // Se a anamnese vier vazia (falha do GPT, fallback degradado, etc.), nao
+        // perca a transcricao crua — ela e melhor que um campo em branco.
+        const initialText = normalizedAnamnesis || normalizedTranscription;
+
+        setAnamnesisText(initialText);
         setExtractedRecord(normalizeExtractedRecord(result.extractedData));
 
-        if (normalizedAnamnesis) {
-            enhanceAnamnesisMutation.mutate({ text: normalizedAnamnesis, auto: true });
+        if (initialText) {
+            enhanceAnamnesisMutation.mutate({ text: initialText, auto: true });
         }
 
         toast({
             title: "Consulta transcrita com sucesso!",
-            description: "A anamnese foi preenchida e enviada automaticamente para refinamento com IA.",
+            description: normalizedAnamnesis
+                ? "A anamnese foi preenchida e enviada automaticamente para refinamento com IA."
+                : "Transcricao carregada. Refinamento automatico em andamento.",
         });
     };
 
     useEffect(() => {
-        if (!completedResult || !activeProfile?.id) return;
-        if (completedResult.profileId !== activeProfile.id) return;
+        if (!completedResult) return;
+        if (!activeProfile?.id) {
+            console.warn("[Anamnesis] completedResult chegou sem activeProfile ativo", {
+                completedProfileId: completedResult.profileId,
+            });
+            return;
+        }
+
+        // profileId === null significa que a gravacao foi iniciada antes do
+        // paciente estar hidratado — aceite para o paciente ativo atual.
+        // Mismatch real (gravacao de paciente A, paciente B ativo) avisamos e ignoramos.
+        if (
+            completedResult.profileId !== null &&
+            completedResult.profileId !== activeProfile.id
+        ) {
+            console.warn("[Anamnesis] Resultado descartado por mismatch de paciente", {
+                completedProfileId: completedResult.profileId,
+                activeProfileId: activeProfile.id,
+            });
+            toast({
+                title: "Transcricao de outro paciente",
+                description: "A gravacao concluida pertence a um paciente diferente do ativo. Selecione o paciente correto para visualiza-la.",
+                variant: "destructive",
+            });
+            clearCompletedResult();
+            return;
+        }
 
         handleTranscriptionComplete({
             transcription: completedResult.transcription,
