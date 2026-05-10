@@ -1,19 +1,10 @@
 
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Lock } from "lucide-react";
 import { useLocation } from "wouter";
 import { Slot } from "@radix-ui/react-slot";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 interface FeatureGateProps {
@@ -76,10 +67,10 @@ const isSubscriptionUsable = (subscription?: Subscription | null) => {
 export const FeatureGate = React.forwardRef<HTMLDivElement, FeatureGateProps>(
     ({ children, feature: _feature, ...props }, ref) => {
         const [, setLocation] = useLocation();
-        const [dialogOpen, setDialogOpen] = React.useState(false);
+        const [hovered, setHovered] = React.useState(false);
         const { data: subscriptionData, isLoading } = useQuery<UserSubscription>({
             queryKey: ['/api/user-subscription'],
-            staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+            staleTime: 5 * 60 * 1000,
         });
 
         const hasPremiumAccess =
@@ -87,81 +78,58 @@ export const FeatureGate = React.forwardRef<HTMLDivElement, FeatureGateProps>(
             isPaidPlan(subscriptionData?.plan);
 
         if (hasPremiumAccess || isLoading) {
-            // Unlocked state: Forward ref and spread props using Slot to merge with children
             if (isLoading) return <Slot ref={ref} {...props}>{children}</Slot>;
             return <Slot ref={ref} {...props}>{children}</Slot>;
         }
 
-        const lockedContent = (
+        return (
             <div
                 ref={ref}
                 {...props}
                 className={cn(
-                    "group relative inline-block opacity-70 grayscale-[0.3]",
-                    "cursor-pointer",
+                    "relative inline-block opacity-70 grayscale-[0.3]",
                     (props as React.HTMLAttributes<HTMLDivElement>).className
                 )}
+                onMouseEnter={() => setHovered(true)}
+                onMouseLeave={() => setHovered(false)}
             >
-                <Badge
-                    variant="default"
-                    className="pointer-events-none absolute right-2 top-2 z-20 gap-1 bg-charcoal/95 text-pureWhite opacity-0 shadow-md backdrop-blur-sm transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
-                >
-                    <Lock className="h-3 w-3" />
-                    <span>Recurso Premium</span>
-                </Badge>
-
                 <div className="pointer-events-none w-full">
                     {children}
                 </div>
-            </div>
-        );
 
-        const upgradeContent = (
-            <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2 font-semibold text-lg">
-                    <Lock className="h-5 w-5" />
-                    <span>Recurso Premium</span>
-                </div>
-                <p className="text-sm">
-                    Esta funcionalidade está disponível exclusivamente nos planos <strong>Vita</strong>.
-                </p>
-                <Button
-                    variant="secondary"
-                    size="sm"
-                    className="w-full mt-2"
-                    onClick={() => setLocation('/subscription')}
-                >
-                    Fazer Upgrade Agora
-                </Button>
-            </div>
-        );
-
-        return (
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                <div
-                    onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setDialogOpen(true);
-                    }}
-                >
-                    {lockedContent}
-                </div>
-                <DialogContent className="max-w-sm">
-                    <DialogHeader>
-                        <DialogTitle>Recurso Premium</DialogTitle>
-                        <DialogDescription>
-                            Este recurso está bloqueado no plano atual.
-                        </DialogDescription>
-                    </DialogHeader>
-                    {upgradeContent}
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                            Fechar
+                {hovered && (
+                    <div
+                        className="absolute left-1/2 top-full z-50 mt-2 w-64 -translate-x-1/2 rounded-xl border border-white/10 bg-charcoal/95 p-4 shadow-2xl backdrop-blur-sm"
+                        onMouseEnter={() => setHovered(true)}
+                        onMouseLeave={() => setHovered(false)}
+                        style={{ pointerEvents: 'all' }}
+                    >
+                        <div className="mb-3 flex items-center gap-2">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-yellow-500/20">
+                                <Lock className="h-4 w-4 text-yellow-400" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-semibold text-white">Recurso Premium</p>
+                                <p className="text-xs text-white/60">Plano atual não inclui</p>
+                            </div>
+                        </div>
+                        <p className="mb-4 text-xs leading-relaxed text-white/80">
+                            A funcionalidade <strong className="text-white">Evolução</strong> está disponível exclusivamente nos planos <strong className="text-yellow-400">Vita</strong>. Faça upgrade para desbloquear.
+                        </p>
+                        <Button
+                            size="sm"
+                            className="w-full bg-yellow-500 text-charcoal hover:bg-yellow-400 font-semibold"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setLocation('/subscription');
+                            }}
+                        >
+                            Fazer Upgrade
                         </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                    </div>
+                )}
+            </div>
         );
     }
 );
