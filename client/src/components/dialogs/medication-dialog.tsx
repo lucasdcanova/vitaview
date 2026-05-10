@@ -4381,45 +4381,45 @@ export function MedicationDialog({
                                 <FormItem className="flex flex-col">
                                     <FormLabel>Nome do Medicamento *</FormLabel>
                                     <Popover open={medicationOpen} onOpenChange={setMedicationOpen} modal={true}>
-                                        <PopoverAnchor asChild>
+                                        <PopoverAnchor>
                                             <FormControl>
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                role="combobox"
-                                                aria-expanded={medicationOpen}
-                                                onClick={() => setMedicationOpen(!medicationOpen)}
-                                                className={cn(
-                                                    "w-full justify-between font-normal h-10",
-                                                    !field.value && "text-muted-foreground"
-                                                )}
-                                            >
-                                                <span className="flex-1 flex items-center gap-2">
-                                                    {field.value || "Selecione o medicamento"}
-                                                    {(() => {
-                                                        const val = (field.value || "").toLowerCase().trim();
-                                                        const isStandard = ALL_MEDICATIONS_WITH_PRESENTATIONS.some(
-                                                            m => m.displayName.toLowerCase() === val || m.baseName.toLowerCase() === val
-                                                        );
-                                                        const isCustom = customMedications.some(m => m.name.toLowerCase() === val) || !isStandard;
-
-                                                        if (isCustom && val) {
-                                                            return (
-                                                                <Badge variant="outline" className="text-[10px] px-1 py-0 border-blue-200 text-blue-600 bg-blue-50">
-                                                                    Personalizado
-                                                                </Badge>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    role="combobox"
+                                                    aria-expanded={medicationOpen}
+                                                    onClick={() => setMedicationOpen(!medicationOpen)}
+                                                    className={cn(
+                                                        "w-full justify-between font-normal h-10",
+                                                        !field.value && "text-muted-foreground"
+                                                    )}
+                                                >
+                                                    <span className="flex-1 flex items-center gap-2">
+                                                        {field.value || "Selecione o medicamento"}
+                                                        {(() => {
+                                                            const val = (field.value || "").toLowerCase().trim();
+                                                            const isStandard = ALL_MEDICATIONS_WITH_PRESENTATIONS.some(
+                                                                m => m.displayName.toLowerCase() === val || m.baseName.toLowerCase() === val
                                                             );
-                                                        }
+                                                            const isCustom = customMedications.some(m => m.name.toLowerCase() === val) || !isStandard;
 
-                                                        if (selectedMedInfo?.prescriptionType && (selectedMedInfo.prescriptionType as string) !== 'common' && (selectedMedInfo.prescriptionType as string) !== 'padrao') {
-                                                            return <PrescriptionTypeBadge type={selectedMedInfo.prescriptionType} />;
-                                                        }
-                                                        return null;
-                                                    })()}
-                                                </span>
-                                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                            </Button>
-                                        </FormControl>
+                                                            if (isCustom && val) {
+                                                                return (
+                                                                    <Badge variant="outline" className="text-[10px] px-1 py-0 border-blue-200 text-blue-600 bg-blue-50">
+                                                                        Personalizado
+                                                                    </Badge>
+                                                                );
+                                                            }
+
+                                                            if (selectedMedInfo?.prescriptionType && (selectedMedInfo.prescriptionType as string) !== 'common' && (selectedMedInfo.prescriptionType as string) !== 'padrao') {
+                                                                return <PrescriptionTypeBadge type={selectedMedInfo.prescriptionType} />;
+                                                            }
+                                                            return null;
+                                                        })()}
+                                                    </span>
+                                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                                </Button>
+                                            </FormControl>
                                         </PopoverAnchor>
                                         <PopoverContent
                                             className="w-[400px] p-0"
