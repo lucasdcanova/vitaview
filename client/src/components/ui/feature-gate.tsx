@@ -131,7 +131,7 @@ export const FeatureGate = React.forwardRef<HTMLDivElement, FeatureGateProps>(
                     </div>
                 </div>
                 <p className="mb-4 text-xs leading-relaxed text-white/70">
-                    Faça upgrade do seu plano para desbloquear a funcionalidade <strong className="text-white">Evolução</strong> e outros recursos exclusivos.
+                    Faça upgrade do seu plano para desbloquear essa funcionalidade.
                 </p>
                 <Button
                     size="sm"
