@@ -994,3 +994,23 @@ nav, .no-drag {
 .skip-link:focus {
   top: 0;
 }
+
+@layer utilities {
+  .hover-scroll-text {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  .group:hover .hover-scroll-text {
+    overflow: visible;
+    text-overflow: clip;
+    animation: scroll-text 4s linear infinite alternate;
+  }
+  
+  @keyframes scroll-text {
+    0%, 10% { transform: translateX(0); }
+    90%, 100% { transform: translateX(calc(-100% + 110px)); }
+  }
+}
