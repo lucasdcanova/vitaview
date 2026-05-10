@@ -71,6 +71,7 @@ export const FeatureGate = React.forwardRef<HTMLDivElement, FeatureGateProps>(
         const [hovered, setHovered] = React.useState(false);
         const [tooltipPos, setTooltipPos] = React.useState({ top: 0, left: 0 });
         const wrapperRef = React.useRef<HTMLDivElement>(null);
+        const hideTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
         const { data: subscriptionData, isLoading } = useQuery<UserSubscription>({
             queryKey: ['/api/user-subscription'],
             staleTime: 5 * 60 * 1000,
@@ -85,7 +86,19 @@ export const FeatureGate = React.forwardRef<HTMLDivElement, FeatureGateProps>(
             return <Slot ref={ref} {...props}>{children}</Slot>;
         }
 
+        const cancelHide = () => {
+            if (hideTimer.current) {
+                clearTimeout(hideTimer.current);
+                hideTimer.current = null;
+            }
+        };
+
+        const scheduleHide = () => {
+            hideTimer.current = setTimeout(() => setHovered(false), 100);
+        };
+
         const handleMouseEnter = () => {
+            cancelHide();
             if (wrapperRef.current) {
                 const rect = wrapperRef.current.getBoundingClientRect();
                 setTooltipPos({
@@ -105,8 +118,8 @@ export const FeatureGate = React.forwardRef<HTMLDivElement, FeatureGateProps>(
                     transform: 'translateX(-50%)',
                     position: 'absolute',
                 }}
-                onMouseEnter={() => setHovered(true)}
-                onMouseLeave={() => setHovered(false)}
+                onMouseEnter={cancelHide}
+                onMouseLeave={scheduleHide}
             >
                 <div className="mb-3 flex items-center gap-3">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10">
@@ -149,7 +162,7 @@ export const FeatureGate = React.forwardRef<HTMLDivElement, FeatureGateProps>(
                         (props as React.HTMLAttributes<HTMLDivElement>).className
                     )}
                     onMouseEnter={handleMouseEnter}
-                    onMouseLeave={() => setHovered(false)}
+                    onMouseLeave={scheduleHide}
                 >
                     <div className="pointer-events-none w-full">
                         {children}
