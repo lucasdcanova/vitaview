@@ -1,5 +1,6 @@
 
 import React from 'react';
+import ReactDOM from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Lock } from "lucide-react";
@@ -68,6 +69,8 @@ export const FeatureGate = React.forwardRef<HTMLDivElement, FeatureGateProps>(
     ({ children, feature: _feature, ...props }, ref) => {
         const [, setLocation] = useLocation();
         const [hovered, setHovered] = React.useState(false);
+        const [tooltipPos, setTooltipPos] = React.useState({ top: 0, left: 0 });
+        const wrapperRef = React.useRef<HTMLDivElement>(null);
         const { data: subscriptionData, isLoading } = useQuery<UserSubscription>({
             queryKey: ['/api/user-subscription'],
             staleTime: 5 * 60 * 1000,
@@ -82,54 +85,78 @@ export const FeatureGate = React.forwardRef<HTMLDivElement, FeatureGateProps>(
             return <Slot ref={ref} {...props}>{children}</Slot>;
         }
 
-        return (
+        const handleMouseEnter = () => {
+            if (wrapperRef.current) {
+                const rect = wrapperRef.current.getBoundingClientRect();
+                setTooltipPos({
+                    top: rect.bottom + window.scrollY + 8,
+                    left: rect.left + window.scrollX + rect.width / 2,
+                });
+            }
+            setHovered(true);
+        };
+
+        const tooltip = hovered && ReactDOM.createPortal(
             <div
-                ref={ref}
-                {...props}
-                className={cn(
-                    "relative inline-block opacity-70 grayscale-[0.3]",
-                    (props as React.HTMLAttributes<HTMLDivElement>).className
-                )}
+                className="fixed z-[9999] w-72 rounded-xl border border-white/10 bg-black p-5 shadow-2xl"
+                style={{
+                    top: tooltipPos.top,
+                    left: tooltipPos.left,
+                    transform: 'translateX(-50%)',
+                    position: 'absolute',
+                }}
                 onMouseEnter={() => setHovered(true)}
                 onMouseLeave={() => setHovered(false)}
             >
-                <div className="pointer-events-none w-full">
-                    {children}
-                </div>
-
-                {hovered && (
-                    <div
-                        className="absolute left-1/2 top-full z-50 mt-2 w-64 -translate-x-1/2 rounded-xl border border-white/10 bg-charcoal/95 p-4 shadow-2xl backdrop-blur-sm"
-                        onMouseEnter={() => setHovered(true)}
-                        onMouseLeave={() => setHovered(false)}
-                        style={{ pointerEvents: 'all' }}
-                    >
-                        <div className="mb-3 flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-yellow-500/20">
-                                <Lock className="h-4 w-4 text-yellow-400" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-semibold text-white">Recurso Premium</p>
-                                <p className="text-xs text-white/60">Plano atual não inclui</p>
-                            </div>
-                        </div>
-                        <p className="mb-4 text-xs leading-relaxed text-white/80">
-                            A funcionalidade <strong className="text-white">Evolução</strong> está disponível exclusivamente nos planos <strong className="text-yellow-400">Vita</strong>. Faça upgrade para desbloquear.
-                        </p>
-                        <Button
-                            size="sm"
-                            className="w-full bg-yellow-500 text-charcoal hover:bg-yellow-400 font-semibold"
-                            onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setLocation('/subscription');
-                            }}
-                        >
-                            Fazer Upgrade
-                        </Button>
+                <div className="mb-3 flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10">
+                        <Lock className="h-4 w-4 text-yellow-400" />
                     </div>
-                )}
-            </div>
+                    <div>
+                        <p className="text-sm font-semibold text-white">Recurso Premium</p>
+                        <p className="text-xs text-white/50">Disponível nos planos Vita</p>
+                    </div>
+                </div>
+                <p className="mb-4 text-xs leading-relaxed text-white/70">
+                    Faça upgrade do seu plano para desbloquear a funcionalidade <strong className="text-white">Evolução</strong> e outros recursos exclusivos.
+                </p>
+                <Button
+                    size="sm"
+                    className="w-full bg-white text-black hover:bg-white/90 font-semibold"
+                    onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setLocation('/subscription');
+                    }}
+                >
+                    Fazer Upgrade
+                </Button>
+            </div>,
+            document.body
+        );
+
+        return (
+            <>
+                <div
+                    ref={(node) => {
+                        (wrapperRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+                        if (typeof ref === 'function') ref(node);
+                        else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
+                    }}
+                    {...props}
+                    className={cn(
+                        "relative inline-block opacity-70 grayscale-[0.3] cursor-pointer",
+                        (props as React.HTMLAttributes<HTMLDivElement>).className
+                    )}
+                    onMouseEnter={handleMouseEnter}
+                    onMouseLeave={() => setHovered(false)}
+                >
+                    <div className="pointer-events-none w-full">
+                        {children}
+                    </div>
+                </div>
+                {tooltip}
+            </>
         );
     }
 );
