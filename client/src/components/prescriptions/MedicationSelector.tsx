@@ -331,7 +331,7 @@ export function MedicationSelector({
                                     <div className="flex items-center px-3 pb-1">
                                         <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                                         <input
-                                            className="flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                                            className="flex h-10 w-full rounded-md border-0 bg-transparent py-3 text-sm shadow-none outline-none ring-0 focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
                                             placeholder="Digitar nome do medicamento..."
                                             value={searchValue}
                                             onChange={(e) => setSearchValue(e.target.value)}
