@@ -300,7 +300,7 @@ export function ActiveRequestList({
                                     <button
                                         key={(protocol as any).id}
                                         className={cn(
-                                            "relative flex items-center gap-2 p-2 rounded-lg border text-left transition-all",
+                                            "group relative flex items-center gap-2 p-2 rounded-lg border text-left transition-all overflow-hidden",
                                             protocolLogic?.deleteMode
                                                 ? isDeleting
                                                     ? "border-red-500/60 bg-red-500/10"
@@ -325,7 +325,7 @@ export function ActiveRequestList({
                                             <Icon className="h-3.5 w-3.5" />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <span className="text-xs font-medium text-foreground block truncate">{(protocol as any).name}</span>
+                                            <span className="text-xs font-medium text-foreground hover-scroll-text">{(protocol as any).name}</span>
                                             <span className="text-[10px] text-muted-foreground">{(protocol as any).exams?.length || 0} exames</span>
                                         </div>
                                         {protocolLogic?.deleteMode && (
