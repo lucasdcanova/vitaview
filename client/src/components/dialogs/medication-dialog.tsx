@@ -4379,7 +4379,7 @@ export function MedicationDialog({
                             render={({ field }) => (
                                 <FormItem className="flex flex-col">
                                     <FormLabel>Nome do Medicamento *</FormLabel>
-                                    <Popover open={medicationOpen} onOpenChange={setMedicationOpen} modal={false}>
+                                    <Popover open={medicationOpen} onOpenChange={setMedicationOpen} modal={true}>
                                         <PopoverTrigger asChild>
                                             <FormControl>
                                                 <Button
@@ -4628,7 +4628,7 @@ export function MedicationDialog({
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Dose por vez *</FormLabel>
-                                        <Popover open={dosagePopoverOpen} onOpenChange={setDosagePopoverOpen}>
+                                        <Popover open={dosagePopoverOpen} onOpenChange={setDosagePopoverOpen} modal={true}>
                                             <div className="relative">
                                                 <FormControl>
                                                     <Input
