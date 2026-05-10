@@ -77,7 +77,7 @@ export function ExamRequestHistory({ history, onReprint, onEdit }: ExamRequestHi
                 <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <History className="h-4 w-4 text-gray-500" />
-                        <h3 className="font-medium text-gray-900">Histórico de Solicitações</h3>
+                        <h3 className="text-sm font-medium text-gray-900">Histórico de Solicitações</h3>
                     </div>
                     {hasMore && (
                         <span className="text-xs text-gray-400">
