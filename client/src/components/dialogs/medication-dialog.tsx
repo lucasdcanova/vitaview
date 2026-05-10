@@ -27,6 +27,7 @@ import {
     Popover,
     PopoverContent,
     PopoverTrigger,
+    PopoverAnchor,
 } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -4380,7 +4381,8 @@ export function MedicationDialog({
                                 <FormItem className="flex flex-col">
                                     <FormLabel>Nome do Medicamento *</FormLabel>
                                     <Popover open={medicationOpen} onOpenChange={setMedicationOpen} modal={true}>
-                                        <FormControl>
+                                        <PopoverAnchor asChild>
+                                            <FormControl>
                                             <Button
                                                 type="button"
                                                 variant="outline"
@@ -4418,6 +4420,7 @@ export function MedicationDialog({
                                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                             </Button>
                                         </FormControl>
+                                        </PopoverAnchor>
                                         <PopoverContent
                                             className="w-[400px] p-0"
                                             align="start"
