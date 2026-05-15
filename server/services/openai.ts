@@ -2808,7 +2808,8 @@ Texto corrido em parágrafos. Sem títulos, sem seções, sem listas com tópico
 ${template.specialtyInstructions}
 
 ### FORMATO DA ANAMNESE (${template.label}):
-A anamnese deve seguir a estrutura abaixo, MAS OMITINDO SEÇÕES SEM DADOS:
+Siga a estrutura abaixo. As orientações da especialidade definem se cada seção deve ser preservada mesmo sem dados ou omitida quando vazia.
+
 ${template.structure}`;
 
   const prompt = `
