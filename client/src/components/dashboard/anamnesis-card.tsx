@@ -965,7 +965,9 @@ export function AnamnesisCard() {
                                 className={`${isMobile ? 'h-8 text-sm' : 'h-9 text-sm'} w-auto min-w-[140px] rounded-lg border-border bg-background gap-2`}
                                 aria-label="Padrão de anamnese"
                             >
-                                <SelectValue placeholder="Selecione um padrão" />
+                                <SelectValue placeholder="Selecione um padrão">
+                                    {getAnamnesisTemplate(anamnesisTemplate).label}
+                                </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
                                 {ANAMNESIS_TEMPLATE_OPTIONS.map((option) => (
