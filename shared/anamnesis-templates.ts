@@ -121,34 +121,79 @@ Quando o profissional descrever um procedimento realizado em consulta, descreva-
     id: "puericultura",
     label: "Puericultura",
     shortLabel: "Puericultura",
-    description: "Consulta pediátrica preventiva com crescimento, desenvolvimento, vacinação e alimentação.",
+    description: "Consulta pediátrica preventiva com antecedentes, exame físico segmentar e orientações por idade.",
     systemRoleDescription:
       "Você é um(a) pediatra experiente em acompanhamento de puericultura e documentação clínica pediátrica.",
-    structure: `- **Identificação**: Nome, idade exata em anos/meses/dias quando aplicável, sexo
-- **Motivo da Consulta**: Consulta de rotina de puericultura ou queixa específica
-- **História da Doença Atual (HDA)**: APENAS se houver queixa aguda
-- **Antecedentes Gestacionais**: Pré-natal (nº de consultas, intercorrências), uso de medicações, infecções, sorologias maternas
-- **Antecedentes do Parto**: Tipo de parto, idade gestacional, peso e comprimento ao nascer, Apgar
-- **Antecedentes Neonatais**: Internação em UTIN/UCIN, icterícia, triagens neonatais (pezinho, orelhinha, olhinho, coraçãozinho, linguinha)
-- **Aleitamento e Alimentação**: Aleitamento materno exclusivo até quando, fórmula, introdução alimentar, alimentação atual
-- **Eliminações**: Diurese e padrão de evacuações
-- **Sono**: Padrão, número de despertares, local
-- **Desenvolvimento Neuropsicomotor (DNPM)**: Marcos atingidos para a idade (sustento cefálico, sentar, engatinhar, andar, primeiras palavras, frases)
-- **Vacinação**: Esquema vacinal em dia conforme PNI ou pendências; vacinas privadas relevantes
-- **Antecedentes Patológicos**: Internações, cirurgias, alergias, doenças prévias
-- **História Familiar**: Doenças relevantes em pais e irmãos
-- **Antecedentes Sociais**: Composição familiar, creche, cuidador principal, exposição a tabagismo passivo
-- **Exame Físico**: Peso, estatura, perímetro cefálico, IMC quando aplicável, percentis/escore-Z; estado geral, hidratação, corado, ativo, reativo; segmentar (cabeça e pescoço, ACV, AR, abdome, genitália, extremidades, pele, neurológico)
-- **Avaliação de Crescimento e Desenvolvimento**: Adequação para a idade conforme curvas da OMS; classificação de DNPM (adequado/com atraso)
-- **Impressão**: Lactente/criança hígido(a) ou em acompanhamento de condição específica
-- **Conduta**: Orientações de alimentação, sono, segurança, prevenção de acidentes; suplementação (vitamina D, ferro); vacinas a aplicar; retorno`,
-    specialtyInstructions: `Omita seções sem dados — não inclua rótulos vazios nem comentários sobre ausência de informação.
+    structure: `Idade: dias
+Nascimento em / / , parto cesárea/normal, sem intercorrências.
+IG: S | Peso nascimento: g | Estatura: cm | PC: cm | Peso alta: g em / /
+Triagem auditiva/olhinho/coração: normais/alterado
+Teste do pezinho: normal/alterado
+Vacinas BCG e hepatite B realizadas/não realizadas
+Alimentação:
+Aleitamento materno exclusivo, em livre demanda. Sem dificuldades. Pega adequada. Aleitamento misto mL de / horas, devido a
 
-Sempre que a idade for mencionada, registre em anos e meses (ou em meses e dias para lactentes < 2 anos).
-Em "Exame Físico", quando peso, altura, perímetro cefálico ou IMC forem citados, registre o valor exato e indique o percentil/escore-Z quando o profissional mencionar.
-Para vacinação, use a nomenclatura do calendário do PNI (BCG, hepatite B, pentavalente, VIP, VOP, pneumo 10, meningo C, rotavírus, tríplice viral, varicela, hepatite A, DTP, HPV).
-Em DNPM, organize por domínio (motor grosseiro, motor fino, linguagem, social) quando dados suficientes existirem.
-Inclua orientações antecipatórias (anticipatory guidance) na Conduta quando o profissional ditar — ex.: introdução alimentar, prevenção de acidentes, exposição a telas.`,
+Sono:
+Diurese/evacuações:
+Suplementação:
+Objetivo:
+Peso:    g | Altura:   cm | PC:   cm | Ganho ponderal por dia:
+Anictérico, afebril, acianótico.
+Pele corada, elástica, íntegra
+FAN normotensa | Cabeça simétrica, sem alterações
+Ap Cardiovascular: ritmo regular, 2 tempos, bulhas normofonéticas, sem sopros
+Ap Respiratório: MVRD, sem ruídos adventicios e sem esforço respiratório
+Abdome: normotenso, ruídos hidroaéreos presentes, não palpo visceromegalias, sem fácies de dor à palpação, cicatriz umbilical sem infecção
+Genitália masculina/feminina típica, compatível com idade, testículos em bolsa
+Reflexos presentes: sucção (até 4-6m), preensão palmar (até 4m), preensão plantar (até 15m), Moro (até 3-6m) e marcha (até 2m)
+Manobra de Barlow Ortolani negativa
+Realiza os marcos de desenvolvimento neuropsicomotor para idade
+Teste da cobertura e de Hirschberg (estrabismo) negativos/positivos   (aos 4m)
+
+Avaliação:
+Crescimento e desenvolvimento adequado/inadequado
+Aleitamento materno sem/com dificuldades (até 12m)
+Vacinas em dia/em atraso
+
+Plano:
+Oriento manter coto/cicatriz umbilical limpa e seca. (até 30d)
+Oriento introdução alimentar / alimentação saudável e escovação dentária (a partir 6m)
+Oriento próximas vacinas.
+Incentivo/forneço informativos sobre cuidados com o bebê, aleitamento materno, estímulos ao desenvolvimento neuro psicomotor e prevenção de acidentes.
+Prescrevo/mantenho vitamina D 400 UI até os 12 meses.
+Prescrevo/Ajusto/Mantenho sulfato ferroso, x gotas por dia e prescrevo/mantenho vitamina D 400 UI até os 12 meses / ajusto/mantenho vitamina D para 600 UI até os 24 meses.
+Converso sobre/prescrevo métodos contraceptivos maternos
+Oriento próxima consulta aos 30 dias / 2 / 4 / 6 / 9 / 12 / 18 meses de vida.`,
+    specialtyInstructions: `REPRODUZA A ESTRUTURA ACIMA EXATAMENTE COMO ESTÁ, mantendo a ordem, os rótulos e a quebra das linhas. NÃO use markdown (sem negrito, sem cabeçalhos com #, sem listas com hífen ou asteriscos).
+
+Preencha cada lacuna com os dados ditados pelo profissional. Quando um campo não foi citado, mantenha o rótulo com a lacuna em branco — não escreva "não informado", "sem dados" ou variações.
+
+Regras para os marcadores com barra (/), que indicam opções mutuamente excludentes:
+- "parto cesárea/normal": escolha apenas a opção correta e remova a outra (ex.: "parto cesárea, sem intercorrências").
+- "Triagem auditiva/olhinho/coração: normais/alterado": liste o resultado de cada triagem realizada; se todas normais, deixe "normais"; se alguma alterada, especifique qual ("olhinho alterado, demais normais").
+- "Teste do pezinho: normal/alterado": deixe apenas a opção citada.
+- "Vacinas BCG e hepatite B realizadas/não realizadas": mantenha somente a opção verdadeira.
+- "Aleitamento materno exclusivo... / Aleitamento misto mL de / horas, devido a": preserve a linha do tipo de aleitamento informado e remova a outra. Se misto, preencha o volume, o intervalo em horas e o motivo. Se complementar/fórmula exclusiva, escreva como tal.
+- "Genitália masculina/feminina típica, compatível com idade, testículos em bolsa": deixe apenas a forma compatível com o sexo. Em feminino, remova "testículos em bolsa".
+- "negativos/positivos", "adequado/inadequado", "sem/com dificuldades", "em dia/em atraso", "Prescrevo/Ajusto/Mantenho", "Incentivo/forneço", "coto/cicatriz", "introdução alimentar / alimentação saudável", etc.: mantenha somente a opção correta para o caso.
+
+Idade (primeira linha):
+- Para lactentes < 30 dias, escreva em dias (ex.: "Idade: 15 dias").
+- Entre 1 mês e 24 meses, escreva em meses e dias quando ditos (ex.: "Idade: 4 meses e 12 dias").
+- Acima de 24 meses, escreva em anos e meses (ex.: "Idade: 3 anos e 2 meses").
+
+Linhas condicionais por idade (marcadas entre parênteses no modelo, ex.: "(até 30d)", "(a partir 6m)", "(aos 4m)", "(até 12m)"):
+- Mantenha a linha apenas se a idade da criança estiver dentro da janela indicada.
+- Remova o marcador entre parênteses quando a linha for mantida (ex.: a linha sai como "Oriento manter coto/cicatriz umbilical limpa e seca." sem "(até 30d)").
+- Se a idade for posterior à janela, remova a linha inteira.
+
+Reflexos primitivos: mantenha na lista apenas os reflexos esperados para a idade conforme as janelas indicadas (sucção até 4-6m, preensão palmar até 4m, preensão plantar até 15m, Moro até 3-6m, marcha até 2m). Remova os parênteses ao manter o reflexo.
+
+Suplementação e prescrição: utilize a opção apropriada (Prescrevo/Ajusto/Mantenho) conforme o profissional. Para sulfato ferroso, preencha o número de gotas. Vitamina D segue dose por idade (400 UI até 12m; 600 UI até 24m).
+
+Exame físico: quando peso, altura, PC ou ganho ponderal forem citados, registre o valor exato. Se algum não for citado, mantenha o rótulo com a unidade ("Peso:    g") em branco.
+
+Vacinas: use a nomenclatura do calendário do PNI (BCG, hepatite B, pentavalente, VIP, VOP, pneumo 10, meningo C, rotavírus, tríplice viral, varicela, hepatite A, DTP, HPV).`,
     placeholderExample:
       "Ex.: Lactente de 6 meses em consulta de rotina, aleitamento materno exclusivo, ganho ponderal adequado...",
   },
