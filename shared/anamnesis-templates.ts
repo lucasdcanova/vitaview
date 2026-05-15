@@ -86,33 +86,94 @@ Não use bullets com hífen (-) nem asteriscos (*). Use apenas o formato literal
     id: "odontologia",
     label: "Odontologia",
     shortLabel: "Odontologia",
-    description: "Anamnese odontológica com exame intraoral, oclusão e plano de tratamento.",
+    description: "Evolução odontológica com antecedentes, exame intra/extraoral, oclusão e procedimento.",
     systemRoleDescription:
-      "Você é um cirurgião-dentista experiente em documentação odontológica clínica.",
-    structure: `- **Identificação**: Dados básicos do paciente (APENAS se mencionados)
-- **Queixa Principal Odontológica**: Motivo da consulta em palavras do paciente
-- **História da Doença Atual (HDA)**: Início, duração, característica e intensidade da dor; fatores de melhora/piora
-- **História Médica Pregressa**: Comorbidades sistêmicas relevantes (diabetes, hipertensão, distúrbios de coagulação, gestação)
-- **História Odontológica Pregressa**: Tratamentos anteriores, traumatismos, cirurgias odontológicas, ortodontia
-- **Higiene Bucal e Hábitos**: Frequência de escovação, uso de fio dental, enxaguante, bruxismo/apertamento, onicofagia
-- **Hábitos Sociais**: Tabagismo, etilismo, consumo cariogênico
-- **Medicamentos em Uso**: APENAS medicamentos citados
-- **Alergias**: Especialmente anestésicos, látex, AINEs e antibióticos
-- **Exame Extraoral**: Inspeção de face, ATM (estalido, dor, limitação), linfonodos, musculatura mastigatória
-- **Exame Intraoral**: Mucosa, língua, soalho bucal, palato, orofaringe, glândulas salivares
-- **Achados Dentais / Odontograma**: Dentes acometidos pelo número (FDI ou Universal), lesões de cárie, restaurações, ausências, mobilidade
-- **Avaliação Periodontal**: Higiene, sangramento à sondagem, presença de cálculo, bolsas, recessões
-- **Oclusão**: Classificação de Angle, mordida (cruzada, aberta, profunda), interferências
-- **Exames Complementares**: Radiografias periapicais, bitewing, panorâmica, tomografias mencionadas
-- **Diagnóstico Odontológico**: Hipóteses diagnósticas dos achados (ex.: cárie dentinária no 26, pulpite irreversível, periodontite estágio II)
-- **Plano de Tratamento**: Etapas terapêuticas em ordem de prioridade
-- **Conduta Imediata**: Prescrições, orientações, próximos passos e retorno`,
-    specialtyInstructions: `Omita seções sem dados — não inclua rótulos vazios nem comentários sobre ausência de informação.
+      "Você é um(a) cirurgião(ã)-dentista experiente em documentação clínica odontológica.",
+    structure: `# Comorbidades
+# Nega tabagismo e etilismo
+# Nega alergias (anestésicos, AINEs, ATB, látex) / Alergias:
+# Nega MUC / Em uso de:
+# Tratamentos odontológicos prévios:
+# Higiene oral: escovação x/dia, fio dental sim/não, enxaguante sim/não
+# Hábitos: nega bruxismo e apertamento / Bruxismo noturno/diurno, onicofagia
+# Última visita ao dentista:
 
-Use nomenclatura dental por número (notação FDI 11-48 ou Universal 1-32) sempre que o dente for citado.
-Em diagnósticos odontológicos, prefira termos como: cárie dentinária, pulpite reversível/irreversível, necrose pulpar, periapical aguda/crônica, gengivite, periodontite (estágio e grau quando possível), DTM (disfunção temporomandibular), bruxismo.
-Em medicações de prescrição odontológica habitual (amoxicilina, clindamicina, ibuprofeno, dipirona, paracetamol, clorexidina 0,12%), registre dose e duração quando mencionadas.
-Quando o profissional descrever um procedimento realizado em consulta, descreva-o em "Conduta Imediata" com técnica e materiais quando ditos.`,
+Subjetivo
+Queixa principal:
+HDA: dor espontânea/provocada, intensidade x/10, duração, fator desencadeante (frio/calor/doce/mastigação), melhora com analgésico sim/não, irradiação
+
+Objetivo
+Extraoral
+Face simétrica, sem alterações
+ATM sem estalido, sem dor à palpação, abertura bucal preservada
+Linfonodos cervicais não palpáveis
+Musculatura mastigatória sem dor à palpação
+
+Intraoral
+Mucosa jugal, labial e palatina sem alterações
+Língua e soalho bucal sem alterações
+Orofaringe sem alterações
+Glândulas salivares com fluxo preservado
+
+Achados dentais
+Dente XX:
+
+Periodontal
+Higiene: boa/regular/ruim | Biofilme: ausente/presente | Cálculo: ausente/presente | Sangramento à sondagem: ausente/presente | Recessões:
+
+Oclusão
+Classe de Angle: I/II/III | Mordida: normal/cruzada/aberta/profunda | Interferências:
+
+Exames complementares
+Radiografias (periapical/bitewing/panorâmica/CBCT):
+
+Impressão
+Hipótese diagnóstica:
+
+Conduta
+Procedimento realizado:
+Anestesia: lidocaína 2% c/ epinefrina 1:100.000 — x tubete(s)
+Material utilizado:
+Prescrições:
+Orientações: higiene oral, controle de biofilme, dieta, evitar mastigação no lado afetado por x horas
+Plano de tratamento (etapas):
+Retorno:`,
+    specialtyInstructions: `REPRODUZA A ESTRUTURA ACIMA EXATAMENTE COMO ESTÁ, mantendo a ordem das linhas, os marcadores "#" e a separação em parágrafos. NÃO use markdown (sem negrito, sem cabeçalhos com # do markdown, sem listas com hífen ou asteriscos).
+
+Os "#" no início das linhas do cabeçalho são marcadores fixos da evolução — preserve-os.
+
+Regras de preenchimento de cada item:
+- "# Comorbidades": liste as comorbidades sistêmicas citadas após o rótulo (ex.: "# Comorbidades: HAS, DM2 em uso de metformina"). Atenção especial a condições que alteram o manejo odontológico: diabetes, hipertensão, distúrbios de coagulação, gestação, uso de bifosfonatos/anticoagulantes, imunossupressão. Se nenhuma, deixe "# Sem comorbidades relevantes".
+- "# Nega tabagismo e etilismo": se NEGAR ambos, mantenha a linha. Se relatar algum, reescreva com o dado positivo (ex.: "# Tabagista 10 anos-maço, etilismo social").
+- "# Nega alergias (anestésicos, AINEs, ATB, látex) / Alergias:": se NEGAR, mantenha "# Nega alergias (anestésicos, AINEs, ATB, látex)". Se houver alergia, escreva "# Alergias: <substância> — <reação>" (ex.: "# Alergias: penicilina — rash cutâneo").
+- "# Nega MUC / Em uso de:": MUC = medicação de uso contínuo. Se NEGAR, deixe "# Nega MUC". Se em uso, escreva "# Em uso de: <medicações com dose e posologia>", destacando anticoagulantes, bifosfonatos e imunossupressores.
+- "# Tratamentos odontológicos prévios:": liste tratamentos relevantes (restaurações, endodontia, exodontia, ortodontia, implante, próteses). Se nenhum citado, deixe o rótulo em branco.
+- "# Higiene oral": substitua os marcadores pelos dados ditados (ex.: "# Higiene oral: escovação 3x/dia, fio dental sim, enxaguante não").
+- "# Hábitos: nega bruxismo e apertamento / Bruxismo noturno/diurno, onicofagia": mantenha a negativa default se o paciente negar. Se houver hábitos parafuncionais, reescreva com a descrição (ex.: "# Hábitos: bruxismo noturno, uso de placa miorrelaxante").
+- "# Última visita ao dentista:": registre a data ou o tempo relatado.
+
+Subjetivo:
+- "Queixa principal": frase curta com a queixa em palavras do paciente.
+- "HDA": substitua os marcadores "x/10", "espontânea/provocada", "frio/calor/doce/mastigação", "sim/não" pelos dados específicos do caso. Remova marcadores não aplicáveis. Se a consulta é de rotina/preventiva, registre "Consulta de rotina, sem queixas".
+
+Objetivo (Extraoral, Intraoral, Achados dentais, Periodontal, Oclusão, Exames complementares):
+- Mantenha as frases default das seções Extraoral e Intraoral quando o profissional confirmar normalidade ou não comentar alterações. Se houver alteração, substitua a frase específica.
+- Em "Achados dentais", liste cada dente envolvido com NUMERAÇÃO DENTAL (notação FDI 11-48 ou Universal 1-32) e o achado: cárie (oclusal, mesial, distal, vestibular, lingual), restauração (resina, amálgama, ionômero), endodontia prévia, ausência, mobilidade, fratura, lesão periapical. Pode haver várias linhas "Dente XX: ..." conforme necessário.
+- Em "Periodontal", substitua cada "a/b/c" pela opção apropriada. Se mediu profundidade de sondagem (PS), nível de inserção clínica (NIC) ou índice de sangramento, acrescente os valores.
+- Em "Oclusão", escolha a Classe de Angle, o tipo de mordida e descreva interferências quando houver.
+- Em "Exames complementares", registre os exames de imagem realizados ou solicitados e principais achados.
+
+Impressão:
+- Use diagnósticos odontológicos precisos: cárie dentinária, pulpite reversível/irreversível, necrose pulpar, periodontite apical aguda/crônica, abscesso periapical, gengivite, periodontite (estágio I-IV e grau A-C quando possível), DTM, bruxismo, recessão gengival, perda dentária parcial, etc. Sempre associe ao(s) dente(s) acometido(s).
+
+Conduta:
+- "Procedimento realizado": descreva o procedimento clínico em uma frase (ex.: "Restauração em resina composta classe I no 26 com isolamento absoluto"; "Tartarectomia supragengival com ultrassom em todos os quadrantes"; "Pulpectomia de urgência no 36").
+- "Anestesia": preencha tipo, concentração, vasoconstritor e número de tubetes. Remova a linha se nenhum procedimento anestésico foi feito.
+- "Material utilizado": liste materiais relevantes (resina A2/A3, ionômero, amálgama, hidróxido de cálcio, cimento provisório). Remova a linha se não aplicável.
+- "Prescrições": medicações com dose, intervalo e duração. Use prescrições odontológicas habituais (amoxicilina 500mg 8/8h por 7d; clindamicina 300mg 8/8h por 7d; ibuprofeno 600mg 8/8h por 3d; dipirona 1g se dor; paracetamol 750mg 6/6h se dor; clorexidina 0,12% bochecho 2x/dia por 7d).
+- "Orientações": ajuste conforme o procedimento (evitar mastigação no lado tratado, dieta líquida/pastosa fria, compressa fria, não cuspir, escovação suave).
+- "Plano de tratamento (etapas)": numere as etapas terapêuticas em ordem de prioridade quando o profissional ditar (1. controle de placa e raspagem; 2. tratamento das cáries; 3. reabilitação protética; etc.).
+- "Retorno": data, intervalo (ex.: "Retorno em 7 dias para remoção de sutura") ou condição.`,
     placeholderExample:
       "Ex.: Paciente refere dor espontânea no dente 36 há 3 dias, piora ao frio, sem melhora com analgésico...",
   },
