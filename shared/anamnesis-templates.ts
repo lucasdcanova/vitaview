@@ -1,4 +1,5 @@
 export type AnamnesisTemplateId =
+  | "em-branco"
   | "clinica-geral"
   | "odontologia"
   | "puericultura"
@@ -19,6 +20,22 @@ export interface AnamnesisTemplateConfig extends AnamnesisTemplateOption {
 }
 
 const ANAMNESIS_TEMPLATES_RECORD: Record<AnamnesisTemplateId, AnamnesisTemplateConfig> = {
+  "em-branco": {
+    id: "em-branco",
+    label: "Em branco",
+    shortLabel: "Em branco",
+    description: "Sem estrutura imposta — texto livre organizado de forma natural.",
+    systemRoleDescription:
+      "Você é um(a) profissional de saúde experiente em documentação clínica.",
+    structure: `- Texto livre, sem seções pré-definidas
+- Organize as informações na ordem em que fizerem mais sentido clinicamente
+- Use parágrafos curtos e diretos`,
+    specialtyInstructions:
+      "Não imponha um modelo SOAP nem títulos de seção. Escreva como uma evolução clínica corrida, em parágrafos, preservando todas as informações relevantes da consulta.",
+    placeholderExample:
+      "Ex.: descreva livremente a consulta — queixa, achados, conduta...",
+  },
+
   "clinica-geral": {
     id: "clinica-geral",
     label: "Clínica geral",
@@ -162,7 +179,7 @@ export const ANAMNESIS_TEMPLATE_OPTIONS: AnamnesisTemplateOption[] = ANAMNESIS_T
   }
 );
 
-export const DEFAULT_ANAMNESIS_TEMPLATE_ID: AnamnesisTemplateId = "clinica-geral";
+export const DEFAULT_ANAMNESIS_TEMPLATE_ID: AnamnesisTemplateId = "em-branco";
 
 export function isAnamnesisTemplateId(value: unknown): value is AnamnesisTemplateId {
   return typeof value === "string" && value in ANAMNESIS_TEMPLATES_RECORD;

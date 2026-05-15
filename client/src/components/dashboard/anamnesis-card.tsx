@@ -958,29 +958,26 @@ export function AnamnesisCard() {
         <div className={isMobile ? "space-y-4" : "space-y-8"}>
             <Card className="border border-border shadow-md">
                 <CardHeader className={`flex flex-col ${isMobile ? 'gap-2 pb-3' : 'gap-4'}`}>
-                    <div className={`flex ${isMobile ? 'flex-col items-start gap-2' : 'flex-row items-center justify-between gap-4'}`}>
+                    <div className={`flex items-center ${isMobile ? 'gap-2 flex-wrap' : 'gap-3'}`}>
                         <CardTitle className={`text-foreground ${isMobile ? 'text-lg' : 'text-2xl'}`}>Anamnese inteligente</CardTitle>
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Padrão</span>
-                            <Select value={anamnesisTemplate} onValueChange={handleSelectAnamnesisTemplate}>
-                                <SelectTrigger
-                                    className={`${isMobile ? 'h-9 w-full text-sm' : 'h-9 w-[210px] text-sm'} rounded-lg border-border bg-background`}
-                                    aria-label="Padrão de anamnese"
-                                >
-                                    <SelectValue placeholder="Selecione um padrão" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {ANAMNESIS_TEMPLATE_OPTIONS.map((option) => (
-                                        <SelectItem key={option.id} value={option.id}>
-                                            <div className="flex flex-col">
-                                                <span className="text-sm font-medium leading-tight">{option.label}</span>
-                                                <span className="text-xs text-muted-foreground leading-tight">{option.description}</span>
-                                            </div>
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
+                        <Select value={anamnesisTemplate} onValueChange={handleSelectAnamnesisTemplate}>
+                            <SelectTrigger
+                                className={`${isMobile ? 'h-8 text-sm' : 'h-9 text-sm'} w-auto min-w-[140px] rounded-lg border-border bg-background gap-2`}
+                                aria-label="Padrão de anamnese"
+                            >
+                                <SelectValue placeholder="Selecione um padrão" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {ANAMNESIS_TEMPLATE_OPTIONS.map((option) => (
+                                    <SelectItem key={option.id} value={option.id}>
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-medium leading-tight">{option.label}</span>
+                                            <span className="text-xs text-muted-foreground leading-tight">{option.description}</span>
+                                        </div>
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
 
                     {/* Destaque para gravação de consulta */}
