@@ -256,7 +256,9 @@ export function AnamnesisCard() {
     const editorRef = useRef<HTMLDivElement | null>(null);
     const isUpdatingFromEditorRef = useRef(false);
     const anamnesisPlainText = stripClinicalHtml(anamnesisText).trim();
-    const anamnesisTemplatePlaceholder = getAnamnesisTemplate(anamnesisTemplate).placeholderExample;
+    const anamnesisTemplatePlaceholder =
+        getAnamnesisTemplate(anamnesisTemplate).placeholderExample ||
+        "Escreva ou grave a consulta...";
 
     // Restaurar template selecionado (persiste por usuário, não por paciente)
     useEffect(() => {

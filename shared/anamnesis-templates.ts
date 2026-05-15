@@ -17,6 +17,7 @@ export interface AnamnesisTemplateConfig extends AnamnesisTemplateOption {
   structure: string;
   specialtyInstructions: string;
   placeholderExample: string;
+  freeForm?: boolean;
 }
 
 const ANAMNESIS_TEMPLATES_RECORD: Record<AnamnesisTemplateId, AnamnesisTemplateConfig> = {
@@ -24,16 +25,13 @@ const ANAMNESIS_TEMPLATES_RECORD: Record<AnamnesisTemplateId, AnamnesisTemplateC
     id: "em-branco",
     label: "Em branco",
     shortLabel: "Em branco",
-    description: "Sem estrutura imposta — texto livre organizado de forma natural.",
+    description: "Sem padrão — texto da consulta sem qualquer estrutura.",
     systemRoleDescription:
       "Você é um(a) profissional de saúde experiente em documentação clínica.",
-    structure: `- Texto livre, sem seções pré-definidas
-- Organize as informações na ordem em que fizerem mais sentido clinicamente
-- Use parágrafos curtos e diretos`,
-    specialtyInstructions:
-      "Não imponha um modelo SOAP nem títulos de seção. Escreva como uma evolução clínica corrida, em parágrafos, preservando todas as informações relevantes da consulta.",
-    placeholderExample:
-      "Ex.: descreva livremente a consulta — queixa, achados, conduta...",
+    structure: "",
+    specialtyInstructions: "",
+    placeholderExample: "",
+    freeForm: true,
   },
 
   "clinica-geral": {
