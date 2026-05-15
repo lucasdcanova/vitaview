@@ -38,23 +38,46 @@ const ANAMNESIS_TEMPLATES_RECORD: Record<AnamnesisTemplateId, AnamnesisTemplateC
     id: "clinica-geral",
     label: "Clínica geral",
     shortLabel: "Clínica geral",
-    description: "Modelo SOAP padrão para consultas clínicas gerais.",
+    description: "Modelo SOAP com cabeçalho de antecedentes e exame físico segmentar.",
     systemRoleDescription:
       "Você é um médico clínico geral com vasta experiência em documentação clínica.",
-    structure: `- **Identificação**: Dados básicos do paciente (APENAS se mencionados)
-- **Queixa Principal (QP)**: Motivo da consulta em palavras do paciente
-- **História da Doença Atual (HDA)**: Evolução cronológica dos sintomas
-- **Interrogatório Sintomatológico**: APENAS sintomas positivos
-- **História Patológica Pregressa (HPP)**: APENAS se relatada
-- **História Familiar (HF)**: APENAS se relatada
-- **História Social (HS)**: OMITIR se não houver dados
-- **Medicamentos em Uso**: APENAS medicamentos citados
-- **Alergias**: APENAS se houver relato
-- **Exame Físico**: APENAS achados mencionados
-- **Impressão Diagnóstica**: Hipóteses diagnósticas
-- **Conduta**: Plano terapêutico e orientações`,
-    specialtyInstructions:
-      "Use terminologia clínica geral. Diferencie hipótese diagnóstica de diagnóstico estabelecido no campo notes.",
+    structure: `# Comorbidades
+# Nega tabagismo, etilismo e UDI
+# Nega alergia medicamentosa / Alergias:
+# Nega MUC / Em uso de:
+
+Subjetivo
+
+Objetivo
+BEG, LOC, MUCAA
+Ectoscopia:
+Oroscopia:
+Otoscopia:
+Ap resp:
+Ap card:
+Abdome:
+MMII:
+
+Impressão
+
+Conduta`,
+    specialtyInstructions: `REPRODUZA A ESTRUTURA ACIMA EXATAMENTE COMO ESTÁ, mesmo que não haja dados em alguma seção — não omita linhas, não troque rótulos, não use markdown extra (sem negrito, sem cabeçalhos com #s do markdown).
+
+Os "#" no início das primeiras linhas são marcadores fixos da anamnese — preserve-os.
+
+Regras de preenchimento de cada item:
+- "# Comorbidades": liste cada comorbidade citada após o rótulo (ex.: "# Comorbidades: HAS, DM2"). Se nenhuma foi citada, mantenha "# Comorbidades" sem complemento.
+- "# Nega tabagismo, etilismo e UDI": se o paciente NEGAR todos, mantenha a linha como está. Se relatar algum, reescreva a linha com o dado positivo (ex.: "# Tabagista 10 anos-maço, etilismo social, nega UDI").
+- "# Nega alergia medicamentosa / Alergias:": se NEGAR, deixe "# Nega alergia medicamentosa". Se houver alergia, escreva "# Alergias: <lista>".
+- "# Nega MUC / Em uso de:": MUC = medicação de uso contínuo. Se NEGAR, deixe "# Nega MUC". Se em uso, escreva "# Em uso de: <medicações com dose e posologia>".
+
+Seções SOAP:
+- "Subjetivo": queixa principal e HDA do paciente em texto corrido (1–3 parágrafos curtos).
+- "Objetivo": comece com "BEG, LOC, MUCAA" (mantenha a linha mesmo se não dito explicitamente) e preencha cada aparelho/segmento abaixo. Se um aparelho não foi examinado/comentado, mantenha o rótulo com "sem alterações" apenas se o profissional indicar normalidade; caso contrário, deixe o rótulo sem complemento.
+- "Impressão": hipóteses diagnósticas em lista curta ou frase única, com CID-10 entre parênteses quando aplicável.
+- "Conduta": numere as ações terapêuticas, prescrições, exames solicitados e retorno.
+
+Não use bullets com hífen (-) nem asteriscos (*). Use apenas o formato literal acima.`,
     placeholderExample:
       "Ex.: Paciente em acompanhamento por hipertensão controlada com losartana 50mg...",
   },
@@ -84,7 +107,9 @@ const ANAMNESIS_TEMPLATES_RECORD: Record<AnamnesisTemplateId, AnamnesisTemplateC
 - **Diagnóstico Odontológico**: Hipóteses diagnósticas dos achados (ex.: cárie dentinária no 26, pulpite irreversível, periodontite estágio II)
 - **Plano de Tratamento**: Etapas terapêuticas em ordem de prioridade
 - **Conduta Imediata**: Prescrições, orientações, próximos passos e retorno`,
-    specialtyInstructions: `Use nomenclatura dental por número (notação FDI 11-48 ou Universal 1-32) sempre que o dente for citado.
+    specialtyInstructions: `Omita seções sem dados — não inclua rótulos vazios nem comentários sobre ausência de informação.
+
+Use nomenclatura dental por número (notação FDI 11-48 ou Universal 1-32) sempre que o dente for citado.
 Em diagnósticos odontológicos, prefira termos como: cárie dentinária, pulpite reversível/irreversível, necrose pulpar, periapical aguda/crônica, gengivite, periodontite (estágio e grau quando possível), DTM (disfunção temporomandibular), bruxismo.
 Em medicações de prescrição odontológica habitual (amoxicilina, clindamicina, ibuprofeno, dipirona, paracetamol, clorexidina 0,12%), registre dose e duração quando mencionadas.
 Quando o profissional descrever um procedimento realizado em consulta, descreva-o em "Conduta Imediata" com técnica e materiais quando ditos.`,
@@ -117,7 +142,9 @@ Quando o profissional descrever um procedimento realizado em consulta, descreva-
 - **Avaliação de Crescimento e Desenvolvimento**: Adequação para a idade conforme curvas da OMS; classificação de DNPM (adequado/com atraso)
 - **Impressão**: Lactente/criança hígido(a) ou em acompanhamento de condição específica
 - **Conduta**: Orientações de alimentação, sono, segurança, prevenção de acidentes; suplementação (vitamina D, ferro); vacinas a aplicar; retorno`,
-    specialtyInstructions: `Sempre que a idade for mencionada, registre em anos e meses (ou em meses e dias para lactentes < 2 anos).
+    specialtyInstructions: `Omita seções sem dados — não inclua rótulos vazios nem comentários sobre ausência de informação.
+
+Sempre que a idade for mencionada, registre em anos e meses (ou em meses e dias para lactentes < 2 anos).
 Em "Exame Físico", quando peso, altura, perímetro cefálico ou IMC forem citados, registre o valor exato e indique o percentil/escore-Z quando o profissional mencionar.
 Para vacinação, use a nomenclatura do calendário do PNI (BCG, hepatite B, pentavalente, VIP, VOP, pneumo 10, meningo C, rotavírus, tríplice viral, varicela, hepatite A, DTP, HPV).
 Em DNPM, organize por domínio (motor grosseiro, motor fino, linguagem, social) quando dados suficientes existirem.
@@ -150,7 +177,9 @@ Inclua orientações antecipatórias (anticipatory guidance) na Conduta quando o
 - **Vacinação**: dTpa, hepatite B, influenza, COVID-19 quando indicado
 - **Avaliação / Impressão**: Gestação tópica única (ou múltipla), idade gestacional, classificação de risco (habitual / alto risco) com justificativa
 - **Conduta**: Prescrições, suplementação, solicitação de exames, orientações (sinais de alerta, atividade física, alimentação, atividade sexual), agendamento de retorno`,
-    specialtyInstructions: `Sempre que IG (idade gestacional) for mencionada, registre em semanas e dias (ex.: "24s 3d").
+    specialtyInstructions: `Omita seções sem dados — não inclua rótulos vazios nem comentários sobre ausência de informação.
+
+Sempre que IG (idade gestacional) for mencionada, registre em semanas e dias (ex.: "24s 3d").
 Quando DUM for citada, calcule e mencione a DPP pela regra de Naegele apenas se o profissional não tiver dito a DPP; caso contrário, use a DPP ditada.
 Paridade deve sempre seguir o formato G_P_A_ (gestações, partos, abortos); detalhe partos vaginais/cesárea quando informado.
 Em "Exame Físico", registre AU (altura uterina) em cm e BCF em bpm quando ditos. Para PA, registre o valor exato citado.
