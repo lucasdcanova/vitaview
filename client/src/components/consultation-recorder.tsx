@@ -29,15 +29,13 @@ import {
   formatRecordingTime,
   useConsultationRecording,
 } from "@/hooks/use-consultation-recording";
-import type { AnamnesisTemplateId } from "@shared/anamnesis-templates";
-
 interface ConsultationRecorderProps {
   profileId?: number;
   patientName?: string | null;
   disabled?: boolean;
   className?: string;
   returnPath?: string;
-  anamnesisTemplate?: AnamnesisTemplateId;
+  anamnesisTemplate?: string;
 }
 
 export function ConsultationRecorder({

@@ -38,6 +38,9 @@ import { Save,
   RemoveFormatting,
   Undo2,
   Redo2,
+  Pencil,
+  Plus,
+  RotateCcw,
 } from "lucide-react";
 import { ConsultationRecorder } from "@/components/consultation-recorder";
 import { BrandLoader } from "@/components/ui/brand-loader";
@@ -45,13 +48,15 @@ import { useConsultationRecording } from "@/hooks/use-consultation-recording";
 import { useAuth } from "@/hooks/use-auth";
 import { ExamUploadLauncher } from "@/components/exams/exam-upload-launcher";
 import { normalizeClinicalContent, plainTextToClinicalHtml, stripClinicalHtml } from "@shared/clinical-rich-text";
+import { DEFAULT_ANAMNESIS_TEMPLATE_ID } from "@shared/anamnesis-templates";
 import {
-  ANAMNESIS_TEMPLATE_OPTIONS,
-  DEFAULT_ANAMNESIS_TEMPLATE_ID,
-  getAnamnesisTemplate,
-  normalizeAnamnesisTemplateId,
-  type AnamnesisTemplateId,
-} from "@shared/anamnesis-templates";
+  useAnamnesisTemplates,
+  type ResolvedAnamnesisTemplate,
+} from "@/hooks/use-anamnesis-templates";
+import {
+  AnamnesisTemplateEditorDialog,
+  type AnamnesisTemplateEditorMode,
+} from "@/components/dashboard/anamnesis-template-editor";
 
 type ExtractedDiagnosis = {
     cidCode?: string;
@@ -113,7 +118,7 @@ type ApplyExtractionResult = {
 type AnamnesisDraft = {
     text: string;
     extractedRecord: ExtractedRecord | null;
-    templateId?: AnamnesisTemplateId | null;
+    templateId?: string | null;
 };
 
 const getAnamnesisDraftStorageKey = (profileId: number, userId?: number | null) =>
@@ -130,7 +135,7 @@ const readAnamnesisDraft = (profileId: number, userId?: number | null): Anamnesi
         return {
             text: typeof parsed?.text === "string" ? parsed.text : "",
             extractedRecord: parsed?.extractedRecord ? normalizeExtractedRecord(parsed.extractedRecord) : null,
-            templateId: typeof parsed?.templateId === "string" ? (parsed.templateId as AnamnesisTemplateId) : null,
+            templateId: typeof parsed?.templateId === "string" ? parsed.templateId : null,
         };
     } catch {
         return null;
@@ -160,27 +165,26 @@ const clearAnamnesisDraft = (profileId: number, userId?: number | null) => {
 const getAnamnesisTemplateStorageKey = (userId?: number | null) =>
     `anamnese-template-${userId ?? "anon"}`;
 
-const readAnamnesisTemplate = (userId?: number | null): AnamnesisTemplateId => {
+const readAnamnesisTemplateKey = (userId?: number | null): string => {
     if (typeof window === "undefined") return DEFAULT_ANAMNESIS_TEMPLATE_ID;
     try {
         const raw = window.localStorage.getItem(getAnamnesisTemplateStorageKey(userId));
-        return normalizeAnamnesisTemplateId(raw);
+        return raw && raw.trim() ? raw.trim() : DEFAULT_ANAMNESIS_TEMPLATE_ID;
     } catch {
         return DEFAULT_ANAMNESIS_TEMPLATE_ID;
     }
 };
 
-const writeAnamnesisTemplate = (templateId: AnamnesisTemplateId, userId?: number | null) => {
+const writeAnamnesisTemplateKey = (templateKey: string, userId?: number | null) => {
     if (typeof window === "undefined") return;
     try {
-        window.localStorage.setItem(getAnamnesisTemplateStorageKey(userId), templateId);
+        window.localStorage.setItem(getAnamnesisTemplateStorageKey(userId), templateKey);
     } catch {
         // Best-effort persistence
     }
 };
 
-const buildTemplateHtml = (templateId: AnamnesisTemplateId): string => {
-    const structure = getAnamnesisTemplate(templateId).structure;
+const buildTemplateHtmlFromStructure = (structure: string): string => {
     if (!structure.trim()) return "";
     return plainTextToClinicalHtml(structure);
 };
@@ -258,8 +262,12 @@ export function AnamnesisCard() {
     const [anamnesisText, setAnamnesisText] = useState("");
     const [extractedRecord, setExtractedRecord] = useState<ExtractedRecord | null>(null);
     const [isApplyingExtraction, setIsApplyingExtraction] = useState(false);
-    const [anamnesisTemplate, setAnamnesisTemplateState] = useState<AnamnesisTemplateId>(DEFAULT_ANAMNESIS_TEMPLATE_ID);
-    const appliedTemplateRef = useRef<AnamnesisTemplateId | null>(null);
+    const [anamnesisTemplate, setAnamnesisTemplateState] = useState<string>(DEFAULT_ANAMNESIS_TEMPLATE_ID);
+    const appliedTemplateRef = useRef<string | null>(null);
+    const { templates: availableTemplates, resolveByKey, deleteTemplate } = useAnamnesisTemplates();
+    const [editorMode, setEditorMode] = useState<AnamnesisTemplateEditorMode | null>(null);
+    const [editorOpen, setEditorOpen] = useState(false);
+    const activeResolvedTemplate = resolveByKey(anamnesisTemplate);
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const { activeProfile, inServiceAppointmentId, clearPatientInService } = useProfiles();
@@ -271,22 +279,23 @@ export function AnamnesisCard() {
     const isUpdatingFromEditorRef = useRef(false);
     const anamnesisPlainText = stripClinicalHtml(anamnesisText).trim();
     const anamnesisTemplatePlaceholder =
-        getAnamnesisTemplate(anamnesisTemplate).placeholderExample ||
+        activeResolvedTemplate.placeholderExample ||
         "Escreva ou grave a consulta...";
 
     // Restaurar template selecionado (persiste por usuário, não por paciente)
     useEffect(() => {
-        setAnamnesisTemplateState(readAnamnesisTemplate(user?.id));
+        setAnamnesisTemplateState(readAnamnesisTemplateKey(user?.id));
     }, [user?.id]);
 
-    const handleSelectAnamnesisTemplate = (value: string) => {
-        const normalized = normalizeAnamnesisTemplateId(value);
-        const newTemplateHtml = buildTemplateHtml(normalized);
+    const applyTemplateByKey = (key: string) => {
+        const resolved = resolveByKey(key);
+        const newTemplateHtml = buildTemplateHtmlFromStructure(resolved.structure);
         const newTemplatePlain = normalizePlainTextForCompare(newTemplateHtml);
         const currentPlain = normalizePlainTextForCompare(anamnesisText);
-        const previousTemplateId = appliedTemplateRef.current;
-        const previousTemplatePlain = previousTemplateId
-            ? normalizePlainTextForCompare(buildTemplateHtml(previousTemplateId))
+        const previousKey = appliedTemplateRef.current;
+        const previousResolved = previousKey ? resolveByKey(previousKey) : null;
+        const previousTemplatePlain = previousResolved
+            ? normalizePlainTextForCompare(buildTemplateHtmlFromStructure(previousResolved.structure))
             : "";
 
         const editorIsEmpty = currentPlain.length === 0;
@@ -300,15 +309,80 @@ export function AnamnesisCard() {
                 "Substituir o texto atual pelo padrão selecionado? O conteúdo digitado será perdido."
             );
 
-        if (!shouldReplace) {
-            return;
-        }
+        if (!shouldReplace) return false;
 
-        setAnamnesisTemplateState(normalized);
-        writeAnamnesisTemplate(normalized, user?.id);
+        setAnamnesisTemplateState(resolved.key);
+        writeAnamnesisTemplateKey(resolved.key, user?.id);
         setAnamnesisText(newTemplateHtml);
         setExtractedRecord(null);
-        appliedTemplateRef.current = newTemplatePlain ? normalized : null;
+        appliedTemplateRef.current = newTemplatePlain ? resolved.key : null;
+        return true;
+    };
+
+    const handleSelectAnamnesisTemplate = (value: string) => {
+        applyTemplateByKey(value);
+    };
+
+    const handleOpenCreateTemplate = () => {
+        setEditorMode({ kind: "create" });
+        setEditorOpen(true);
+    };
+
+    const handleOpenEditTemplate = () => {
+        setEditorMode({ kind: "edit", template: activeResolvedTemplate });
+        setEditorOpen(true);
+    };
+
+    const handleTemplateSaved = (saved: { key: string; label: string; structure: string }) => {
+        setAnamnesisTemplateState(saved.key);
+        writeAnamnesisTemplateKey(saved.key, user?.id);
+        const newHtml = buildTemplateHtmlFromStructure(saved.structure);
+        setAnamnesisText(newHtml);
+        appliedTemplateRef.current = newHtml ? saved.key : null;
+    };
+
+    const handleRestoreOriginalTemplate = async () => {
+        const target = activeResolvedTemplate;
+        if (target.source !== "override" || !target.rowId) return;
+        if (!window.confirm(`Restaurar o padrão "${target.label}" para a versão original? Sua personalização será removida.`)) {
+            return;
+        }
+        try {
+            await deleteTemplate(target.rowId);
+            toast({ title: "Padrão restaurado", description: "Voltou para a versão original." });
+            // Após restaurar, reaplicar o template (que agora vem do built-in)
+            const baseKey = target.baseTemplateId ?? DEFAULT_ANAMNESIS_TEMPLATE_ID;
+            setAnamnesisTemplateState(baseKey);
+            writeAnamnesisTemplateKey(baseKey, user?.id);
+            appliedTemplateRef.current = null;
+        } catch (error: any) {
+            toast({
+                title: "Erro ao restaurar",
+                description: error?.message ?? "Não foi possível restaurar o padrão.",
+                variant: "destructive",
+            });
+        }
+    };
+
+    const handleDeleteCustomTemplate = async () => {
+        const target = activeResolvedTemplate;
+        if (target.source !== "custom" || !target.rowId) return;
+        if (!window.confirm(`Excluir o padrão "${target.label}"? Esta ação não pode ser desfeita.`)) {
+            return;
+        }
+        try {
+            await deleteTemplate(target.rowId);
+            toast({ title: "Padrão excluído", description: `"${target.label}" foi removido.` });
+            setAnamnesisTemplateState(DEFAULT_ANAMNESIS_TEMPLATE_ID);
+            writeAnamnesisTemplateKey(DEFAULT_ANAMNESIS_TEMPLATE_ID, user?.id);
+            appliedTemplateRef.current = null;
+        } catch (error: any) {
+            toast({
+                title: "Erro ao excluir",
+                description: error?.message ?? "Não foi possível excluir o padrão.",
+                variant: "destructive",
+            });
+        }
     };
 
     // Restaurar rascunho quando o paciente mudar ou quando o componente montar novamente
@@ -341,19 +415,20 @@ export function AnamnesisCard() {
         }
 
         const hasDraftText = Boolean(stripClinicalHtml(draft?.text ?? "").trim());
-        const selectedTemplate = readAnamnesisTemplate(user?.id);
+        const selectedKey = readAnamnesisTemplateKey(user?.id);
+        const selectedResolved = resolveByKey(selectedKey);
 
         if (hasDraftText) {
             setAnamnesisText(normalizeClinicalContent(draft?.text ?? ""));
             setExtractedRecord(draft?.extractedRecord ?? null);
             appliedTemplateRef.current = draft?.templateId ?? null;
         } else {
-            const templateHtml = buildTemplateHtml(selectedTemplate);
+            const templateHtml = buildTemplateHtmlFromStructure(selectedResolved.structure);
             setAnamnesisText(templateHtml);
             setExtractedRecord(null);
-            appliedTemplateRef.current = templateHtml ? selectedTemplate : null;
+            appliedTemplateRef.current = templateHtml ? selectedResolved.key : null;
         }
-    }, [activeProfile?.id, user?.id]);
+    }, [activeProfile?.id, user?.id, resolveByKey]);
 
     // Persistir rascunho para sobreviver à troca de abas e páginas
     useEffect(() => {
@@ -887,9 +962,9 @@ export function AnamnesisCard() {
             if (activeProfile?.id && !shouldPreserveExtractedRecord) {
                 clearAnamnesisDraft(activeProfile.id, user?.id);
             }
-            const templateHtml = buildTemplateHtml(anamnesisTemplate);
+            const templateHtml = buildTemplateHtmlFromStructure(activeResolvedTemplate.structure);
             setAnamnesisText(templateHtml);
-            appliedTemplateRef.current = templateHtml ? anamnesisTemplate : null;
+            appliedTemplateRef.current = templateHtml ? activeResolvedTemplate.key : null;
             setExtractedRecord(shouldPreserveExtractedRecord ? (applyResult?.remainingRecord || variables.recordToApply || null) : null);
         },
         onError: (error: any) => {
@@ -1007,9 +1082,9 @@ export function AnamnesisCard() {
         if (activeProfile?.id) {
             clearAnamnesisDraft(activeProfile.id, user?.id);
         }
-        const templateHtml = buildTemplateHtml(anamnesisTemplate);
+        const templateHtml = buildTemplateHtmlFromStructure(activeResolvedTemplate.structure);
         setAnamnesisText(templateHtml);
-        appliedTemplateRef.current = templateHtml ? anamnesisTemplate : null;
+        appliedTemplateRef.current = templateHtml ? activeResolvedTemplate.key : null;
         setExtractedRecord(null);
     };
 
@@ -1017,7 +1092,7 @@ export function AnamnesisCard() {
         <div className={isMobile ? "space-y-4" : "space-y-8"}>
             <Card className="border border-border shadow-md">
                 <CardHeader className={`flex flex-col ${isMobile ? 'gap-2 pb-3' : 'gap-4'}`}>
-                    <div className={`flex items-center ${isMobile ? 'gap-2 flex-wrap' : 'gap-3'}`}>
+                    <div className={`flex items-center ${isMobile ? 'gap-2 flex-wrap' : 'gap-2'}`}>
                         <CardTitle className={`text-foreground ${isMobile ? 'text-lg' : 'text-2xl'}`}>Anamnese inteligente</CardTitle>
                         <Select value={anamnesisTemplate} onValueChange={handleSelectAnamnesisTemplate}>
                             <SelectTrigger
@@ -1025,20 +1100,75 @@ export function AnamnesisCard() {
                                 aria-label="Padrão de anamnese"
                             >
                                 <SelectValue placeholder="Selecione um padrão">
-                                    {getAnamnesisTemplate(anamnesisTemplate).label}
+                                    {activeResolvedTemplate.label}
                                 </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
-                                {ANAMNESIS_TEMPLATE_OPTIONS.map((option) => (
-                                    <SelectItem key={option.id} value={option.id}>
+                                {availableTemplates.map((option) => (
+                                    <SelectItem key={option.key} value={option.key}>
                                         <div className="flex flex-col">
-                                            <span className="text-sm font-medium leading-tight">{option.label}</span>
+                                            <span className="text-sm font-medium leading-tight flex items-center gap-2">
+                                                {option.label}
+                                                {option.source !== "builtin" && (
+                                                    <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
+                                                        Personalizado
+                                                    </span>
+                                                )}
+                                            </span>
                                             <span className="text-xs text-muted-foreground leading-tight">{option.description}</span>
                                         </div>
                                     </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
+                        <FeatureGate feature="anamnesis-template-editor">
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-9 w-9"
+                                title={activeResolvedTemplate.source === "builtin" ? "Personalizar este padrão" : "Editar padrão"}
+                                onClick={handleOpenEditTemplate}
+                            >
+                                <Pencil className="h-4 w-4" />
+                            </Button>
+                        </FeatureGate>
+                        <FeatureGate feature="anamnesis-template-editor">
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-9 w-9"
+                                title="Criar novo padrão"
+                                onClick={handleOpenCreateTemplate}
+                            >
+                                <Plus className="h-4 w-4" />
+                            </Button>
+                        </FeatureGate>
+                        {activeResolvedTemplate.source === "override" && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-9 gap-1 text-xs"
+                                onClick={handleRestoreOriginalTemplate}
+                            >
+                                <RotateCcw className="h-3.5 w-3.5" />
+                                Restaurar original
+                            </Button>
+                        )}
+                        {activeResolvedTemplate.source === "custom" && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-9 gap-1 text-xs text-destructive hover:text-destructive"
+                                onClick={handleDeleteCustomTemplate}
+                            >
+                                <X className="h-3.5 w-3.5" />
+                                Excluir padrão
+                            </Button>
+                        )}
                     </div>
 
                     {/* Destaque para gravação de consulta */}
@@ -1615,6 +1745,13 @@ export function AnamnesisCard() {
                     </CardContent>
                 </Card>
             )}
+
+            <AnamnesisTemplateEditorDialog
+                open={editorOpen}
+                onOpenChange={setEditorOpen}
+                mode={editorMode}
+                onSaved={handleTemplateSaved}
+            />
         </div>
     );
 }

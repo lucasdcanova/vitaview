@@ -4,6 +4,7 @@ import type { HealthMetric } from "@shared/schema";
 import { CID10_DATABASE } from "@shared/data/cid10-database";
 import {
   getAnamnesisTemplate,
+  type AnamnesisTemplateConfig,
   type AnamnesisTemplateId,
 } from "@shared/anamnesis-templates";
 import type { IStorage } from "../storage";
@@ -2770,7 +2771,7 @@ export async function transcribeConsultationAudio(audioBuffer: Buffer, mimeType:
  * @param patientData Dados do paciente para contextualização
  * @returns Anamnese formatada profissionalmente
  */
-export async function processTranscriptionToAnamnesis(transcription: string, patientData?: any, userId?: number, clinicId?: number, templateId?: AnamnesisTemplateId | string | null): Promise<{
+export async function processTranscriptionToAnamnesis(transcription: string, patientData?: any, userId?: number, clinicId?: number, templateOrId?: AnamnesisTemplateConfig | AnamnesisTemplateId | string | null): Promise<{
   anamnesis: string;
   extractedData: {
     summary: string;
@@ -2787,7 +2788,10 @@ export async function processTranscriptionToAnamnesis(transcription: string, pat
 
   const encounterDate = getTodayIsoDate();
   const patientContext = patientData ? formatPatientContext(patientData) : "";
-  const template = getAnamnesisTemplate(templateId);
+  const template: AnamnesisTemplateConfig =
+    templateOrId && typeof templateOrId === "object"
+      ? templateOrId
+      : getAnamnesisTemplate(templateOrId);
 
   const taskDescription = template.freeForm
     ? `Sua tarefa é transformar a transcrição de uma consulta em um registro clínico em texto corrido, **sem usar nenhum padrão de anamnese, seções, títulos ou modelos estruturados**. Apenas organize o que foi dito em parágrafos naturais.`
@@ -2967,12 +2971,15 @@ ${transcription.trim()}`,
  * @param text Texto original da anamnese
  * @returns Texto melhorado
  */
-export async function enhanceAnamnesisText(text: string, userId?: number, clinicId?: number, templateId?: AnamnesisTemplateId | string | null): Promise<string> {
+export async function enhanceAnamnesisText(text: string, userId?: number, clinicId?: number, templateOrId?: AnamnesisTemplateConfig | AnamnesisTemplateId | string | null): Promise<string> {
   if (!openai) {
     return text.trim();
   }
 
-  const template = getAnamnesisTemplate(templateId);
+  const template: AnamnesisTemplateConfig =
+    templateOrId && typeof templateOrId === "object"
+      ? templateOrId
+      : getAnamnesisTemplate(templateOrId);
 
   const structureBlock = template.freeForm
     ? `    4. NÃO adicione seções, títulos, tópicos em negrito nem listas com bullets. Mantenha como texto corrido em parágrafos.`

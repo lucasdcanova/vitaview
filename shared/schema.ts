@@ -429,6 +429,29 @@ export const insertEvolutionSchema = createInsertSchema(evolutions).pick({
   date: true,
 });
 
+// Anamnesis templates schema (custom + overrides dos built-in)
+export const anamnesisTemplates = pgTable("anamnesis_templates", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  baseTemplateId: text("base_template_id"), // ex.: 'clinica-geral' (override) | null (custom novo)
+  label: text("label").notNull(),
+  structure: text("structure").notNull().default(""),
+  freeForm: boolean("free_form").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertAnamnesisTemplateSchema = createInsertSchema(anamnesisTemplates).pick({
+  userId: true,
+  baseTemplateId: true,
+  label: true,
+  structure: true,
+  freeForm: true,
+});
+
+export type AnamnesisTemplateRow = typeof anamnesisTemplates.$inferSelect;
+export type InsertAnamnesisTemplate = z.infer<typeof insertAnamnesisTemplateSchema>;
+
 // Subscription plans schema
 export const subscriptionPlans = pgTable("subscription_plans", {
   id: serial("id").primaryKey(),
