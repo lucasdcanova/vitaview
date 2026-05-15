@@ -27,6 +27,7 @@ import {
 import Stripe from "stripe";
 import multer from "multer";
 import { CID10_DATABASE } from "../shared/data/cid10-database";
+import { normalizeAnamnesisTemplateId } from "@shared/anamnesis-templates";
 import { biometricTwoFactorAuth } from "./auth/biometric-2fa";
 import { advancedSecurity } from "./middleware/advanced-security";
 import { ensureAuthenticated } from "./middleware/auth.middleware";
@@ -3090,7 +3091,8 @@ export async function registerRoutes(app: Express): Promise<void> {
         return res.status(400).json({ message: "Texto da anamnese é obrigatório" });
       }
 
-      const enhancedText = await enhanceAnamnesisText(text, req.user!.id, req.tenantId);
+      const templateId = normalizeAnamnesisTemplateId(req.body?.template);
+      const enhancedText = await enhanceAnamnesisText(text, req.user!.id, req.tenantId, templateId);
       res.json({ text: enhancedText });
     } catch (error) {
       logger.error("[PatientRecord] Falha ao melhorar anamnese com IA", {
@@ -3494,11 +3496,14 @@ export async function registerRoutes(app: Express): Promise<void> {
           });
         }
 
+        const templateId = normalizeAnamnesisTemplateId(req.body?.template);
+
         const result = await processTranscriptionToAnamnesis(
           transcription,
           patientData,
           req.user!.id,
-          req.tenantId
+          req.tenantId,
+          templateId
         );
 
         if (sessionId) {
@@ -3640,9 +3645,12 @@ export async function registerRoutes(app: Express): Promise<void> {
           }
         }
 
+        const templateId = normalizeAnamnesisTemplateId(req.body?.template);
+
         logger.info("[Transcription] Retry manual solicitado", {
           userId: req.user?.id,
           sessionId,
+          templateId,
         });
 
         const result =
@@ -3661,7 +3669,8 @@ export async function registerRoutes(app: Express): Promise<void> {
                 transcription,
                 pd,
                 userId,
-                clinicId
+                clinicId,
+                templateId
               ),
             patientData,
           });

@@ -45,6 +45,13 @@ import { useConsultationRecording } from "@/hooks/use-consultation-recording";
 import { useAuth } from "@/hooks/use-auth";
 import { ExamUploadLauncher } from "@/components/exams/exam-upload-launcher";
 import { normalizeClinicalContent, stripClinicalHtml } from "@shared/clinical-rich-text";
+import {
+  ANAMNESIS_TEMPLATE_OPTIONS,
+  DEFAULT_ANAMNESIS_TEMPLATE_ID,
+  getAnamnesisTemplate,
+  normalizeAnamnesisTemplateId,
+  type AnamnesisTemplateId,
+} from "@shared/anamnesis-templates";
 
 type ExtractedDiagnosis = {
     cidCode?: string;
@@ -148,6 +155,28 @@ const clearAnamnesisDraft = (profileId: number, userId?: number | null) => {
     window.localStorage.removeItem(getAnamnesisDraftStorageKey(profileId, userId));
 };
 
+const getAnamnesisTemplateStorageKey = (userId?: number | null) =>
+    `anamnese-template-${userId ?? "anon"}`;
+
+const readAnamnesisTemplate = (userId?: number | null): AnamnesisTemplateId => {
+    if (typeof window === "undefined") return DEFAULT_ANAMNESIS_TEMPLATE_ID;
+    try {
+        const raw = window.localStorage.getItem(getAnamnesisTemplateStorageKey(userId));
+        return normalizeAnamnesisTemplateId(raw);
+    } catch {
+        return DEFAULT_ANAMNESIS_TEMPLATE_ID;
+    }
+};
+
+const writeAnamnesisTemplate = (templateId: AnamnesisTemplateId, userId?: number | null) => {
+    if (typeof window === "undefined") return;
+    try {
+        window.localStorage.setItem(getAnamnesisTemplateStorageKey(userId), templateId);
+    } catch {
+        // Best-effort persistence
+    }
+};
+
 const normalizeExtractedRecord = (payload: any): ExtractedRecord => ({
     summary: payload?.summary || "",
     diagnoses: Array.isArray(payload?.diagnoses)
@@ -216,6 +245,7 @@ export function AnamnesisCard() {
     const [anamnesisText, setAnamnesisText] = useState("");
     const [extractedRecord, setExtractedRecord] = useState<ExtractedRecord | null>(null);
     const [isApplyingExtraction, setIsApplyingExtraction] = useState(false);
+    const [anamnesisTemplate, setAnamnesisTemplateState] = useState<AnamnesisTemplateId>(DEFAULT_ANAMNESIS_TEMPLATE_ID);
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const { activeProfile, inServiceAppointmentId, clearPatientInService } = useProfiles();
@@ -226,6 +256,18 @@ export function AnamnesisCard() {
     const editorRef = useRef<HTMLDivElement | null>(null);
     const isUpdatingFromEditorRef = useRef(false);
     const anamnesisPlainText = stripClinicalHtml(anamnesisText).trim();
+    const anamnesisTemplatePlaceholder = getAnamnesisTemplate(anamnesisTemplate).placeholderExample;
+
+    // Restaurar template selecionado (persiste por usuário, não por paciente)
+    useEffect(() => {
+        setAnamnesisTemplateState(readAnamnesisTemplate(user?.id));
+    }, [user?.id]);
+
+    const handleSelectAnamnesisTemplate = (value: string) => {
+        const normalized = normalizeAnamnesisTemplateId(value);
+        setAnamnesisTemplateState(normalized);
+        writeAnamnesisTemplate(normalized, user?.id);
+    };
 
     // Restaurar rascunho quando o paciente mudar ou quando o componente montar novamente
     useEffect(() => {
@@ -826,7 +868,7 @@ export function AnamnesisCard() {
 
     const enhanceAnamnesisMutation = useMutation({
         mutationFn: async ({ text }: { text: string; auto?: boolean }) => {
-            const res = await apiRequest("POST", "/api/patient-record/enhance", { text });
+            const res = await apiRequest("POST", "/api/patient-record/enhance", { text, template: anamnesisTemplate });
             return await res.json();
         },
         onSuccess: (data, variables) => {
@@ -916,8 +958,29 @@ export function AnamnesisCard() {
         <div className={isMobile ? "space-y-4" : "space-y-8"}>
             <Card className="border border-border shadow-md">
                 <CardHeader className={`flex flex-col ${isMobile ? 'gap-2 pb-3' : 'gap-4'}`}>
-                    <div>
+                    <div className={`flex ${isMobile ? 'flex-col items-start gap-2' : 'flex-row items-center justify-between gap-4'}`}>
                         <CardTitle className={`text-foreground ${isMobile ? 'text-lg' : 'text-2xl'}`}>Anamnese inteligente</CardTitle>
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Padrão</span>
+                            <Select value={anamnesisTemplate} onValueChange={handleSelectAnamnesisTemplate}>
+                                <SelectTrigger
+                                    className={`${isMobile ? 'h-9 w-full text-sm' : 'h-9 w-[210px] text-sm'} rounded-lg border-border bg-background`}
+                                    aria-label="Padrão de anamnese"
+                                >
+                                    <SelectValue placeholder="Selecione um padrão" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {ANAMNESIS_TEMPLATE_OPTIONS.map((option) => (
+                                        <SelectItem key={option.id} value={option.id}>
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-medium leading-tight">{option.label}</span>
+                                                <span className="text-xs text-muted-foreground leading-tight">{option.description}</span>
+                                            </div>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
 
                     {/* Destaque para gravação de consulta */}
@@ -936,6 +999,7 @@ export function AnamnesisCard() {
                                 profileId={activeProfile?.id}
                                 patientName={activeProfile?.name}
                                 returnPath="/atendimento"
+                                anamnesisTemplate={anamnesisTemplate}
                                 className={isMobile ? "w-full" : "w-auto"}
                             />
                         </FeatureGate>
@@ -975,7 +1039,7 @@ export function AnamnesisCard() {
                         <div className="relative">
                             {!anamnesisPlainText && (
                                 <div className="pointer-events-none absolute left-4 top-3 text-sm text-muted-foreground">
-                                    Ex.: Paciente em acompanhamento por hipertensão controlada com losartana 50mg...
+                                    {anamnesisTemplatePlaceholder}
                                 </div>
                             )}
                             <div
