@@ -29,6 +29,7 @@ import {
   formatRecordingTime,
   useConsultationRecording,
 } from "@/hooks/use-consultation-recording";
+import type { AnamnesisTemplateId } from "@shared/anamnesis-templates";
 
 interface ConsultationRecorderProps {
   profileId?: number;
@@ -36,6 +37,7 @@ interface ConsultationRecorderProps {
   disabled?: boolean;
   className?: string;
   returnPath?: string;
+  anamnesisTemplate?: AnamnesisTemplateId;
 }
 
 export function ConsultationRecorder({
@@ -44,6 +46,7 @@ export function ConsultationRecorder({
   disabled = false,
   className,
   returnPath = "/atendimento",
+  anamnesisTemplate,
 }: ConsultationRecorderProps) {
   const [showConsentDialog, setShowConsentDialog] = useState(false);
   const {
@@ -88,6 +91,7 @@ export function ConsultationRecorder({
       profileId,
       patientName,
       returnPath,
+      anamnesisTemplate,
     });
   };
 

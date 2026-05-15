@@ -26,6 +26,11 @@ import {
   type NativeAudioRecorderListenerHandle,
   type NativeAudioRecorderSegment,
 } from "@/lib/native-audio-recorder";
+import {
+  DEFAULT_ANAMNESIS_TEMPLATE_ID,
+  normalizeAnamnesisTemplateId,
+  type AnamnesisTemplateId,
+} from "@shared/anamnesis-templates";
 
 // Reliability: chunked recording with periodic auto-restart to manter cada
 // segmento bem abaixo do limite de 25MB do Whisper, em qualquer plataforma.
@@ -71,6 +76,7 @@ interface ConsultationRecordingSession {
   profileId: number | null;
   patientName: string | null;
   returnPath: string;
+  anamnesisTemplate: AnamnesisTemplateId;
 }
 
 interface RecordingFormat {
@@ -229,6 +235,7 @@ interface ConsultationRecordingContextType {
     profileId?: number;
     patientName?: string | null;
     returnPath?: string;
+    anamnesisTemplate?: AnamnesisTemplateId | string | null;
   }) => Promise<void>;
   togglePause: () => void;
   stopRecording: () => void;
@@ -743,6 +750,7 @@ export function ConsultationRecordingProvider({
           segments: transcripts,
           profileId: session?.profileId ?? null,
           patientName: session?.patientName ?? null,
+          template: session?.anamnesisTemplate ?? DEFAULT_ANAMNESIS_TEMPLATE_ID,
         }),
       });
 
@@ -918,6 +926,7 @@ export function ConsultationRecordingProvider({
       profileId?: number;
       patientName?: string | null;
       returnPath?: string;
+      anamnesisTemplate?: AnamnesisTemplateId | string | null;
     }) => {
       try {
         const nextSession = {
@@ -925,6 +934,7 @@ export function ConsultationRecordingProvider({
           profileId: options?.profileId ?? null,
           patientName: options?.patientName?.trim() || null,
           returnPath: options?.returnPath || "/atendimento",
+          anamnesisTemplate: normalizeAnamnesisTemplateId(options?.anamnesisTemplate),
         };
         if (nextSession.profileId === null) {
           console.warn("[Recording] startRecording chamado sem profileId — resultado sera anexado ao paciente ativo no momento da finalizacao");
@@ -1519,6 +1529,7 @@ export function ConsultationRecordingProvider({
         body: JSON.stringify({
           sessionId: failedSessionId,
           profileId: failedSessionProfile?.profileId ?? currentSession?.profileId ?? null,
+          template: currentSession?.anamnesisTemplate ?? DEFAULT_ANAMNESIS_TEMPLATE_ID,
         }),
       });
 

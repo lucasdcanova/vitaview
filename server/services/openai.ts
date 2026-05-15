@@ -2,6 +2,10 @@ import OpenAI from "openai";
 import type { ExamResult, User, Exam } from "@shared/schema";
 import type { HealthMetric } from "@shared/schema";
 import { CID10_DATABASE } from "@shared/data/cid10-database";
+import {
+  getAnamnesisTemplate,
+  type AnamnesisTemplateId,
+} from "@shared/anamnesis-templates";
 import type { IStorage } from "../storage";
 
 import logger from "../logger";
@@ -2766,7 +2770,7 @@ export async function transcribeConsultationAudio(audioBuffer: Buffer, mimeType:
  * @param patientData Dados do paciente para contextualização
  * @returns Anamnese formatada profissionalmente
  */
-export async function processTranscriptionToAnamnesis(transcription: string, patientData?: any, userId?: number, clinicId?: number): Promise<{
+export async function processTranscriptionToAnamnesis(transcription: string, patientData?: any, userId?: number, clinicId?: number, templateId?: AnamnesisTemplateId | string | null): Promise<{
   anamnesis: string;
   extractedData: {
     summary: string;
@@ -2783,10 +2787,11 @@ export async function processTranscriptionToAnamnesis(transcription: string, pat
 
   const encounterDate = getTodayIsoDate();
   const patientContext = patientData ? formatPatientContext(patientData) : "";
+  const template = getAnamnesisTemplate(templateId);
 
   const prompt = `
-Você é um médico especialista com vasta experiência em documentação clínica.
-Sua tarefa é transformar a transcrição de uma consulta médica em uma anamnese profissional completa, com redação natural e fluida, como se tivesse sido escrita pelo médico ao final da consulta.
+${template.systemRoleDescription}
+Sua tarefa é transformar a transcrição de uma consulta em uma anamnese profissional completa de **${template.label}**, com redação natural e fluida, como se tivesse sido escrita pelo profissional ao final da consulta.
 
 ${patientContext ? `### CONTEXTO DO PACIENTE:\n${patientContext}\n` : ''}
 
@@ -2798,12 +2803,12 @@ ${transcription}
 ### INSTRUÇÕES:
 1. Analise cuidadosamente toda a transcrição da consulta
 2. Extraia todas as informações clinicamente relevantes
-3. Organize as informações no formato de anamnese médica profissional
+3. Organize as informações no formato de anamnese profissional para **${template.label}**
 4. Identifique diagnósticos, medicamentos, alergias, comorbidades e cirurgias prévias mencionados
 5. Sempre que um diagnóstico estiver explicitamente citado, associe o CID-10 mais adequado
 6. Se qualquer campo de data estiver ausente, use a data atual da consulta (${encounterDate})
 7. Diferencie hipótese diagnóstica de diagnóstico já estabelecido usando o campo notes
-8. Use terminologia médica apropriada, mas mantenha a redação humana, direta e natural
+8. Use terminologia clínica apropriada à especialidade, mas mantenha a redação humana, direta e natural
 9. Mantenha objetividade e clareza, evitando listas mecânicas quando a narrativa clínica for mais adequada
 10. Quando não houver informações sobre um tópico, omita o tópico completamente
 11. Nunca use frases metalinguísticas ou justificativas sobre ausência de dados
@@ -2811,20 +2816,12 @@ ${transcription}
 13. Não faça comentários sobre IA, transcrição, extração automática ou necessidade de revisão
 14. No campo notes, escreva apenas observações clínicas relevantes; se não houver observação útil, use null
 
-### FORMATO DA ANAMNESE:
-A anamnese deve seguir a estrutura SOAP ou similar, MAS OMITINDO SEÇÕES SEM DADOS:
-- **Identificação**: Dados básicos do paciente (APENAS se mencionados)
-- **Queixa Principal (QP)**: Motivo da consulta em palavras do paciente
-- **História da Doença Atual (HDA)**: Evolução cronológica dos sintomas
-- **Interrogatório Sintomatológico**: APENAS sintomas positivos
-- **História Patológica Pregressa (HPP)**: APENAS se relatada
-- **História Familiar (HF)**: APENAS se relatada
-- **História Social (HS)**: OMITIR se não houver dados
-- **Medicamentos em Uso**: APENAS medicamentos citados
-- **Alergias**: APENAS se houver relato
-- **Exame Físico**: APENAS achados mencionados
-- **Impressão Diagnóstica**: Hipóteses diagnósticas
-- **Conduta**: Plano terapêutico e orientações
+### ORIENTAÇÕES ESPECÍFICAS DA ESPECIALIDADE (${template.label}):
+${template.specialtyInstructions}
+
+### FORMATO DA ANAMNESE (${template.label}):
+A anamnese deve seguir a estrutura abaixo, MAS OMITINDO SEÇÕES SEM DADOS:
+${template.structure}
 
 ### REGRAS PARA O JSON:
 - Retorne apenas JSON válido
@@ -2865,7 +2862,7 @@ A anamnese deve seguir a estrutura SOAP ou similar, MAS OMITINDO SEÇÕES SEM DA
       messages: [
         {
           role: "system",
-          content: "Você redige documentos clínicos em português do Brasil com linguagem natural, profissional e humana. Se um dado não foi mencionado, apenas omita esse conteúdo sem comentar a ausência."
+          content: `Você redige documentos clínicos em português do Brasil com linguagem natural, profissional e humana, no padrão de **${template.label}**. Se um dado não foi mencionado, apenas omita esse conteúdo sem comentar a ausência.`
         },
         { role: "user", content: prompt }
       ],
@@ -2952,37 +2949,34 @@ ${transcription.trim()}`,
  * @param text Texto original da anamnese
  * @returns Texto melhorado
  */
-export async function enhanceAnamnesisText(text: string, userId?: number, clinicId?: number): Promise<string> {
+export async function enhanceAnamnesisText(text: string, userId?: number, clinicId?: number, templateId?: AnamnesisTemplateId | string | null): Promise<string> {
   if (!openai) {
     return text.trim();
   }
 
+  const template = getAnamnesisTemplate(templateId);
+
   const prompt = `
-    Você é um médico assistente experiente em documentação clínica.
-    Reescreva o texto abaixo para transformá-lo em uma evolução/anamnese de consulta mais rica, organizada e profissional, sem inventar nenhum dado novo.
-    
+    ${template.systemRoleDescription}
+    Reescreva o texto abaixo para transformá-lo em uma evolução/anamnese de **${template.label}** mais rica, organizada e profissional, sem inventar nenhum dado novo.
+
     DIRETRIZES:
     1. Preserve integralmente os fatos, negações, temporalidade e incertezas do texto original.
     2. Corrija ortografia, gramática, pontuação e concordância.
-    3. Enriqueça a redação médica: transforme anotações telegráficas em narrativa clínica clara, coesa e natural, como um médico escrevendo no prontuário após a consulta.
-    4. Estruture o conteúdo como registro de consulta, usando apenas as seções que realmente tenham dados:
-       - **Queixa Principal**
-       - **História da Doença Atual**
-       - **Interrogatório Sintomatológico**
-       - **História Patológica Pregressa**
-       - **Medicamentos em Uso**
-       - **Alergias**
-       - **Exame Físico**
-       - **Avaliação / Impressão Diagnóstica**
-       - **Conduta**
+    3. Enriqueça a redação clínica: transforme anotações telegráficas em narrativa clara, coesa e natural, como um profissional escrevendo no prontuário após a consulta.
+    4. Estruture o conteúdo segundo o padrão de **${template.label}**, usando apenas as seções que realmente tenham dados:
+${template.structure}
     5. Se o texto não trouxer dados para uma seção, omita a seção sem avisar que faltam informações.
-    6. Use terminologia médica adequada quando o contexto permitir, sem extrapolar o que não foi dito.
+    6. Use terminologia clínica adequada à especialidade quando o contexto permitir, sem extrapolar o que não foi dito.
     7. NÃO invente diagnósticos, exames, achados físicos, medicamentos, doses, alergias ou condutas que não estejam no texto original.
     8. Pode reorganizar a ordem das informações para melhorar clareza clínica.
     9. Nunca use frases ou variações de: "não foi dito", "não se pode identificar", "não informado", "não relatado", "não mencionado", "sem dados", "sem informações", "gerado automaticamente", "detectado automaticamente" ou "requer revisão médica".
     10. Não faça qualquer referência a IA, transcrição, extração automática ou ao fato de o texto ter sido gerado.
     11. Quando algo não estiver presente no texto, simplesmente não mencione esse assunto.
     12. Retorne APENAS o texto final melhorado, sem introduções ou observações extras.
+
+    ORIENTAÇÕES ESPECÍFICAS DA ESPECIALIDADE (${template.label}):
+    ${template.specialtyInstructions}
 
     TEXTO ORIGINAL:
     "${text}"
@@ -2998,7 +2992,7 @@ export async function enhanceAnamnesisText(text: string, userId?: number, clinic
       messages: [
         {
           role: "system",
-          content: "Você é um assistente médico especializado em documentação clínica. Escreva como um profissional humano, com linguagem natural e direta, e nunca explique a ausência de dados."
+          content: `Você é um assistente clínico especializado em documentação no padrão de **${template.label}**. Escreva como um profissional humano, com linguagem natural e direta, e nunca explique a ausência de dados.`
         },
         { role: "user", content: prompt }
       ],
