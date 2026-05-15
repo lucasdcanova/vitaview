@@ -2789,9 +2789,31 @@ export async function processTranscriptionToAnamnesis(transcription: string, pat
   const patientContext = patientData ? formatPatientContext(patientData) : "";
   const template = getAnamnesisTemplate(templateId);
 
+  const taskDescription = template.freeForm
+    ? `Sua tarefa é transformar a transcrição de uma consulta em um registro clínico em texto corrido, **sem usar nenhum padrão de anamnese, seções, títulos ou modelos estruturados**. Apenas organize o que foi dito em parágrafos naturais.`
+    : `Sua tarefa é transformar a transcrição de uma consulta em uma anamnese profissional completa de **${template.label}**, com redação natural e fluida, como se tivesse sido escrita pelo profissional ao final da consulta.`;
+
+  const structuredInstructions = `
+3. Organize as informações no formato de anamnese profissional para **${template.label}**
+8. Use terminologia clínica apropriada à especialidade, mas mantenha a redação humana, direta e natural`;
+
+  const freeFormInstructions = `
+3. NÃO use modelo SOAP, títulos de seção (ex.: "Queixa Principal", "HDA", "Conduta"), tópicos em negrito ou listas com bullets. Escreva em parágrafos corridos.
+8. Use terminologia clínica adequada, mas mantenha a redação humana, direta e natural`;
+
+  const formatBlock = template.freeForm
+    ? `### FORMATO DA ANAMNESE:
+Texto corrido em parágrafos. Sem títulos, sem seções, sem listas com tópicos. Apenas a história clínica organizada como prosa.`
+    : `### ORIENTAÇÕES ESPECÍFICAS DA ESPECIALIDADE (${template.label}):
+${template.specialtyInstructions}
+
+### FORMATO DA ANAMNESE (${template.label}):
+A anamnese deve seguir a estrutura abaixo, MAS OMITINDO SEÇÕES SEM DADOS:
+${template.structure}`;
+
   const prompt = `
 ${template.systemRoleDescription}
-Sua tarefa é transformar a transcrição de uma consulta em uma anamnese profissional completa de **${template.label}**, com redação natural e fluida, como se tivesse sido escrita pelo profissional ao final da consulta.
+${taskDescription}
 
 ${patientContext ? `### CONTEXTO DO PACIENTE:\n${patientContext}\n` : ''}
 
@@ -2802,13 +2824,11 @@ ${transcription}
 
 ### INSTRUÇÕES:
 1. Analise cuidadosamente toda a transcrição da consulta
-2. Extraia todas as informações clinicamente relevantes
-3. Organize as informações no formato de anamnese profissional para **${template.label}**
+2. Extraia todas as informações clinicamente relevantes${template.freeForm ? freeFormInstructions : structuredInstructions}
 4. Identifique diagnósticos, medicamentos, alergias, comorbidades e cirurgias prévias mencionados
 5. Sempre que um diagnóstico estiver explicitamente citado, associe o CID-10 mais adequado
 6. Se qualquer campo de data estiver ausente, use a data atual da consulta (${encounterDate})
 7. Diferencie hipótese diagnóstica de diagnóstico já estabelecido usando o campo notes
-8. Use terminologia clínica apropriada à especialidade, mas mantenha a redação humana, direta e natural
 9. Mantenha objetividade e clareza, evitando listas mecânicas quando a narrativa clínica for mais adequada
 10. Quando não houver informações sobre um tópico, omita o tópico completamente
 11. Nunca use frases metalinguísticas ou justificativas sobre ausência de dados
@@ -2816,12 +2836,7 @@ ${transcription}
 13. Não faça comentários sobre IA, transcrição, extração automática ou necessidade de revisão
 14. No campo notes, escreva apenas observações clínicas relevantes; se não houver observação útil, use null
 
-### ORIENTAÇÕES ESPECÍFICAS DA ESPECIALIDADE (${template.label}):
-${template.specialtyInstructions}
-
-### FORMATO DA ANAMNESE (${template.label}):
-A anamnese deve seguir a estrutura abaixo, MAS OMITINDO SEÇÕES SEM DADOS:
-${template.structure}
+${formatBlock}
 
 ### REGRAS PARA O JSON:
 - Retorne apenas JSON válido
@@ -2862,7 +2877,9 @@ ${template.structure}
       messages: [
         {
           role: "system",
-          content: `Você redige documentos clínicos em português do Brasil com linguagem natural, profissional e humana, no padrão de **${template.label}**. Se um dado não foi mencionado, apenas omita esse conteúdo sem comentar a ausência.`
+          content: template.freeForm
+            ? `Você redige documentos clínicos em português do Brasil em texto corrido, sem usar padrões de anamnese, seções ou títulos. Linguagem natural, profissional e humana. Se um dado não foi mencionado, apenas omita esse conteúdo sem comentar a ausência.`
+            : `Você redige documentos clínicos em português do Brasil com linguagem natural, profissional e humana, no padrão de **${template.label}**. Se um dado não foi mencionado, apenas omita esse conteúdo sem comentar a ausência.`
         },
         { role: "user", content: prompt }
       ],
@@ -2956,16 +2973,29 @@ export async function enhanceAnamnesisText(text: string, userId?: number, clinic
 
   const template = getAnamnesisTemplate(templateId);
 
+  const structureBlock = template.freeForm
+    ? `    4. NÃO adicione seções, títulos, tópicos em negrito nem listas com bullets. Mantenha como texto corrido em parágrafos.`
+    : `    4. Estruture o conteúdo segundo o padrão de **${template.label}**, usando apenas as seções que realmente tenham dados:
+${template.structure}`;
+
+  const specialtyBlock = template.freeForm
+    ? ""
+    : `\n    ORIENTAÇÕES ESPECÍFICAS DA ESPECIALIDADE (${template.label}):
+    ${template.specialtyInstructions}\n`;
+
+  const taskLine = template.freeForm
+    ? `Reescreva o texto abaixo como uma evolução clínica em texto corrido, sem usar nenhum padrão de anamnese ou seções, sem inventar nenhum dado novo.`
+    : `Reescreva o texto abaixo para transformá-lo em uma evolução/anamnese de **${template.label}** mais rica, organizada e profissional, sem inventar nenhum dado novo.`;
+
   const prompt = `
     ${template.systemRoleDescription}
-    Reescreva o texto abaixo para transformá-lo em uma evolução/anamnese de **${template.label}** mais rica, organizada e profissional, sem inventar nenhum dado novo.
+    ${taskLine}
 
     DIRETRIZES:
     1. Preserve integralmente os fatos, negações, temporalidade e incertezas do texto original.
     2. Corrija ortografia, gramática, pontuação e concordância.
     3. Enriqueça a redação clínica: transforme anotações telegráficas em narrativa clara, coesa e natural, como um profissional escrevendo no prontuário após a consulta.
-    4. Estruture o conteúdo segundo o padrão de **${template.label}**, usando apenas as seções que realmente tenham dados:
-${template.structure}
+${structureBlock}
     5. Se o texto não trouxer dados para uma seção, omita a seção sem avisar que faltam informações.
     6. Use terminologia clínica adequada à especialidade quando o contexto permitir, sem extrapolar o que não foi dito.
     7. NÃO invente diagnósticos, exames, achados físicos, medicamentos, doses, alergias ou condutas que não estejam no texto original.
@@ -2974,10 +3004,7 @@ ${template.structure}
     10. Não faça qualquer referência a IA, transcrição, extração automática ou ao fato de o texto ter sido gerado.
     11. Quando algo não estiver presente no texto, simplesmente não mencione esse assunto.
     12. Retorne APENAS o texto final melhorado, sem introduções ou observações extras.
-
-    ORIENTAÇÕES ESPECÍFICAS DA ESPECIALIDADE (${template.label}):
-    ${template.specialtyInstructions}
-
+${specialtyBlock}
     TEXTO ORIGINAL:
     "${text}"
   `;
@@ -2992,7 +3019,9 @@ ${template.structure}
       messages: [
         {
           role: "system",
-          content: `Você é um assistente clínico especializado em documentação no padrão de **${template.label}**. Escreva como um profissional humano, com linguagem natural e direta, e nunca explique a ausência de dados.`
+          content: template.freeForm
+            ? `Você é um assistente clínico que escreve evoluções em texto corrido, sem padrão de anamnese nem seções. Escreva como um profissional humano, com linguagem natural e direta, e nunca explique a ausência de dados.`
+            : `Você é um assistente clínico especializado em documentação no padrão de **${template.label}**. Escreva como um profissional humano, com linguagem natural e direta, e nunca explique a ausência de dados.`
         },
         { role: "user", content: prompt }
       ],
