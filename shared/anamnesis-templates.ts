@@ -202,36 +202,93 @@ Vacinas: use a nomenclatura do calendário do PNI (BCG, hepatite B, pentavalente
     id: "pre-natal",
     label: "Pré-natal obstétrico",
     shortLabel: "Pré-natal",
-    description: "Consulta obstétrica com idade gestacional, paridade, exames e conduta.",
+    description: "Pré-natal com cabeçalho de antecedentes/risco, exame obstétrico e conduta.",
     systemRoleDescription:
       "Você é um(a) obstetra experiente em acompanhamento pré-natal e documentação clínica obstétrica.",
-    structure: `- **Identificação**: Nome, idade, profissão (se mencionada)
-- **Motivo da Consulta**: Consulta pré-natal de rotina, intercorrência ou retorno de exames
-- **História da Doença Atual (HDA)**: Sintomas atuais, movimentação fetal (a partir de ~20 semanas), perdas vaginais, contrações
-- **Antecedentes Ginecológicos**: Menarca, ciclos, sexarca, métodos contraceptivos prévios, IST prévias, último colpocitológico
-- **Antecedentes Obstétricos**: Paridade (G_P_A_), gestações anteriores com tipo de parto, idade gestacional, peso ao nascer, intercorrências
-- **Gestação Atual**: DUM, idade gestacional (IG) atual, DPP (Naegele), gestação planejada/desejada, início do pré-natal, tipagem ABO/Rh, sorologias
-- **Intercorrências da Gestação**: Sangramentos, hipertensão, diabetes gestacional, infecções, hospitalizações
-- **Antecedentes Patológicos**: Comorbidades prévias (HAS, DM, tireoidopatias, trombofilias, cardiopatias)
-- **Medicamentos em Uso e Suplementação**: Ácido fólico, sulfato ferroso, polivitamínico, demais prescrições
-- **Alergias**: Especialmente medicamentos e látex
-- **História Familiar**: HAS, DM, pré-eclâmpsia, doenças genéticas, gemelaridade
-- **História Social**: Tabagismo, álcool, drogas ilícitas, situação conjugal e suporte familiar
-- **Exame Físico**: PA, peso atual, ganho ponderal acumulado, IMC pré-gestacional; ausculta cardiopulmonar; edema de MMII; exame obstétrico (altura uterina, BCF, dinâmica uterina, apresentação fetal quando aplicável); toque vaginal se indicado
-- **Exames Complementares**: Sorologias (HIV, VDRL, hepatite B/C, toxoplasmose, rubéola, CMV), hemograma, glicemia/TTOG, urocultura, USG obstétrica (IG, vitalidade, anatomia, crescimento)
-- **Vacinação**: dTpa, hepatite B, influenza, COVID-19 quando indicado
-- **Avaliação / Impressão**: Gestação tópica única (ou múltipla), idade gestacional, classificação de risco (habitual / alto risco) com justificativa
-- **Conduta**: Prescrições, suplementação, solicitação de exames, orientações (sinais de alerta, atividade física, alimentação, atividade sexual), agendamento de retorno`,
-    specialtyInstructions: `Omita seções sem dados — não inclua rótulos vazios nem comentários sobre ausência de informação.
+    structure: `# G0P0A0
+# IG xxs+xxd (US xx/xx/xx com xxs+xxd)
+# TS
+- Coombs indireto mais recente se Rh negativo
+# Sorologias: xx/xx/xx todas NR, toxo imune.
+# Patologias atuais ou prévias
+# Nega alergia
+# Nega tabagismo e etilismo
+# Nega cirurgias prévias
+# Vacinação: Hep B xx doses, dTpa (20s), Influenza e COVID-19
+# Em uso de: ácido fólico (até 12s), SF 3cp/d e cálcio 2cp/d
 
-Sempre que IG (idade gestacional) for mencionada, registre em semanas e dias (ex.: "24s 3d").
-Quando DUM for citada, calcule e mencione a DPP pela regra de Naegele apenas se o profissional não tiver dito a DPP; caso contrário, use a DPP ditada.
-Paridade deve sempre seguir o formato G_P_A_ (gestações, partos, abortos); detalhe partos vaginais/cesárea quando informado.
-Em "Exame Físico", registre AU (altura uterina) em cm e BCF em bpm quando ditos. Para PA, registre o valor exato citado.
-Identifique fatores de risco obstétrico (idade > 35, HAS crônica, DM prévio, pré-eclâmpsia anterior, prematuridade prévia) e cite-os na "Avaliação / Impressão" quando presentes.
-Em "Conduta", inclua orientações sobre sinais de alerta obstétrico (sangramento, perda de líquido, redução de movimentação fetal, cefaleia/escotomas, dor abdominal intensa) quando o profissional ditar.`,
+# IMC pré-gestacional
+# Ingesta cálcio (meta 1g Ca/dia)
+# Dentista: em acompanhamento / aguarda
+# Risco TPPT (colo uterino com US de 18 a 22s)
+# Risco PE (cálculo de 11 a 13+6 ou FR)
+# Risco AF: afrodescendência ou anemia não investigada no 1o trimestre
+# Risco tireoidopatia: FR
+# CP: última coleta
+# Via parto:
+
+Subjetivo
+Paciente vem para consulta pré-natal com IG xx+xs. Nega secreção vaginal patológica, perda liquida e/ou sangramento vaginal. Nega disúria e demais queixas urinárias. Nega sinais premonitórios de eclampsia como cefaleia intensa, turvação visual, epigastralgia e/ou edema. Refere movimentação fetal habitual. Sem demais queixas.
+
+Objetivo
+PA xx/xx mmHg
+Peso xx,x Kg | Alt xx cm | IMC
+AU: xx cm | BCF xx | MF +
+
+Exames complementares
+US
+LAC
+
+Impressão
+Gestação xº TRIM
+
+Conduta
+Orientações gerais
+Manter cálcio + SF até 3 meses após o parto
+Oriento sobre sinais de alerta (sangramento vaginal, dor abdominal intensa, corrimento esverdeado/amarelado, perda de líquido vaginal, diminuição da movimentação fetal, sinais de trabalho de parto e sintomas de pré-eclâmpsia) e a buscar atendimento se necessário.
+Oriento alimentação saudável, o não consumo de bebidas alcoólicas, precaução no uso de medicamentos e medidas de prevenção de toxoplasmose
+Oriento sinais de trabalho de parto;
+Oriento sobre a consulta de puerpério e a consulta precoce do RN`,
+    specialtyInstructions: `REPRODUZA A ESTRUTURA ACIMA EXATAMENTE COMO ESTÁ, mantendo a ordem das linhas, os marcadores "#" e "-", a separação em parágrafos e as linhas em branco entre seções. NÃO use markdown (sem negrito, sem cabeçalhos com # do markdown, sem listas com hífen ou asteriscos além das já presentes no modelo).
+
+Os "#" no início das linhas são marcadores fixos da anamnese — preserve-os. O "-" da linha "Coombs indireto" também é parte do modelo.
+
+Preencha as lacunas com "xx", "/", "+" e similares com os dados ditados pelo profissional. Quando um campo não foi citado, mantenha a lacuna em branco com o rótulo — não escreva "não informado" nem variações.
+
+Regras de cabeçalho (linhas com "#"):
+- "# G0P0A0": preencha a paridade ditada no formato G_P_A_ (gestações, partos, abortos). Se houver detalhamento (cesárea, vaginal, ectópica), acrescente após (ex.: "# G3P1A1 (1 PN, 1 abortamento espontâneo 1o trim)").
+- "# IG xxs+xxd (US xx/xx/xx com xxs+xxd)": informe a IG atual em semanas+dias e, entre parênteses, a USG de referência (data e IG do exame). Se não houver USG de referência, mantenha apenas "# IG xxs+xxd" sem o parêntese.
+- "# TS" + "- Coombs indireto mais recente se Rh negativo": preencha "# TS: <tipagem>". Mantenha a linha do Coombs apenas se o tipo for Rh negativo; remova-a se Rh positivo.
+- "# Sorologias: xx/xx/xx todas NR, toxo imune.": preencha a data da coleta e o status (NR = não reagentes; toxo imune/suscetível/aguda).
+- "# Patologias atuais ou prévias": liste as patologias citadas após o rótulo. Se não houver, deixe "# Sem patologias prévias relevantes".
+- "# Nega alergia", "# Nega tabagismo e etilismo", "# Nega cirurgias prévias": mantenha a negativa default se o paciente negar; se positivo, reescreva a linha com o dado (ex.: "# Alergia: dipirona — rash cutâneo"; "# Tabagista 5 maços-ano, nega etilismo"; "# Cirurgias prévias: cesárea em 2021").
+- "# Vacinação: Hep B xx doses, dTpa (20s), Influenza e COVID-19": preencha o número de doses recebidas e marque as vacinas já feitas. Vacinas pendentes podem ser registradas como "pendente" entre parênteses.
+- "# Em uso de: ácido fólico (até 12s), SF 3cp/d e cálcio 2cp/d": ajuste a lista conforme as medicações em uso. Ácido fólico só permanece se IG ≤ 12 semanas; remova após. Inclua outras medicações se citadas.
+
+Bloco de risco (segundo grupo de "#"):
+- "# IMC pré-gestacional": preencha o valor numérico e a classificação (baixo peso, eutrófica, sobrepeso, obesidade).
+- "# Ingesta cálcio (meta 1g Ca/dia)": registre a ingesta estimada e se atinge a meta (ex.: "# Ingesta cálcio ~700 mg/d — abaixo da meta, orientado complemento").
+- "# Dentista: em acompanhamento / aguarda": escolha uma das opções e remova a outra.
+- "# Risco TPPT (colo uterino com US de 18 a 22s)": registre o resultado da medida de colo no US morfológico ou se está pendente.
+- "# Risco PE (cálculo de 11 a 13+6 ou FR)": registre o cálculo de risco do 1º trimestre quando disponível ou liste fatores de risco (FR).
+- "# Risco AF": registre se há afrodescendência ou anemia não investigada no 1º trimestre.
+- "# Risco tireoidopatia: FR": registre fatores de risco para tireoidopatia ou TSH/T4L se solicitados.
+- "# CP: última coleta": data e resultado do colpocitológico mais recente.
+- "# Via parto:": preferência/indicação para via de parto (vaginal, cesárea com indicação, indefinida).
+
+Subjetivo: mantenha a frase default como base e ajuste apenas o necessário — substitua "xx+xs" pela IG atual e modifique as negativas para refletir queixas reais. Se o paciente referir alguma queixa, troque "Nega ..." pela descrição da queixa.
+
+Objetivo: preencha PA em mmHg, peso em kg, altura em cm, IMC calculado, AU em cm, BCF em bpm e MF (+ presente / − ausente). Mantenha os rótulos mesmo se algum dado não foi citado.
+
+Exames complementares: liste USG e exames laboratoriais (LAC = laboratorial) ditados. Se nada foi citado, mantenha "US" e "LAC" como rótulos em branco.
+
+Impressão: indique o trimestre ("Gestação 1º/2º/3º TRIM"), classificação de risco (habitual ou alto risco com justificativa) e gestação tópica única/múltipla quando aplicável.
+
+Conduta: mantenha as orientações default que se aplicarem; adicione/remova conforme o ditado. "Manter cálcio + SF até 3 meses após o parto" pode ser ajustado se a conduta for diferente.
+
+Sempre que IG for mencionada, registre em semanas+dias (ex.: "24s+3d" ou "24+3s").`,
     placeholderExample:
-      "Ex.: Gestante G2P1A0, IG 24s 3d pela DUM, em pré-natal de risco habitual, refere movimentação fetal presente...",
+      "Ex.: Gestante G2P1A0, IG 24s+3d pela DUM, em pré-natal de risco habitual, refere movimentação fetal presente...",
   },
 };
 
