@@ -44,7 +44,7 @@ import { BrandLoader } from "@/components/ui/brand-loader";
 import { useConsultationRecording } from "@/hooks/use-consultation-recording";
 import { useAuth } from "@/hooks/use-auth";
 import { ExamUploadLauncher } from "@/components/exams/exam-upload-launcher";
-import { normalizeClinicalContent, stripClinicalHtml } from "@shared/clinical-rich-text";
+import { normalizeClinicalContent, plainTextToClinicalHtml, stripClinicalHtml } from "@shared/clinical-rich-text";
 import {
   ANAMNESIS_TEMPLATE_OPTIONS,
   DEFAULT_ANAMNESIS_TEMPLATE_ID,
@@ -113,6 +113,7 @@ type ApplyExtractionResult = {
 type AnamnesisDraft = {
     text: string;
     extractedRecord: ExtractedRecord | null;
+    templateId?: AnamnesisTemplateId | null;
 };
 
 const getAnamnesisDraftStorageKey = (profileId: number, userId?: number | null) =>
@@ -129,6 +130,7 @@ const readAnamnesisDraft = (profileId: number, userId?: number | null): Anamnesi
         return {
             text: typeof parsed?.text === "string" ? parsed.text : "",
             extractedRecord: parsed?.extractedRecord ? normalizeExtractedRecord(parsed.extractedRecord) : null,
+            templateId: typeof parsed?.templateId === "string" ? (parsed.templateId as AnamnesisTemplateId) : null,
         };
     } catch {
         return null;
@@ -176,6 +178,17 @@ const writeAnamnesisTemplate = (templateId: AnamnesisTemplateId, userId?: number
         // Best-effort persistence
     }
 };
+
+const buildTemplateHtml = (templateId: AnamnesisTemplateId): string => {
+    const structure = getAnamnesisTemplate(templateId).structure;
+    if (!structure.trim()) return "";
+    return plainTextToClinicalHtml(structure);
+};
+
+const normalizePlainTextForCompare = (value: string) =>
+    stripClinicalHtml(value)
+        .replace(/\s+/g, " ")
+        .trim();
 
 const normalizeExtractedRecord = (payload: any): ExtractedRecord => ({
     summary: payload?.summary || "",
@@ -246,6 +259,7 @@ export function AnamnesisCard() {
     const [extractedRecord, setExtractedRecord] = useState<ExtractedRecord | null>(null);
     const [isApplyingExtraction, setIsApplyingExtraction] = useState(false);
     const [anamnesisTemplate, setAnamnesisTemplateState] = useState<AnamnesisTemplateId>(DEFAULT_ANAMNESIS_TEMPLATE_ID);
+    const appliedTemplateRef = useRef<AnamnesisTemplateId | null>(null);
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const { activeProfile, inServiceAppointmentId, clearPatientInService } = useProfiles();
@@ -267,8 +281,34 @@ export function AnamnesisCard() {
 
     const handleSelectAnamnesisTemplate = (value: string) => {
         const normalized = normalizeAnamnesisTemplateId(value);
+        const newTemplateHtml = buildTemplateHtml(normalized);
+        const newTemplatePlain = normalizePlainTextForCompare(newTemplateHtml);
+        const currentPlain = normalizePlainTextForCompare(anamnesisText);
+        const previousTemplateId = appliedTemplateRef.current;
+        const previousTemplatePlain = previousTemplateId
+            ? normalizePlainTextForCompare(buildTemplateHtml(previousTemplateId))
+            : "";
+
+        const editorIsEmpty = currentPlain.length === 0;
+        const editorMatchesPreviousTemplate =
+            previousTemplatePlain.length > 0 && currentPlain === previousTemplatePlain;
+
+        const shouldReplace =
+            editorIsEmpty ||
+            editorMatchesPreviousTemplate ||
+            window.confirm(
+                "Substituir o texto atual pelo padrão selecionado? O conteúdo digitado será perdido."
+            );
+
+        if (!shouldReplace) {
+            return;
+        }
+
         setAnamnesisTemplateState(normalized);
         writeAnamnesisTemplate(normalized, user?.id);
+        setAnamnesisText(newTemplateHtml);
+        setExtractedRecord(null);
+        appliedTemplateRef.current = newTemplatePlain ? normalized : null;
     };
 
     // Restaurar rascunho quando o paciente mudar ou quando o componente montar novamente
@@ -285,6 +325,7 @@ export function AnamnesisCard() {
         if (!profileId) {
             setAnamnesisText("");
             setExtractedRecord(null);
+            appliedTemplateRef.current = null;
             return;
         }
 
@@ -299,8 +340,19 @@ export function AnamnesisCard() {
             }
         }
 
-        setAnamnesisText(normalizeClinicalContent(draft?.text ?? ""));
-        setExtractedRecord(draft?.extractedRecord ?? null);
+        const hasDraftText = Boolean(stripClinicalHtml(draft?.text ?? "").trim());
+        const selectedTemplate = readAnamnesisTemplate(user?.id);
+
+        if (hasDraftText) {
+            setAnamnesisText(normalizeClinicalContent(draft?.text ?? ""));
+            setExtractedRecord(draft?.extractedRecord ?? null);
+            appliedTemplateRef.current = draft?.templateId ?? null;
+        } else {
+            const templateHtml = buildTemplateHtml(selectedTemplate);
+            setAnamnesisText(templateHtml);
+            setExtractedRecord(null);
+            appliedTemplateRef.current = templateHtml ? selectedTemplate : null;
+        }
     }, [activeProfile?.id, user?.id]);
 
     // Persistir rascunho para sobreviver à troca de abas e páginas
@@ -315,6 +367,7 @@ export function AnamnesisCard() {
             {
                 text: anamnesisText,
                 extractedRecord,
+                templateId: appliedTemplateRef.current,
             },
             user?.id
         );
@@ -834,7 +887,9 @@ export function AnamnesisCard() {
             if (activeProfile?.id && !shouldPreserveExtractedRecord) {
                 clearAnamnesisDraft(activeProfile.id, user?.id);
             }
-            setAnamnesisText("");
+            const templateHtml = buildTemplateHtml(anamnesisTemplate);
+            setAnamnesisText(templateHtml);
+            appliedTemplateRef.current = templateHtml ? anamnesisTemplate : null;
             setExtractedRecord(shouldPreserveExtractedRecord ? (applyResult?.remainingRecord || variables.recordToApply || null) : null);
         },
         onError: (error: any) => {
@@ -952,7 +1007,9 @@ export function AnamnesisCard() {
         if (activeProfile?.id) {
             clearAnamnesisDraft(activeProfile.id, user?.id);
         }
-        setAnamnesisText("");
+        const templateHtml = buildTemplateHtml(anamnesisTemplate);
+        setAnamnesisText(templateHtml);
+        appliedTemplateRef.current = templateHtml ? anamnesisTemplate : null;
         setExtractedRecord(null);
     };
 
