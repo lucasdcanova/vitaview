@@ -1,6 +1,6 @@
-import { users, exams, examResults, healthMetrics, notifications, profiles, subscriptionPlans, subscriptions, diagnoses, surgeries, evolutions, appointments, doctors, habits, clinics, clinicMemberships, clinicInvitations, triageRecords, prescriptions, certificates, allergies, examRequests, examProtocols, customMedications, customExams, medications, userConsents, auditLogs, tussProcedures, aiConversations, aiMessages, aiUsage, certificateTemplates, storageLogs, deletedUsers } from "@shared/schema";
+import { users, exams, examResults, healthMetrics, notifications, profiles, subscriptionPlans, subscriptions, diagnoses, surgeries, evolutions, appointments, doctors, habits, clinics, clinicMemberships, clinicInvitations, triageRecords, prescriptions, certificates, allergies, examRequests, examProtocols, customMedications, customExams, medications, userConsents, auditLogs, tussProcedures, aiConversations, aiMessages, aiUsage, certificateTemplates, storageLogs, deletedUsers, anamnesisTemplates } from "@shared/schema";
 export type { TriageRecord, InsertTriageRecord } from "@shared/schema";
-import type { User, InsertUser, Profile, InsertProfile, Exam, InsertExam, ExamResult, InsertExamResult, HealthMetric, InsertHealthMetric, Notification, InsertNotification, SubscriptionPlan, InsertSubscriptionPlan, Subscription, InsertSubscription, Evolution, InsertEvolution, Appointment, InsertAppointment, Doctor, InsertDoctor, Habit, Clinic, InsertClinic, ClinicMembership, InsertClinicMembership, ClinicInvitation, InsertClinicInvitation, Prescription, InsertPrescription, Certificate, InsertCertificate, ExamRequest, InsertExamRequest, ExamProtocol, InsertExamProtocol, CustomMedication, InsertCustomMedication, CustomExam, InsertCustomExam, TussProcedure, InsertTussProcedure, AIConversation, InsertAIConversation, AIMessage, InsertAIMessage, AIUsage, InsertAIUsage, UserConsent, InsertUserConsent, AuditLog, InsertAuditLog, CertificateTemplate, InsertCertificateTemplate, DeletedUser, InsertDeletedUser } from "@shared/schema";
+import type { User, InsertUser, Profile, InsertProfile, Exam, InsertExam, ExamResult, InsertExamResult, HealthMetric, InsertHealthMetric, Notification, InsertNotification, SubscriptionPlan, InsertSubscriptionPlan, Subscription, InsertSubscription, Evolution, InsertEvolution, Appointment, InsertAppointment, Doctor, InsertDoctor, Habit, Clinic, InsertClinic, ClinicMembership, InsertClinicMembership, ClinicInvitation, InsertClinicInvitation, Prescription, InsertPrescription, Certificate, InsertCertificate, ExamRequest, InsertExamRequest, ExamProtocol, InsertExamProtocol, CustomMedication, InsertCustomMedication, CustomExam, InsertCustomExam, TussProcedure, InsertTussProcedure, AIConversation, InsertAIConversation, AIMessage, InsertAIMessage, AIUsage, InsertAIUsage, UserConsent, InsertUserConsent, AuditLog, InsertAuditLog, CertificateTemplate, InsertCertificateTemplate, DeletedUser, InsertDeletedUser, AnamnesisTemplateRow, InsertAnamnesisTemplate } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
 import connectPg from "connect-pg-simple";
@@ -87,6 +87,14 @@ export interface IStorage {
   getEvolutionsByUserId(userId: number): Promise<Evolution[]>;
   getEvolutionsByProfileId(userId: number, profileId: number): Promise<Evolution[]>;
   deleteEvolution(id: number): Promise<boolean>;
+
+  // Anamnesis template operations
+  getAnamnesisTemplatesByUserId(userId: number): Promise<AnamnesisTemplateRow[]>;
+  getAnamnesisTemplateById(id: number, userId: number): Promise<AnamnesisTemplateRow | undefined>;
+  getAnamnesisTemplateOverride(userId: number, baseTemplateId: string): Promise<AnamnesisTemplateRow | undefined>;
+  createAnamnesisTemplate(template: InsertAnamnesisTemplate): Promise<AnamnesisTemplateRow>;
+  updateAnamnesisTemplate(id: number, userId: number, updates: Partial<InsertAnamnesisTemplate>): Promise<AnamnesisTemplateRow | undefined>;
+  deleteAnamnesisTemplate(id: number, userId: number): Promise<boolean>;
 
   // Habit operations
   createHabit(habit: any): Promise<any>;
@@ -974,6 +982,26 @@ export class MemStorage implements IStorage {
 
   async deleteEvolution(id: number): Promise<boolean> {
     return this.evolutionsMap.delete(id);
+  }
+
+  // Anamnesis templates (MemStorage stubs — produção usa DatabaseStorage)
+  async getAnamnesisTemplatesByUserId(_userId: number): Promise<AnamnesisTemplateRow[]> {
+    return [];
+  }
+  async getAnamnesisTemplateById(_id: number, _userId: number): Promise<AnamnesisTemplateRow | undefined> {
+    return undefined;
+  }
+  async getAnamnesisTemplateOverride(_userId: number, _baseTemplateId: string): Promise<AnamnesisTemplateRow | undefined> {
+    return undefined;
+  }
+  async createAnamnesisTemplate(_template: InsertAnamnesisTemplate): Promise<AnamnesisTemplateRow> {
+    throw new Error("MemStorage não suporta anamnesis templates");
+  }
+  async updateAnamnesisTemplate(_id: number, _userId: number, _updates: Partial<InsertAnamnesisTemplate>): Promise<AnamnesisTemplateRow | undefined> {
+    return undefined;
+  }
+  async deleteAnamnesisTemplate(_id: number, _userId: number): Promise<boolean> {
+    return false;
   }
 
   // Habit operations
@@ -2803,6 +2831,59 @@ export class DatabaseStorage implements IStorage {
   async deleteEvolution(id: number): Promise<boolean> {
     await db.delete(evolutions).where(eq(evolutions.id, id));
     return true;
+  }
+
+  // Anamnesis templates
+  async getAnamnesisTemplatesByUserId(userId: number): Promise<AnamnesisTemplateRow[]> {
+    return await db
+      .select()
+      .from(anamnesisTemplates)
+      .where(eq(anamnesisTemplates.userId, userId))
+      .orderBy(asc(anamnesisTemplates.label));
+  }
+
+  async getAnamnesisTemplateById(id: number, userId: number): Promise<AnamnesisTemplateRow | undefined> {
+    const [row] = await db
+      .select()
+      .from(anamnesisTemplates)
+      .where(and(eq(anamnesisTemplates.id, id), eq(anamnesisTemplates.userId, userId)));
+    return row;
+  }
+
+  async getAnamnesisTemplateOverride(userId: number, baseTemplateId: string): Promise<AnamnesisTemplateRow | undefined> {
+    const [row] = await db
+      .select()
+      .from(anamnesisTemplates)
+      .where(and(
+        eq(anamnesisTemplates.userId, userId),
+        eq(anamnesisTemplates.baseTemplateId, baseTemplateId),
+      ));
+    return row;
+  }
+
+  async createAnamnesisTemplate(template: InsertAnamnesisTemplate): Promise<AnamnesisTemplateRow> {
+    const [row] = await db
+      .insert(anamnesisTemplates)
+      .values(template)
+      .returning();
+    return row;
+  }
+
+  async updateAnamnesisTemplate(id: number, userId: number, updates: Partial<InsertAnamnesisTemplate>): Promise<AnamnesisTemplateRow | undefined> {
+    const [row] = await db
+      .update(anamnesisTemplates)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(anamnesisTemplates.id, id), eq(anamnesisTemplates.userId, userId)))
+      .returning();
+    return row;
+  }
+
+  async deleteAnamnesisTemplate(id: number, userId: number): Promise<boolean> {
+    const result = await db
+      .delete(anamnesisTemplates)
+      .where(and(eq(anamnesisTemplates.id, id), eq(anamnesisTemplates.userId, userId)))
+      .returning({ id: anamnesisTemplates.id });
+    return result.length > 0;
   }
 
   // Habits

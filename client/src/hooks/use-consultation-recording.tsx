@@ -26,11 +26,7 @@ import {
   type NativeAudioRecorderListenerHandle,
   type NativeAudioRecorderSegment,
 } from "@/lib/native-audio-recorder";
-import {
-  DEFAULT_ANAMNESIS_TEMPLATE_ID,
-  normalizeAnamnesisTemplateId,
-  type AnamnesisTemplateId,
-} from "@shared/anamnesis-templates";
+import { DEFAULT_ANAMNESIS_TEMPLATE_ID } from "@shared/anamnesis-templates";
 
 // Reliability: chunked recording with periodic auto-restart to manter cada
 // segmento bem abaixo do limite de 25MB do Whisper, em qualquer plataforma.
@@ -76,7 +72,7 @@ interface ConsultationRecordingSession {
   profileId: number | null;
   patientName: string | null;
   returnPath: string;
-  anamnesisTemplate: AnamnesisTemplateId;
+  anamnesisTemplate: string;
 }
 
 interface RecordingFormat {
@@ -235,7 +231,7 @@ interface ConsultationRecordingContextType {
     profileId?: number;
     patientName?: string | null;
     returnPath?: string;
-    anamnesisTemplate?: AnamnesisTemplateId | string | null;
+    anamnesisTemplate?: string | null;
   }) => Promise<void>;
   togglePause: () => void;
   stopRecording: () => void;
@@ -926,7 +922,7 @@ export function ConsultationRecordingProvider({
       profileId?: number;
       patientName?: string | null;
       returnPath?: string;
-      anamnesisTemplate?: AnamnesisTemplateId | string | null;
+      anamnesisTemplate?: string | null;
     }) => {
       try {
         const nextSession = {
@@ -934,7 +930,10 @@ export function ConsultationRecordingProvider({
           profileId: options?.profileId ?? null,
           patientName: options?.patientName?.trim() || null,
           returnPath: options?.returnPath || "/atendimento",
-          anamnesisTemplate: normalizeAnamnesisTemplateId(options?.anamnesisTemplate),
+          anamnesisTemplate:
+            typeof options?.anamnesisTemplate === "string" && options.anamnesisTemplate.trim()
+              ? options.anamnesisTemplate.trim()
+              : DEFAULT_ANAMNESIS_TEMPLATE_ID,
         };
         if (nextSession.profileId === null) {
           console.warn("[Recording] startRecording chamado sem profileId — resultado sera anexado ao paciente ativo no momento da finalizacao");

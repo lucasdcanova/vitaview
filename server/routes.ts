@@ -27,7 +27,13 @@ import {
 import Stripe from "stripe";
 import multer from "multer";
 import { CID10_DATABASE } from "../shared/data/cid10-database";
-import { normalizeAnamnesisTemplateId } from "@shared/anamnesis-templates";
+import {
+  ANAMNESIS_TEMPLATE_IDS,
+  isAnamnesisTemplateId,
+  normalizeAnamnesisTemplateId,
+} from "@shared/anamnesis-templates";
+import { ensurePremium } from "./middleware/ensure-premium";
+import { resolveAnamnesisTemplate } from "./services/anamnesis-template-resolver";
 import { biometricTwoFactorAuth } from "./auth/biometric-2fa";
 import { advancedSecurity } from "./middleware/advanced-security";
 import { ensureAuthenticated } from "./middleware/auth.middleware";
@@ -3091,8 +3097,8 @@ export async function registerRoutes(app: Express): Promise<void> {
         return res.status(400).json({ message: "Texto da anamnese é obrigatório" });
       }
 
-      const templateId = normalizeAnamnesisTemplateId(req.body?.template);
-      const enhancedText = await enhanceAnamnesisText(text, req.user!.id, req.tenantId, templateId);
+      const template = await resolveAnamnesisTemplate(req.body?.template, req.user!.id);
+      const enhancedText = await enhanceAnamnesisText(text, req.user!.id, req.tenantId, template);
       res.json({ text: enhancedText });
     } catch (error) {
       logger.error("[PatientRecord] Falha ao melhorar anamnese com IA", {
@@ -3100,6 +3106,125 @@ export async function registerRoutes(app: Express): Promise<void> {
         message: error instanceof Error ? error.message : String(error)
       });
       res.status(500).json({ message: "Erro ao melhorar texto da anamnese" });
+    }
+  });
+
+  // Templates de anamnese (custom + overrides dos built-in)
+  app.get("/api/anamnesis-templates", ensureAuthenticated, async (req, res) => {
+    try {
+      const rows = await storage.getAnamnesisTemplatesByUserId(req.user!.id);
+      res.json(rows);
+    } catch (error) {
+      logger.error("[AnamnesisTemplates] Falha ao listar", {
+        userId: req.user?.id,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      res.status(500).json({ message: "Erro ao listar padrões de anamnese." });
+    }
+  });
+
+  app.post("/api/anamnesis-templates", ensureAuthenticated, ensurePremium, async (req, res) => {
+    try {
+      const label = typeof req.body?.label === "string" ? req.body.label.trim() : "";
+      const structure = typeof req.body?.structure === "string" ? req.body.structure : "";
+      const rawBase = typeof req.body?.baseTemplateId === "string" ? req.body.baseTemplateId : null;
+      const baseTemplateId = rawBase && isAnamnesisTemplateId(rawBase) ? rawBase : null;
+      const freeForm = req.body?.freeForm === true;
+
+      if (!label) {
+        return res.status(400).json({ message: "O nome do padrão é obrigatório." });
+      }
+      if (label.length > 80) {
+        return res.status(400).json({ message: "O nome deve ter no máximo 80 caracteres." });
+      }
+
+      if (baseTemplateId) {
+        const existing = await storage.getAnamnesisTemplateOverride(req.user!.id, baseTemplateId);
+        if (existing) {
+          return res.status(409).json({
+            message: "Você já tem uma personalização para esse padrão.",
+            code: "OVERRIDE_EXISTS",
+            template: existing,
+          });
+        }
+      }
+
+      const row = await storage.createAnamnesisTemplate({
+        userId: req.user!.id,
+        baseTemplateId,
+        label,
+        structure,
+        freeForm,
+      });
+      res.status(201).json(row);
+    } catch (error) {
+      logger.error("[AnamnesisTemplates] Falha ao criar", {
+        userId: req.user?.id,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      res.status(500).json({ message: "Erro ao criar padrão de anamnese." });
+    }
+  });
+
+  app.put("/api/anamnesis-templates/:id", ensureAuthenticated, ensurePremium, async (req, res) => {
+    try {
+      const id = Number.parseInt(req.params.id, 10);
+      if (!Number.isFinite(id)) {
+        return res.status(400).json({ message: "ID inválido." });
+      }
+      const existing = await storage.getAnamnesisTemplateById(id, req.user!.id);
+      if (!existing) {
+        return res.status(404).json({ message: "Padrão não encontrado." });
+      }
+
+      const updates: Partial<{ label: string; structure: string; freeForm: boolean }> = {};
+      if (typeof req.body?.label === "string") {
+        const label = req.body.label.trim();
+        if (!label) {
+          return res.status(400).json({ message: "O nome do padrão é obrigatório." });
+        }
+        if (label.length > 80) {
+          return res.status(400).json({ message: "O nome deve ter no máximo 80 caracteres." });
+        }
+        updates.label = label;
+      }
+      if (typeof req.body?.structure === "string") {
+        updates.structure = req.body.structure;
+      }
+      if (typeof req.body?.freeForm === "boolean") {
+        updates.freeForm = req.body.freeForm;
+      }
+
+      const row = await storage.updateAnamnesisTemplate(id, req.user!.id, updates);
+      res.json(row);
+    } catch (error) {
+      logger.error("[AnamnesisTemplates] Falha ao atualizar", {
+        userId: req.user?.id,
+        templateId: req.params.id,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      res.status(500).json({ message: "Erro ao atualizar padrão de anamnese." });
+    }
+  });
+
+  app.delete("/api/anamnesis-templates/:id", ensureAuthenticated, ensurePremium, async (req, res) => {
+    try {
+      const id = Number.parseInt(req.params.id, 10);
+      if (!Number.isFinite(id)) {
+        return res.status(400).json({ message: "ID inválido." });
+      }
+      const ok = await storage.deleteAnamnesisTemplate(id, req.user!.id);
+      if (!ok) {
+        return res.status(404).json({ message: "Padrão não encontrado." });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      logger.error("[AnamnesisTemplates] Falha ao deletar", {
+        userId: req.user?.id,
+        templateId: req.params.id,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      res.status(500).json({ message: "Erro ao excluir padrão de anamnese." });
     }
   });
 
@@ -3496,14 +3621,14 @@ export async function registerRoutes(app: Express): Promise<void> {
           });
         }
 
-        const templateId = normalizeAnamnesisTemplateId(req.body?.template);
+        const template = await resolveAnamnesisTemplate(req.body?.template, req.user!.id);
 
         const result = await processTranscriptionToAnamnesis(
           transcription,
           patientData,
           req.user!.id,
           req.tenantId,
-          templateId
+          template
         );
 
         if (sessionId) {
@@ -3645,12 +3770,12 @@ export async function registerRoutes(app: Express): Promise<void> {
           }
         }
 
-        const templateId = normalizeAnamnesisTemplateId(req.body?.template);
+        const template = await resolveAnamnesisTemplate(req.body?.template, req.user!.id);
 
         logger.info("[Transcription] Retry manual solicitado", {
           userId: req.user?.id,
           sessionId,
-          templateId,
+          templateId: template.id,
         });
 
         const result =
@@ -3670,7 +3795,7 @@ export async function registerRoutes(app: Express): Promise<void> {
                 pd,
                 userId,
                 clinicId,
-                templateId
+                template
               ),
             patientData,
           });
