@@ -24,6 +24,13 @@ import {
   SelectTrigger,
   SelectValue,
   } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Save,
   Sparkles,
   Mic,
@@ -41,6 +48,7 @@ import { Save,
   Pencil,
   Plus,
   RotateCcw,
+  ChevronDown,
 } from "lucide-react";
 import { ConsultationRecorder } from "@/components/consultation-recorder";
 import { BrandLoader } from "@/components/ui/brand-loader";
@@ -328,8 +336,8 @@ export function AnamnesisCard() {
         setEditorOpen(true);
     };
 
-    const handleOpenEditTemplate = () => {
-        setEditorMode({ kind: "edit", template: activeResolvedTemplate });
+    const handleOpenEditTemplateFor = (template: ResolvedAnamnesisTemplate) => {
+        setEditorMode({ kind: "edit", template });
         setEditorOpen(true);
     };
 
@@ -1094,57 +1102,75 @@ export function AnamnesisCard() {
                 <CardHeader className={`flex flex-col ${isMobile ? 'gap-2 pb-3' : 'gap-4'}`}>
                     <div className={`flex items-center ${isMobile ? 'gap-2 flex-wrap' : 'gap-2'}`}>
                         <CardTitle className={`text-foreground ${isMobile ? 'text-lg' : 'text-2xl'}`}>Anamnese inteligente</CardTitle>
-                        <Select value={anamnesisTemplate} onValueChange={handleSelectAnamnesisTemplate}>
-                            <SelectTrigger
-                                className={`${isMobile ? 'h-8 text-sm' : 'h-9 text-sm'} w-auto min-w-[140px] rounded-lg border-border bg-background gap-2`}
-                                aria-label="Padrão de anamnese"
-                            >
-                                <SelectValue placeholder="Selecione um padrão">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className={`${isMobile ? 'h-8' : 'h-9'} gap-2 rounded-lg border-border bg-background px-3 text-sm font-medium`}
+                                    aria-label="Padrão de anamnese"
+                                >
                                     {activeResolvedTemplate.label}
-                                </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                                {availableTemplates.map((option) => (
-                                    <SelectItem key={option.key} value={option.key}>
-                                        <div className="flex flex-col">
-                                            <span className="text-sm font-medium leading-tight flex items-center gap-2">
-                                                {option.label}
-                                                {option.source !== "builtin" && (
-                                                    <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
-                                                        Personalizado
-                                                    </span>
-                                                )}
-                                            </span>
-                                            <span className="text-xs text-muted-foreground leading-tight">{option.description}</span>
-                                        </div>
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <FeatureGate feature="anamnesis-template-editor">
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-9 w-9"
-                                title={activeResolvedTemplate.source === "builtin" ? "Personalizar este padrão" : "Editar padrão"}
-                                onClick={handleOpenEditTemplate}
-                            >
-                                <Pencil className="h-4 w-4" />
-                            </Button>
-                        </FeatureGate>
-                        <FeatureGate feature="anamnesis-template-editor">
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-9 w-9"
-                                title="Criar novo padrão"
-                                onClick={handleOpenCreateTemplate}
-                            >
-                                <Plus className="h-4 w-4" />
-                            </Button>
-                        </FeatureGate>
+                                    <ChevronDown className="h-4 w-4 opacity-60" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-72 p-1">
+                                {availableTemplates.map((option) => {
+                                    const isActive = option.key === anamnesisTemplate;
+                                    return (
+                                        <DropdownMenuItem
+                                            key={option.key}
+                                            className={`flex items-start gap-2 rounded-md px-2 py-2 ${isActive ? 'bg-accent' : ''}`}
+                                            onSelect={(event) => {
+                                                event.preventDefault();
+                                                handleSelectAnamnesisTemplate(option.key);
+                                            }}
+                                        >
+                                            <div className="flex min-w-0 flex-1 flex-col">
+                                                <span className="text-sm font-medium leading-tight flex items-center gap-2">
+                                                    <span className="truncate">{option.label}</span>
+                                                    {option.source !== "builtin" && (
+                                                        <span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
+                                                            Personalizado
+                                                        </span>
+                                                    )}
+                                                </span>
+                                                <span className="text-xs text-muted-foreground leading-tight">
+                                                    {option.description}
+                                                </span>
+                                            </div>
+                                            <FeatureGate feature="anamnesis-template-editor">
+                                                <button
+                                                    type="button"
+                                                    className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                    title={option.source === "builtin" ? "Personalizar este padrão" : "Editar padrão"}
+                                                    onClick={(event) => {
+                                                        event.preventDefault();
+                                                        event.stopPropagation();
+                                                        handleOpenEditTemplateFor(option);
+                                                    }}
+                                                >
+                                                    <Pencil className="h-3.5 w-3.5" />
+                                                </button>
+                                            </FeatureGate>
+                                        </DropdownMenuItem>
+                                    );
+                                })}
+                                <DropdownMenuSeparator />
+                                <FeatureGate feature="anamnesis-template-editor">
+                                    <DropdownMenuItem
+                                        className="gap-2 rounded-md px-2 py-2 text-sm font-medium text-primary"
+                                        onSelect={(event) => {
+                                            event.preventDefault();
+                                            handleOpenCreateTemplate();
+                                        }}
+                                    >
+                                        <Plus className="h-4 w-4" />
+                                        Novo padrão personalizado
+                                    </DropdownMenuItem>
+                                </FeatureGate>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                         {activeResolvedTemplate.source === "override" && (
                             <Button
                                 type="button"
