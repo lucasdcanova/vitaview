@@ -49,11 +49,14 @@ import { Save,
   Plus,
   RotateCcw,
   ChevronDown,
+  Lock,
 } from "lucide-react";
 import { ConsultationRecorder } from "@/components/consultation-recorder";
 import { BrandLoader } from "@/components/ui/brand-loader";
 import { useConsultationRecording } from "@/hooks/use-consultation-recording";
 import { useAuth } from "@/hooks/use-auth";
+import { usePremiumAccess } from "@/hooks/use-premium-access";
+import { PremiumRequiredDialog } from "@/components/ui/premium-required-dialog";
 import { ExamUploadLauncher } from "@/components/exams/exam-upload-launcher";
 import { normalizeClinicalContent, plainTextToClinicalHtml, stripClinicalHtml } from "@shared/clinical-rich-text";
 import { DEFAULT_ANAMNESIS_TEMPLATE_ID } from "@shared/anamnesis-templates";
@@ -273,8 +276,10 @@ export function AnamnesisCard() {
     const [anamnesisTemplate, setAnamnesisTemplateState] = useState<string>(DEFAULT_ANAMNESIS_TEMPLATE_ID);
     const appliedTemplateRef = useRef<string | null>(null);
     const { templates: availableTemplates, resolveByKey, deleteTemplate } = useAnamnesisTemplates();
+    const { hasPremium } = usePremiumAccess();
     const [editorMode, setEditorMode] = useState<AnamnesisTemplateEditorMode | null>(null);
     const [editorOpen, setEditorOpen] = useState(false);
+    const [premiumDialogOpen, setPremiumDialogOpen] = useState(false);
     const activeResolvedTemplate = resolveByKey(anamnesisTemplate);
     const { toast } = useToast();
     const queryClient = useQueryClient();
@@ -332,11 +337,19 @@ export function AnamnesisCard() {
     };
 
     const handleOpenCreateTemplate = () => {
+        if (!hasPremium) {
+            setPremiumDialogOpen(true);
+            return;
+        }
         setEditorMode({ kind: "create" });
         setEditorOpen(true);
     };
 
     const handleOpenEditTemplateFor = (template: ResolvedAnamnesisTemplate) => {
+        if (!hasPremium) {
+            setPremiumDialogOpen(true);
+            return;
+        }
         setEditorMode({ kind: "edit", template });
         setEditorOpen(true);
     };
@@ -1139,36 +1152,46 @@ export function AnamnesisCard() {
                                                     {option.description}
                                                 </span>
                                             </div>
-                                            <FeatureGate feature="anamnesis-template-editor">
-                                                <button
-                                                    type="button"
-                                                    className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                                                    title={option.source === "builtin" ? "Personalizar este padrão" : "Editar padrão"}
-                                                    onClick={(event) => {
-                                                        event.preventDefault();
-                                                        event.stopPropagation();
-                                                        handleOpenEditTemplateFor(option);
-                                                    }}
-                                                >
+                                            <button
+                                                type="button"
+                                                className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                title={
+                                                    hasPremium
+                                                        ? option.source === "builtin"
+                                                            ? "Personalizar este padrão"
+                                                            : "Editar padrão"
+                                                        : "Recurso premium — fazer upgrade"
+                                                }
+                                                onClick={(event) => {
+                                                    event.preventDefault();
+                                                    event.stopPropagation();
+                                                    handleOpenEditTemplateFor(option);
+                                                }}
+                                            >
+                                                {hasPremium ? (
                                                     <Pencil className="h-3.5 w-3.5" />
-                                                </button>
-                                            </FeatureGate>
+                                                ) : (
+                                                    <Lock className="h-3.5 w-3.5 text-yellow-500" />
+                                                )}
+                                            </button>
                                         </DropdownMenuItem>
                                     );
                                 })}
                                 <DropdownMenuSeparator />
-                                <FeatureGate feature="anamnesis-template-editor">
-                                    <DropdownMenuItem
-                                        className="gap-2 rounded-md px-2 py-2 text-sm font-medium text-primary"
-                                        onSelect={(event) => {
-                                            event.preventDefault();
-                                            handleOpenCreateTemplate();
-                                        }}
-                                    >
+                                <DropdownMenuItem
+                                    className="gap-2 rounded-md px-2 py-2 text-sm font-medium text-primary"
+                                    onSelect={(event) => {
+                                        event.preventDefault();
+                                        handleOpenCreateTemplate();
+                                    }}
+                                >
+                                    {hasPremium ? (
                                         <Plus className="h-4 w-4" />
-                                        Novo padrão personalizado
-                                    </DropdownMenuItem>
-                                </FeatureGate>
+                                    ) : (
+                                        <Lock className="h-4 w-4 text-yellow-500" />
+                                    )}
+                                    Novo padrão personalizado
+                                </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                         {activeResolvedTemplate.source === "override" && (
@@ -1777,6 +1800,12 @@ export function AnamnesisCard() {
                 onOpenChange={setEditorOpen}
                 mode={editorMode}
                 onSaved={handleTemplateSaved}
+            />
+
+            <PremiumRequiredDialog
+                open={premiumDialogOpen}
+                onOpenChange={setPremiumDialogOpen}
+                description="Criar e personalizar padrões de anamnese é um recurso disponível nos planos Vita. Faça upgrade para desbloquear."
             />
         </div>
     );
