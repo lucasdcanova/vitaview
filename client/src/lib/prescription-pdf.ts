@@ -2,9 +2,12 @@ import jsPDF from "jspdf";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
+    drawDocumentFooter,
     drawDocumentHeader,
+    drawDocumentWatermark,
     fetchAndPreloadClinicHeader,
     type ClinicHeaderForPdf,
+    type DocumentIdentity,
     type PreloadedHeaderAssets,
 } from "./document-header";
 
@@ -17,6 +20,8 @@ interface PrescriptionData {
     doctorCrm: string;
     doctorSpecialty?: string;
     doctorRqe?: string;
+    doctorAddress?: string;
+    doctorPhone?: string;
     // Dados do Paciente
     patientName: string;
     patientCpf?: string;
@@ -49,6 +54,15 @@ interface PrescriptionData {
     clinicHeaderAssets?: PreloadedHeaderAssets;
     validityText?: string;
 }
+
+const buildIdentity = (data: PrescriptionData): DocumentIdentity => ({
+    doctorName: data.doctorName,
+    doctorCrm: data.doctorCrm,
+    doctorSpecialty: data.doctorSpecialty,
+    doctorRqe: data.doctorRqe,
+    doctorAddress: data.doctorAddress,
+    doctorPhone: data.doctorPhone,
+});
 
 // Lista de medicamentos controlados
 const CONTROLLED_MEDICATIONS = [
@@ -380,7 +394,7 @@ const drawControlledFooter = (doc: jsPDF, layout: BodyLayout, data: Prescription
     const pageHeight = 210;
     const signatureY = pageHeight - 80;
     const boxesY = pageHeight - 55;
-    const validityY = pageHeight - 12;
+    const validityY = pageHeight - 18;
 
     // Signature
     doc.setLineWidth(0.3);
@@ -443,38 +457,58 @@ const drawControlledFooter = (doc: jsPDF, layout: BodyLayout, data: Prescription
 // GENERATORS
 // ==========================================
 
-const generateBasicPrescription = (doc: jsPDF, data: PrescriptionData, xOffset: number = 0) => {
+const PAGE_HEIGHT_LANDSCAPE = 210;
+
+const generateBasicPrescription = (
+    doc: jsPDF,
+    data: PrescriptionData,
+    xOffset: number,
+    config: { title: string; subtitle?: string }
+) => {
     const layout = layoutFor(xOffset, 148.5);
+    const identity = buildIdentity(data);
     const headerEndY = drawDocumentHeader(
         doc,
         data.clinicHeader ?? null,
         data.clinicHeaderAssets ?? {},
-        { xOffset, pageWidth: layout.pageWidth, marginX: layout.margin, topMargin: 8 }
+        {
+            xOffset,
+            pageWidth: layout.pageWidth,
+            marginX: layout.margin,
+            topMargin: 8,
+            identity,
+        }
     );
 
-    let yPos = drawDocumentTitle(doc, layout, "RECEITUÁRIO", headerEndY);
+    // Subtle watermark
+    drawDocumentWatermark(doc, {
+        xOffset,
+        pageWidth: layout.pageWidth,
+        pageHeight: PAGE_HEIGHT_LANDSCAPE,
+        identity,
+        clinicName: data.clinicHeader?.clinicName,
+    });
+
+    let yPos = drawDocumentTitle(doc, layout, config.title, headerEndY, {
+        subtitle: config.subtitle,
+    });
     yPos = drawDoctorBlock(doc, layout, data, yPos);
     yPos += 3;
     yPos = drawPatientBlock(doc, layout, data, yPos);
     yPos = drawMedicationsBlock(doc, layout, data, yPos);
 
     drawSignatureFooter(doc, layout, data, {
-        viaLabel: xOffset > 0 ? "2ª Via" : "1ª Via",
+        signatureOffset: 50,
+        footerOffset: 22,
+        viaLabel: xOffset > 0 ? "2ª via" : "1ª via",
     });
-};
 
-const drawColoredTitle = (
-    doc: jsPDF,
-    layout: BodyLayout,
-    headerEndY: number,
-    title: string,
-    subtitle: string,
-    color: [number, number, number]
-): number => {
-    return drawDocumentTitle(doc, layout, title, headerEndY, {
-        subtitle,
-        subtitle2: "1ª via – retenção da farmácia",
-        color,
+    drawDocumentFooter(doc, data.clinicHeader ?? null, {
+        xOffset,
+        pageWidth: layout.pageWidth,
+        pageHeight: PAGE_HEIGHT_LANDSCAPE,
+        marginX: layout.margin,
+        identity,
     });
 };
 
@@ -482,23 +516,49 @@ const generateControlledPrescription = (
     doc: jsPDF,
     data: PrescriptionData,
     xOffset: number,
-    config: { title: string; subtitle: string; color: [number, number, number] }
+    config: { title: string; subtitle: string }
 ) => {
     const layout = layoutFor(xOffset, 148.5);
+    const identity = buildIdentity(data);
     const headerEndY = drawDocumentHeader(
         doc,
         data.clinicHeader ?? null,
         data.clinicHeaderAssets ?? {},
-        { xOffset, pageWidth: layout.pageWidth, marginX: layout.margin, topMargin: 8 }
+        {
+            xOffset,
+            pageWidth: layout.pageWidth,
+            marginX: layout.margin,
+            topMargin: 8,
+            identity,
+        }
     );
 
-    let yPos = drawColoredTitle(doc, layout, headerEndY, config.title, config.subtitle, config.color);
+    drawDocumentWatermark(doc, {
+        xOffset,
+        pageWidth: layout.pageWidth,
+        pageHeight: PAGE_HEIGHT_LANDSCAPE,
+        identity,
+        clinicName: data.clinicHeader?.clinicName,
+    });
+
+    let yPos = drawDocumentTitle(doc, layout, config.title, headerEndY, {
+        subtitle: config.subtitle,
+        subtitle2: "1ª via – retenção da farmácia",
+    });
     yPos = drawDoctorBlock(doc, layout, data, yPos);
     yPos += 3;
     yPos = drawPatientBlock(doc, layout, data, yPos);
     yPos = drawMedicationsBlock(doc, layout, data, yPos);
 
     drawControlledFooter(doc, layout, data);
+
+    drawDocumentFooter(doc, data.clinicHeader ?? null, {
+        xOffset,
+        pageWidth: layout.pageWidth,
+        pageHeight: PAGE_HEIGHT_LANDSCAPE,
+        marginX: layout.margin,
+        identity,
+    });
 };
 
 // ==========================================
@@ -555,7 +615,7 @@ export const generatePrescriptionPDF = async (
         const groupData = enrich({ ...data, medications: groups[type] });
         const offsets = [0, 148.5];
 
-        // Dashed cut line between vias
+        // Thin cut line between vias
         doc.setLineWidth(0.1);
         doc.setDrawColor(180, 180, 180);
         doc.line(148.5, 8, 148.5, 202);
@@ -563,54 +623,51 @@ export const generatePrescriptionPDF = async (
         offsets.forEach((xOffset) => {
             switch (type) {
                 case "padrao": {
-                    const validityPadrao = groupData.isContinuousUse
+                    const validity = groupData.isContinuousUse
                         ? "Válido por 180 dias a partir da data de emissão."
                         : "Válido por 30 dias a partir da data de emissão.";
                     generateBasicPrescription(
                         doc,
-                        { ...groupData, validityText: validityPadrao },
-                        xOffset
+                        { ...groupData, validityText: validity },
+                        xOffset,
+                        { title: "RECEITUÁRIO" }
                     );
                     break;
                 }
+                case "A":
+                    generateBasicPrescription(doc, {
+                        ...groupData,
+                        validityText: "Cópia para o paciente · receita oficial preenchida em formulário próprio.",
+                    }, xOffset, {
+                        title: "RECEITUÁRIO",
+                        subtitle: "Cópia paciente — Notificação A (opioides)",
+                    });
+                    break;
+                case "B1":
+                    generateBasicPrescription(doc, {
+                        ...groupData,
+                        validityText: "Cópia para o paciente · receita oficial preenchida em formulário próprio.",
+                    }, xOffset, {
+                        title: "RECEITUÁRIO",
+                        subtitle: "Cópia paciente — Notificação B1 (psicotrópicos)",
+                    });
+                    break;
+                case "B2":
+                    generateBasicPrescription(doc, {
+                        ...groupData,
+                        validityText: "Cópia para o paciente · receita oficial preenchida em formulário próprio.",
+                    }, xOffset, {
+                        title: "RECEITUÁRIO",
+                        subtitle: "Cópia paciente — Notificação B2 (anorexígenos)",
+                    });
+                    break;
                 case "especial":
                     generateControlledPrescription(doc, {
                         ...groupData,
                         validityText: "Válido por 10 dias a partir da data de emissão.",
                     }, xOffset, {
                         title: "RECEITA DE CONTROLE ESPECIAL",
-                        subtitle: "Antimicrobianos — 2 vias (retenção da farmácia)",
-                        color: [25, 25, 25],
-                    });
-                    break;
-                case "A":
-                    generateControlledPrescription(doc, {
-                        ...groupData,
-                        validityText: "Válido por 30 dias a partir da data de emissão.",
-                    }, xOffset, {
-                        title: "NOTIFICAÇÃO DE RECEITA A",
-                        subtitle: "Entorpecentes e psicotrópicos – Lista A1/A2 (opioides)",
-                        color: [180, 120, 0],
-                    });
-                    break;
-                case "B1":
-                    generateControlledPrescription(doc, {
-                        ...groupData,
-                        validityText: "Válido por 30 dias a partir da data de emissão.",
-                    }, xOffset, {
-                        title: "NOTIFICAÇÃO DE RECEITA B",
-                        subtitle: "Psicotrópicos – Lista B1 (ansiolíticos, hipnóticos, anticonvulsivantes)",
-                        color: [30, 80, 150],
-                    });
-                    break;
-                case "B2":
-                    generateControlledPrescription(doc, {
-                        ...groupData,
-                        validityText: "Válido por 30 dias a partir da data de emissão.",
-                    }, xOffset, {
-                        title: "NOTIFICAÇÃO DE RECEITA B2",
-                        subtitle: "Psicotrópicos anorexígenos – Lista B2",
-                        color: [30, 60, 130],
+                        subtitle: "Antimicrobianos — 2 vias",
                     });
                     break;
                 case "C":
@@ -619,8 +676,7 @@ export const generatePrescriptionPDF = async (
                         validityText: "Válido por 30 dias a partir da data de emissão.",
                     }, xOffset, {
                         title: "RECEITA DE CONTROLE ESPECIAL",
-                        subtitle: "Retinoides, imunossupressores – Lista C (2 vias)",
-                        color: [25, 25, 25],
+                        subtitle: "Retinoides / imunossupressores — Lista C",
                     });
                     break;
                 case "C1":
@@ -629,8 +685,7 @@ export const generatePrescriptionPDF = async (
                         validityText: "Válido por 30 dias a partir da data de emissão.",
                     }, xOffset, {
                         title: "RECEITA DE CONTROLE ESPECIAL",
-                        subtitle: "Antidepressivos, antipsicóticos – Lista C1 (2 vias)",
-                        color: [25, 25, 25],
+                        subtitle: "Antidepressivos / antipsicóticos — Lista C1",
                     });
                     break;
             }

@@ -1,8 +1,11 @@
 import jsPDF from "jspdf";
 import {
+    drawDocumentFooter,
     drawDocumentHeader,
+    drawDocumentWatermark,
     fetchAndPreloadClinicHeader,
     type ClinicHeaderForPdf,
+    type DocumentIdentity,
     type PreloadedHeaderAssets,
 } from "./document-header";
 
@@ -12,6 +15,8 @@ export interface CertificateData {
     doctorCrm: string;
     doctorSpecialty?: string;
     doctorRqe?: string;
+    doctorAddress?: string;
+    doctorPhone?: string;
     patientName: string;
     patientDoc?: string;
     issueDate: string | Date;
@@ -72,6 +77,15 @@ export const generateCertificateText = (data: CertificateData): string => {
     }
 };
 
+const buildIdentity = (data: CertificateData): DocumentIdentity => ({
+    doctorName: data.doctorName,
+    doctorCrm: data.doctorCrm,
+    doctorSpecialty: data.doctorSpecialty,
+    doctorRqe: data.doctorRqe,
+    doctorAddress: data.doctorAddress,
+    doctorPhone: data.doctorPhone,
+});
+
 export const generateCertificatePDF = async (data: CertificateData): Promise<Blob> => {
     let header = data.clinicHeader ?? null;
     let assets = data.clinicHeaderAssets ?? {};
@@ -87,34 +101,45 @@ export const generateCertificatePDF = async (data: CertificateData): Promise<Blo
     const margin = 20;
     const contentWidth = pageWidth - margin * 2;
     const centerX = pageWidth / 2;
+    const identity = buildIdentity(data);
 
-    // ===== HEADER (custom letterhead or minimal VitaView wordmark) =====
     const headerEndY = drawDocumentHeader(doc, header, assets, {
         xOffset: 0,
         pageWidth,
         marginX: margin,
         topMargin: 12,
+        identity,
     });
 
-    // ===== TITLE =====
-    let yPos = headerEndY + 4;
-    doc.setTextColor(20, 20, 20);
-    doc.setFontSize(18);
-    doc.setFont("helvetica", "bold");
-    const title = data.type === "laudo" ? "LAUDO MÉDICO" : "ATESTADO MÉDICO";
-    doc.text(title, centerX, yPos + 4, { align: "center" });
+    drawDocumentWatermark(doc, {
+        xOffset: 0,
+        pageWidth,
+        pageHeight,
+        identity,
+        clinicName: header?.clinicName,
+    });
 
-    yPos += 8;
+    // Title
+    let yPos = headerEndY + 6;
+    doc.setTextColor(20, 20, 20);
+    doc.setFontSize(16);
+    doc.setFont("times", "bold");
+    const title = data.type === "laudo" ? "LAUDO MÉDICO" : "ATESTADO MÉDICO";
+    doc.text(title, centerX, yPos, { align: "center" });
+
+    // Subtle underline under the title
+    const titleWidth = doc.getTextWidth(title);
+    yPos += 2;
     doc.setDrawColor(40, 40, 40);
     doc.setLineWidth(0.4);
-    doc.line(margin, yPos + 2, pageWidth - margin, yPos + 2);
+    doc.line(centerX - titleWidth / 2 - 4, yPos, centerX + titleWidth / 2 + 4, yPos);
     yPos += 14;
 
-    // ===== BODY =====
+    // Body
     doc.setTextColor(20, 20, 20);
     doc.setFontSize(12);
     doc.setFont("times", "normal");
-    doc.setLineHeightFactor(1.5);
+    doc.setLineHeightFactor(1.6);
 
     const text = generateCertificateText(data);
     const splitText = doc.splitTextToSize(text, contentWidth);
@@ -122,12 +147,12 @@ export const generateCertificatePDF = async (data: CertificateData): Promise<Blo
     yPos += splitText.length * 7 + 12;
 
     if (data.cid) {
-        doc.setFont("helvetica", "bold");
+        doc.setFont("times", "bold");
         doc.text(`CID: ${cleanTextForPDF(data.cid)}`, margin, yPos);
-        yPos += 16;
+        yPos += 14;
     }
 
-    // ===== CID AUTHORIZATION =====
+    // CID authorization
     if (data.cid) {
         if (yPos > 220) {
             doc.addPage();
@@ -136,7 +161,7 @@ export const generateCertificatePDF = async (data: CertificateData): Promise<Blo
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
         doc.setTextColor(90, 90, 90);
-        const authText = `Eu, ${cleanTextForPDF(data.patientName).toUpperCase()}, autorizo o(a) Dr(a) ${cleanTextForPDF(data.doctorName).toUpperCase()} a registrar o diagnóstico codificado CID10 neste atestado.`;
+        const authText = `Eu, ${cleanTextForPDF(data.patientName).toUpperCase()}, autorizo o(a) Dr(a) ${cleanTextForPDF(data.doctorName).toUpperCase()} a registrar o diagnóstico codificado CID-10 neste atestado.`;
         const splitAuth = doc.splitTextToSize(authText, contentWidth - 40);
         doc.text(splitAuth, centerX, yPos, { align: "center", maxWidth: contentWidth - 40 });
         yPos += splitAuth.length * 5 + 14;
@@ -149,18 +174,18 @@ export const generateCertificatePDF = async (data: CertificateData): Promise<Blo
         yPos += 18;
     }
 
-    // ===== DOCTOR SIGNATURE =====
-    let signatureY = Math.max(yPos + 10, 240);
-    if (signatureY > 268) {
+    // Doctor signature
+    let signatureY = Math.max(yPos + 10, 230);
+    if (signatureY > 260) {
         doc.addPage();
-        signatureY = 240;
+        signatureY = 230;
     }
 
     doc.setLineWidth(0.4);
     doc.setDrawColor(40, 40, 40);
     doc.line(centerX - 45, signatureY, centerX + 45, signatureY);
 
-    doc.setFont("helvetica", "bold");
+    doc.setFont("times", "bold");
     doc.setFontSize(11);
     doc.setTextColor(0, 0, 0);
     doc.text(cleanTextForPDF(data.doctorName), centerX, signatureY + 6, { align: "center" });
@@ -175,6 +200,14 @@ export const generateCertificatePDF = async (data: CertificateData): Promise<Blo
     }
     doc.setFontSize(7);
     doc.text("Assinatura e carimbo", centerX, signatureY + 20, { align: "center" });
+
+    drawDocumentFooter(doc, header, {
+        xOffset: 0,
+        pageWidth,
+        pageHeight,
+        marginX: margin,
+        identity,
+    });
 
     return doc.output("blob");
 };
