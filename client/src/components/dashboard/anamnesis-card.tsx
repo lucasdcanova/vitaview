@@ -50,6 +50,7 @@ import { Save,
   RotateCcw,
   ChevronDown,
   Lock,
+  Calculator,
 } from "lucide-react";
 import { ConsultationRecorder } from "@/components/consultation-recorder";
 import { BrandLoader } from "@/components/ui/brand-loader";
@@ -68,6 +69,7 @@ import {
   AnamnesisTemplateEditorDialog,
   type AnamnesisTemplateEditorMode,
 } from "@/components/dashboard/anamnesis-template-editor";
+import { CalculatorsDialog } from "@/components/calculators/calculators-dialog";
 
 type ExtractedDiagnosis = {
     cidCode?: string;
@@ -280,6 +282,7 @@ export function AnamnesisCard() {
     const [editorMode, setEditorMode] = useState<AnamnesisTemplateEditorMode | null>(null);
     const [editorOpen, setEditorOpen] = useState(false);
     const [premiumDialogOpen, setPremiumDialogOpen] = useState(false);
+    const [calculatorsOpen, setCalculatorsOpen] = useState(false);
     const activeResolvedTemplate = resolveByKey(anamnesisTemplate);
     const { toast } = useToast();
     const queryClient = useQueryClient();
@@ -1113,7 +1116,8 @@ export function AnamnesisCard() {
         <div className={isMobile ? "space-y-4" : "space-y-8"}>
             <Card className="border border-border shadow-md">
                 <CardHeader className={`flex flex-col ${isMobile ? 'gap-2 pb-3' : 'gap-4'}`}>
-                    <div className={`flex items-center ${isMobile ? 'gap-2 flex-wrap' : 'gap-2'}`}>
+                    <div className={`flex ${isMobile ? 'items-start gap-2 flex-wrap' : 'items-center gap-2 justify-between'}`}>
+                        <div className={`flex items-center ${isMobile ? 'gap-2 flex-wrap' : 'gap-2'}`}>
                         <CardTitle className={`text-foreground ${isMobile ? 'text-lg' : 'text-2xl'}`}>Anamnese inteligente</CardTitle>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -1218,6 +1222,19 @@ export function AnamnesisCard() {
                                 Excluir padrão
                             </Button>
                         )}
+                        </div>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className={`gap-1.5 text-muted-foreground hover:text-foreground ${isMobile ? 'h-8 px-2 text-xs' : 'h-9 px-2.5 text-sm'}`}
+                            onClick={() => setCalculatorsOpen(true)}
+                            aria-label="Abrir calculadoras"
+                            title="Calculadoras médicas"
+                        >
+                            <Calculator className={isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+                            Calculadoras
+                        </Button>
                     </div>
 
                     {/* Destaque para gravação de consulta */}
@@ -1807,6 +1824,8 @@ export function AnamnesisCard() {
                 onOpenChange={setPremiumDialogOpen}
                 description="Criar e personalizar padrões de anamnese é um recurso disponível nos planos Vita. Faça upgrade para desbloquear."
             />
+
+            <CalculatorsDialog open={calculatorsOpen} onOpenChange={setCalculatorsOpen} />
         </div>
     );
 }
