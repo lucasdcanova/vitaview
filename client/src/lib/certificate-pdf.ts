@@ -1,222 +1,184 @@
 import jsPDF from "jspdf";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import {
+    drawDocumentHeader,
+    drawVitaViewFooterMark,
+    fetchAndPreloadClinicHeader,
+    type ClinicHeaderForPdf,
+    type PreloadedHeaderAssets,
+} from "./document-header";
 
 export interface CertificateData {
-    type: 'afastamento' | 'comparecimento' | 'acompanhamento' | 'aptidao' | 'laudo';
+    type: "afastamento" | "comparecimento" | "acompanhamento" | "aptidao" | "laudo";
     doctorName: string;
     doctorCrm: string;
+    doctorSpecialty?: string;
+    doctorRqe?: string;
     patientName: string;
     patientDoc?: string;
-    issueDate: string | Date; // Allow string from JSON
+    issueDate: string | Date;
     daysOff?: number | string;
     cid?: string;
     city?: string;
     startTime?: string;
     endTime?: string;
     customText?: string;
+    clinicHeader?: ClinicHeaderForPdf | null;
+    clinicHeaderAssets?: PreloadedHeaderAssets;
 }
 
-// Remove emojis and special characters not supported by standard fonts
 const cleanTextForPDF = (text: string): string => {
-    if (!text) return '';
+    if (!text) return "";
     // eslint-disable-next-line no-control-regex
-    return text.replace(/[\uD800-\uDFFF].|[\u2600-\u27BF]/g, '').trim();
+    return text.replace(/[\uD800-\uDFFF].|[☀-➿]/g, "").trim();
 };
 
-const drawLogo = (doc: jsPDF, x: number, y: number) => {
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(0, 0, 0); // Black
-    doc.text("VitaView", x, y);
-    doc.setTextColor(150, 150, 150);
-    doc.setFontSize(8);
-    doc.text(".AI", x + 16, y);
-};
-
-// Helper to generate text for preview/editing
 const numberToText = (num: number | string): string => {
-    const n = typeof num === 'string' ? parseInt(num) : num;
-    if (isNaN(n)) return '';
-
-    const ones = ['', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove'];
-    const tens = ['', 'dez', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'noventa'];
-    const teens = ['dez', 'onze', 'doze', 'treze', 'quatorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove'];
-
+    const n = typeof num === "string" ? parseInt(num) : num;
+    if (isNaN(n)) return "";
+    const ones = ["", "um", "dois", "três", "quatro", "cinco", "seis", "sete", "oito", "nove"];
+    const tens = ["", "dez", "vinte", "trinta", "quarenta", "cinquenta", "sessenta", "setenta", "oitenta", "noventa"];
+    const teens = ["dez", "onze", "doze", "treze", "quatorze", "quinze", "dezesseis", "dezessete", "dezoito", "dezenove"];
     if (n < 10) return ones[n];
     if (n < 20) return teens[n - 10];
     if (n < 100) {
         const ten = Math.floor(n / 10);
         const one = n % 10;
-        return tens[ten] + (one ? ' e ' + ones[one] : '');
+        return tens[ten] + (one ? " e " + ones[one] : "");
     }
-    return n.toString(); // Fallback for larger numbers
+    return n.toString();
 };
 
 export const generateCertificateText = (data: CertificateData): string => {
     if (data.customText) return data.customText;
-
     const patientName = cleanTextForPDF(data.patientName);
-    const patientDoc = data.patientDoc ? cleanTextForPDF(data.patientDoc) : '________________';
-
-    const days = data.daysOff ? data.daysOff.toString() : '0';
+    const patientDoc = data.patientDoc ? cleanTextForPDF(data.patientDoc) : "________________";
+    const days = data.daysOff ? data.daysOff.toString() : "0";
     const daysInt = parseInt(days);
     const daysExt = numberToText(daysInt);
-    const dayLabel = daysInt === 1 ? 'dia' : 'dias';
+    const dayLabel = daysInt === 1 ? "dia" : "dias";
 
     switch (data.type) {
-        case 'afastamento':
+        case "afastamento":
             return `Atesto para os devidos fins que o(a) Sr(a). ${patientName}, portador(a) do documento nº ${patientDoc}, foi atendido(a) nesta data e necessita de ${days} (${daysExt}) ${dayLabel} de afastamento de suas atividades laborais/escolares a partir desta data, por motivo de doença.`;
-        case 'comparecimento':
-            return `Atesto para os devidos fins que o(a) Sr(a). ${patientName}, portador(a) do documento nº ${patientDoc}, compareceu a este serviço para atendimento médico/exames nesta data, no período das ${data.startTime || '____'} às ${data.endTime || '____'} horas.`;
-        case 'acompanhamento':
+        case "comparecimento":
+            return `Atesto para os devidos fins que o(a) Sr(a). ${patientName}, portador(a) do documento nº ${patientDoc}, compareceu a este serviço para atendimento médico/exames nesta data, no período das ${data.startTime || "____"} às ${data.endTime || "____"} horas.`;
+        case "acompanhamento":
             return `Atesto para os devidos fins que o(a) Sr(a). ${patientName}, portador(a) do documento nº ${patientDoc}, compareceu a este serviço nesta data, como acompanhante de paciente sob meus cuidados.`;
-        case 'aptidao':
+        case "aptidao":
             return `Atesto para os devidos fins que o(a) Sr(a). ${patientName}, portador(a) do documento nº ${patientDoc}, foi examinado(a) por mim nesta data e encontra-se APTO(A) para a prática de atividades físicas.`;
-        case 'laudo':
-            return ''; // Laudo always uses customText, so if fallback here, return empty or default
+        case "laudo":
+            return "";
         default:
-            return '';
+            return "";
     }
 };
 
-export const generateCertificatePDF = (data: CertificateData): Blob => {
-    const doc = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4"
-    });
+export const generateCertificatePDF = async (data: CertificateData): Promise<Blob> => {
+    let header = data.clinicHeader ?? null;
+    let assets = data.clinicHeaderAssets ?? {};
+    if (!header) {
+        const result = await fetchAndPreloadClinicHeader();
+        header = result.header;
+        assets = result.assets;
+    }
 
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const pageWidth = 210;
     const pageHeight = 297;
     const margin = 20;
-    const contentWidth = pageWidth - (margin * 2);
+    const contentWidth = pageWidth - margin * 2;
     const centerX = pageWidth / 2;
 
-    let yPos = 20;
+    // ===== HEADER (custom letterhead or minimal) =====
+    const headerEndY = drawDocumentHeader(doc, header, assets, {
+        xOffset: 0,
+        pageWidth,
+        marginX: margin,
+        topMargin: 12,
+        showVitaViewMark: false,
+    });
 
-    // ===== HEADER =====
-    // Background header bar
-    doc.setFillColor(245, 245, 245); // Gray-100/Light Gray
-    doc.rect(0, 0, pageWidth, 40, 'F');
-
-    // Bottom border of header
-    doc.setDrawColor(0, 0, 0); // Black
-    doc.setLineWidth(1);
-    doc.line(0, 40, pageWidth, 40);
-
-    yPos = 20;
-
-    // Title
-    doc.setFontSize(24);
+    // ===== TITLE =====
+    let yPos = headerEndY + 4;
+    doc.setTextColor(20, 20, 20);
+    doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(0, 0, 0); // Black
-    doc.text("ATESTADO MÉDICO", centerX, yPos, { align: "center" });
+    const title = data.type === "laudo" ? "LAUDO MÉDICO" : "ATESTADO MÉDICO";
+    doc.text(title, centerX, yPos + 4, { align: "center" });
 
-    // Subtitle
     yPos += 8;
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(100, 100, 100);
-    doc.text("VitaView AI Health Platform", centerX, yPos, { align: "center" });
+    doc.setDrawColor(40, 40, 40);
+    doc.setLineWidth(0.4);
+    doc.line(margin, yPos + 2, pageWidth - margin, yPos + 2);
+    yPos += 14;
 
-    // ===== CONTENT =====
-    yPos = 80;
-    doc.setTextColor(0, 0, 0);
+    // ===== BODY =====
+    doc.setTextColor(20, 20, 20);
     doc.setFontSize(12);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("times", "normal");
+    doc.setLineHeightFactor(1.5);
 
     const text = generateCertificateText(data);
-
-    // Paragraph text
     const splitText = doc.splitTextToSize(text, contentWidth);
     doc.text(splitText, margin, yPos, { align: "justify", maxWidth: contentWidth });
+    yPos += splitText.length * 7 + 12;
 
-    yPos += (splitText.length * 7) + 20;
-
-    // CID if present
     if (data.cid) {
         doc.setFont("helvetica", "bold");
         doc.text(`CID: ${cleanTextForPDF(data.cid)}`, margin, yPos);
-        yPos += 20;
+        yPos += 16;
     }
 
-    // Verify if there is space for signature, otherwise add new page
-    // A simple heuristic: if yPos > 240, add new page
-    if (yPos > 230) {
-        doc.addPage();
-        yPos = 40;
-    }
-
-    // ===== CID AUTHORIZATION (If CID is present) =====
+    // ===== CID AUTHORIZATION =====
     if (data.cid) {
-        yPos += 10;
+        if (yPos > 220) {
+            doc.addPage();
+            yPos = 40;
+        }
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
-        doc.setTextColor(80, 80, 80);
-
+        doc.setTextColor(90, 90, 90);
         const authText = `Eu, ${cleanTextForPDF(data.patientName).toUpperCase()}, autorizo o(a) Dr(a) ${cleanTextForPDF(data.doctorName).toUpperCase()} a registrar o diagnóstico codificado CID10 neste atestado.`;
-        const splitAuth = doc.splitTextToSize(authText, contentWidth - 40); // narrower width for emphasis
+        const splitAuth = doc.splitTextToSize(authText, contentWidth - 40);
         doc.text(splitAuth, centerX, yPos, { align: "center", maxWidth: contentWidth - 40 });
+        yPos += splitAuth.length * 5 + 14;
 
-        yPos += (splitAuth.length * 5) + 15;
-
-        // Patient Signature Line
-        doc.setLineWidth(0.5);
+        doc.setLineWidth(0.4);
         doc.setDrawColor(80, 80, 80);
         doc.line(centerX - 40, yPos, centerX + 40, yPos);
-
         doc.setFontSize(8);
-        doc.text("Assinatura do Paciente", centerX, yPos + 4, { align: "center" });
-
-        yPos += 20;
+        doc.text("Assinatura do paciente", centerX, yPos + 4, { align: "center" });
+        yPos += 18;
     }
 
     // ===== DOCTOR SIGNATURE =====
-    // Ensure doctor signature is at the bottom or after content
-    const signatureY = Math.max(yPos + 10, 250);
-
-    // Check if we need a new page for doctor signature
-    if (signatureY > 270) {
+    let signatureY = Math.max(yPos + 10, 240);
+    if (signatureY > 268) {
         doc.addPage();
-        // yPos = 40; // Not needed as we use absolute Y for signature at bottom usually, but here we might just place it at top of new page
-        // Let's just place it at standard position on new page or relative
-        // simpler: just draw at 250 on new page
-        doc.setLineWidth(0.5);
-        doc.setDrawColor(0, 0, 0);
-        doc.line(centerX - 40, 250, centerX + 40, 250);
-
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(11);
-        doc.setTextColor(0, 0, 0);
-        doc.text(cleanTextForPDF(data.doctorName), centerX, 250 + 6, { align: "center" });
-
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(10);
-        doc.text(`CRM: ${cleanTextForPDF(data.doctorCrm)}`, centerX, 250 + 11, { align: "center" });
-
-        doc.setFontSize(8);
-        doc.setTextColor(100, 100, 100);
-        doc.text("Assinatura e Carimbo", centerX, 250 + 16, { align: "center" });
-    } else {
-        doc.setLineWidth(0.5);
-        doc.setDrawColor(0, 0, 0);
-        doc.line(centerX - 40, signatureY, centerX + 40, signatureY);
-
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(11);
-        doc.setTextColor(0, 0, 0);
-        doc.text(cleanTextForPDF(data.doctorName), centerX, signatureY + 6, { align: "center" });
-
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(10);
-        doc.text(`CRM: ${cleanTextForPDF(data.doctorCrm)}`, centerX, signatureY + 11, { align: "center" });
-
-        doc.setFontSize(8);
-        doc.setTextColor(100, 100, 100);
-        doc.text("Assinatura e Carimbo", centerX, signatureY + 16, { align: "center" });
+        signatureY = 240;
     }
 
-    // Return blob
+    doc.setLineWidth(0.4);
+    doc.setDrawColor(40, 40, 40);
+    doc.line(centerX - 45, signatureY, centerX + 45, signatureY);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(0, 0, 0);
+    doc.text(cleanTextForPDF(data.doctorName), centerX, signatureY + 6, { align: "center" });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(80, 80, 80);
+    doc.text(`CRM ${cleanTextForPDF(data.doctorCrm)}`, centerX, signatureY + 11, { align: "center" });
+    if (data.doctorSpecialty) {
+        const sp = data.doctorRqe ? `${data.doctorSpecialty}  ·  RQE ${data.doctorRqe}` : data.doctorSpecialty;
+        doc.text(sp, centerX, signatureY + 15, { align: "center" });
+    }
+    doc.setFontSize(7);
+    doc.text("Assinatura e carimbo", centerX, signatureY + 20, { align: "center" });
+
+    drawVitaViewFooterMark(doc, 0, pageWidth, pageHeight);
+
     return doc.output("blob");
 };

@@ -96,7 +96,7 @@ export function useCertificateLogic(patient: PatientData) {
         }).then(async (savedData) => {
             // Generate PDF Client-side
             try {
-                const blob = generateCertificatePDF({
+                const blob = await generateCertificatePDF({
                     type: savedData.type as any,
                     doctorName: savedData.doctorName,
                     doctorCrm: savedData.doctorCrm,
@@ -130,7 +130,7 @@ export function useCertificateLogic(patient: PatientData) {
         }
 
         try {
-            const blob = generateCertificatePDF({
+            const blob = await generateCertificatePDF({
                 type: c.type as any,
                 doctorName: c.doctorName,
                 doctorCrm: c.doctorCrm,

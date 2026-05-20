@@ -43,6 +43,7 @@ import PatientHeader from "@/components/patient-header";
 import { BrandLoader } from "@/components/ui/brand-loader";
 import { isIOSAppShell } from '@/lib/app-shell';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { PrescriptionHeaderSettings } from "@/components/clinic/prescription-header-settings";
 
 interface Clinic {
     id: number;
@@ -1067,6 +1068,8 @@ const MyClinic = () => {
                                 </div>
                             </CardContent>
                         </Card>
+
+                        <PrescriptionHeaderSettings />
 
                         <Card className="border border-border shadow-sm">
                             <CardHeader>

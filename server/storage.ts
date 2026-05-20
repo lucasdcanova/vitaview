@@ -1342,7 +1342,16 @@ export class MemStorage implements IStorage {
       subscriptionId: clinic.subscriptionId || null,
       maxProfessionals: clinic.maxProfessionals || 5,
       maxSecretaries: clinic.maxSecretaries || 0,
-      createdAt: new Date()
+      createdAt: new Date(),
+      headerMode: 'minimal',
+      headerImageFile: null,
+      headerLogoFile: null,
+      headerClinicName: null,
+      headerAddress: null,
+      headerPhone: null,
+      headerEmail: null,
+      headerWebsite: null,
+      headerCnpj: null,
     };
     this.clinicsMap.set(id, newClinic);
 

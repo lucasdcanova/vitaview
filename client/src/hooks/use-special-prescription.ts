@@ -35,7 +35,7 @@ export function useSpecialPrescription(patient: { name: string }) {
         setPrescriptionItem(prev => ({ ...prev, name: medName }));
     };
 
-    const handleGeneratePDF = () => {
+    const handleGeneratePDF = async () => {
         if (!prescriptionItem.name || !prescriptionItem.dosage || !prescriptionItem.frequency || !prescriptionItem.quantity) {
             toast({
                 title: "Campos incompletos",
@@ -50,7 +50,7 @@ export function useSpecialPrescription(patient: { name: string }) {
             return;
         }
 
-        generateSpecialPrescriptionPDF({
+        await generateSpecialPrescriptionPDF({
             selectedType,
             patientName: patient.name,
             doctorName: user.fullName || user.username || "",

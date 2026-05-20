@@ -5522,6 +5522,334 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // ============================================================================
+  // CLINIC LETTERHEAD / PRESCRIPTION HEADER
+  // ============================================================================
+
+  const clinicHeadersDir = path.join(process.cwd(), 'uploads', 'clinic-headers');
+  if (!fs.existsSync(clinicHeadersDir)) {
+    fs.mkdirSync(clinicHeadersDir, { recursive: true });
+  }
+
+  const clinicHeaderUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    fileFilter: (req, file, cb) => {
+      const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'];
+      if (allowed.includes(file.mimetype)) cb(null, true);
+      else cb(new Error('Use uma imagem PNG, JPG, WebP ou SVG.'));
+    },
+  });
+
+  const normalizeClinicHeaderFilename = (value: string | null | undefined): string | null => {
+    if (!value) return null;
+    const normalized = value.split('?')[0].split('#')[0].trim();
+    if (!normalized) return null;
+    const fileName = path.basename(normalized);
+    if (!fileName || fileName === '.' || fileName === '..') return null;
+    return fileName;
+  };
+
+  const HEADER_TEXT_FIELDS = [
+    'headerClinicName',
+    'headerAddress',
+    'headerPhone',
+    'headerEmail',
+    'headerWebsite',
+    'headerCnpj',
+  ] as const;
+
+  const sanitizeHeaderTextValue = (raw: unknown): string | null => {
+    if (typeof raw !== 'string') return null;
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    return trimmed.slice(0, 240);
+  };
+
+  type ClinicHeaderResponse = {
+    clinicId: number;
+    role: string;
+    isAdmin: boolean;
+    name: string;
+    headerMode: 'minimal' | 'image' | 'composed';
+    headerImageUrl: string | null;
+    headerLogoUrl: string | null;
+    headerClinicName: string | null;
+    headerAddress: string | null;
+    headerPhone: string | null;
+    headerEmail: string | null;
+    headerWebsite: string | null;
+    headerCnpj: string | null;
+  };
+
+  const buildClinicHeaderResponse = (
+    clinic: any,
+    role: string,
+    isAdmin: boolean
+  ): ClinicHeaderResponse => {
+    const mode = (clinic.headerMode as ClinicHeaderResponse['headerMode']) || 'minimal';
+    const imageFile = normalizeClinicHeaderFilename(clinic.headerImageFile);
+    const logoFile = normalizeClinicHeaderFilename(clinic.headerLogoFile);
+    return {
+      clinicId: clinic.id,
+      role,
+      isAdmin,
+      name: clinic.name,
+      headerMode: mode,
+      headerImageUrl: imageFile ? `/api/clinics/${clinic.id}/header/image?v=${encodeURIComponent(imageFile)}` : null,
+      headerLogoUrl: logoFile ? `/api/clinics/${clinic.id}/header/logo?v=${encodeURIComponent(logoFile)}` : null,
+      headerClinicName: clinic.headerClinicName ?? null,
+      headerAddress: clinic.headerAddress ?? null,
+      headerPhone: clinic.headerPhone ?? null,
+      headerEmail: clinic.headerEmail ?? null,
+      headerWebsite: clinic.headerWebsite ?? null,
+      headerCnpj: clinic.headerCnpj ?? null,
+    };
+  };
+
+  const resolveActiveClinicForUser = async (userId: number): Promise<{ clinic: any; role: string; isAdmin: boolean } | null> => {
+    const memberships = await storage.getClinicsForUser(userId);
+    if (memberships.length === 0) return null;
+    const user = await storage.getUser(userId);
+    const preferred = user?.clinicId ? memberships.find((m: any) => (m.clinic ?? m).id === user.clinicId) : null;
+    const chosen = preferred ?? memberships[0];
+    const clinic = (chosen as any).clinic ?? chosen;
+    const role = (chosen as any).role || (clinic.adminUserId === userId ? 'admin' : 'member');
+    const isAdmin = clinic.adminUserId === userId || role === 'admin';
+    return { clinic, role, isAdmin };
+  };
+
+  const ensureClinicForUser = async (userId: number): Promise<{ clinic: any; role: string; isAdmin: boolean }> => {
+    const existing = await resolveActiveClinicForUser(userId);
+    if (existing) return existing;
+
+    const user = await storage.getUser(userId);
+    const clinicName = (user?.fullName?.trim() || user?.username || 'Minha clínica').slice(0, 80);
+    const clinic = await storage.createClinic({
+      name: clinicName,
+      adminUserId: userId,
+      maxProfessionals: 1,
+      maxSecretaries: 0,
+    } as any);
+    return { clinic, role: 'admin', isAdmin: true };
+  };
+
+  type RequireClinicAdminResult =
+    | { ok: true; clinic: any }
+    | { ok: false; status: number; message: string };
+
+  const requireClinicAdmin = async (clinicId: number, userId: number): Promise<RequireClinicAdminResult> => {
+    const clinic = await storage.getClinic(clinicId);
+    if (!clinic) return { ok: false, status: 404, message: 'Clínica não encontrada' };
+    if (clinic.adminUserId !== userId) {
+      const role = await storage.getClinicMemberRole(clinicId, userId);
+      if (role !== 'admin') {
+        return { ok: false, status: 403, message: 'Apenas o administrador pode editar o cabeçalho' };
+      }
+    }
+    return { ok: true, clinic };
+  };
+
+  const HEADER_MIME_BY_EXT: Record<string, string> = {
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.webp': 'image/webp',
+    '.svg': 'image/svg+xml',
+  };
+
+  const sendClinicHeaderFile = (filename: string | null, res: Response) => {
+    if (!filename) return res.status(404).json({ message: 'Arquivo não encontrado' });
+    const safe = normalizeClinicHeaderFilename(filename);
+    if (!safe) return res.status(404).json({ message: 'Arquivo inválido' });
+    const filePath = path.join(clinicHeadersDir, safe);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ message: 'Arquivo não encontrado' });
+    const ext = path.extname(safe).toLowerCase();
+    res.setHeader('Content-Type', HEADER_MIME_BY_EXT[ext] || 'application/octet-stream');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.sendFile(filePath);
+  };
+
+  // GET — current user's active clinic header (auto-creates personal clinic if none)
+  app.get('/api/clinics/header/active', ensureAuthenticated, async (req, res) => {
+    try {
+      const { clinic, role, isAdmin } = await ensureClinicForUser(req.user!.id);
+      res.json(buildClinicHeaderResponse(clinic, role, isAdmin));
+    } catch (error) {
+      logger.error('[Clinic Header] Error fetching active header', { error });
+      res.status(500).json({ message: 'Erro ao carregar cabeçalho do receituário' });
+    }
+  });
+
+  // PATCH — update mode and composed text fields
+  app.patch('/api/clinics/:id/header', ensureAuthenticated, async (req, res) => {
+    try {
+      const clinicId = parseInt(req.params.id);
+      if (isNaN(clinicId)) return res.status(400).json({ message: 'ID inválido' });
+
+      const guard = await requireClinicAdmin(clinicId, req.user!.id);
+      if (!guard.ok) return res.status(guard.status).json({ message: guard.message });
+
+      const update: Record<string, any> = {};
+      if (typeof req.body?.headerMode === 'string') {
+        const mode = req.body.headerMode;
+        if (!['minimal', 'image', 'composed'].includes(mode)) {
+          return res.status(400).json({ message: 'Modo de cabeçalho inválido' });
+        }
+        update.headerMode = mode;
+      }
+      for (const field of HEADER_TEXT_FIELDS) {
+        if (field in (req.body || {})) {
+          update[field] = sanitizeHeaderTextValue(req.body[field]);
+        }
+      }
+
+      const updated = await storage.updateClinic(clinicId, update);
+      if (!updated) return res.status(500).json({ message: 'Falha ao atualizar cabeçalho' });
+
+      const role = updated.adminUserId === req.user!.id ? 'admin' : (await storage.getClinicMemberRole(clinicId, req.user!.id)) || 'member';
+      res.json(buildClinicHeaderResponse(updated, role, true));
+    } catch (error) {
+      logger.error('[Clinic Header] Error updating header', { error });
+      res.status(500).json({ message: 'Erro ao atualizar cabeçalho' });
+    }
+  });
+
+  // POST — upload header image (full letterhead)
+  app.post('/api/clinics/:id/header/image', ensureAuthenticated, clinicHeaderUpload.single('image'), async (req, res) => {
+    try {
+      const clinicId = parseInt(req.params.id);
+      if (isNaN(clinicId)) return res.status(400).json({ message: 'ID inválido' });
+      if (!req.file) return res.status(400).json({ message: 'Nenhuma imagem enviada' });
+
+      const guard = await requireClinicAdmin(clinicId, req.user!.id);
+      if (!guard.ok) return res.status(guard.status).json({ message: guard.message });
+      const clinic = guard.clinic;
+
+      // Remove previous file
+      const previous = normalizeClinicHeaderFilename(clinic.headerImageFile);
+      if (previous) {
+        const previousPath = path.join(clinicHeadersDir, previous);
+        if (fs.existsSync(previousPath)) fs.unlinkSync(previousPath);
+      }
+
+      const extByMime: Record<string, string> = {
+        'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/svg+xml': '.svg',
+      };
+      const ext = extByMime[req.file.mimetype] || path.extname(req.file.originalname) || '.png';
+      const filename = `clinic-${clinicId}-header-${Date.now()}${ext}`;
+      fs.writeFileSync(path.join(clinicHeadersDir, filename), req.file.buffer);
+
+      const updated = await storage.updateClinic(clinicId, {
+        headerImageFile: filename,
+        headerMode: clinic.headerMode === 'minimal' ? 'image' : clinic.headerMode,
+      } as any);
+      res.json(buildClinicHeaderResponse(updated, 'admin', true));
+    } catch (error) {
+      logger.error('[Clinic Header] Error uploading header image', { error });
+      res.status(500).json({ message: 'Erro ao enviar imagem de cabeçalho' });
+    }
+  });
+
+  // POST — upload logo for composed mode
+  app.post('/api/clinics/:id/header/logo', ensureAuthenticated, clinicHeaderUpload.single('logo'), async (req, res) => {
+    try {
+      const clinicId = parseInt(req.params.id);
+      if (isNaN(clinicId)) return res.status(400).json({ message: 'ID inválido' });
+      if (!req.file) return res.status(400).json({ message: 'Nenhuma imagem enviada' });
+
+      const guard = await requireClinicAdmin(clinicId, req.user!.id);
+      if (!guard.ok) return res.status(guard.status).json({ message: guard.message });
+      const clinic = guard.clinic;
+
+      const previous = normalizeClinicHeaderFilename(clinic.headerLogoFile);
+      if (previous) {
+        const previousPath = path.join(clinicHeadersDir, previous);
+        if (fs.existsSync(previousPath)) fs.unlinkSync(previousPath);
+      }
+
+      const extByMime: Record<string, string> = {
+        'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/svg+xml': '.svg',
+      };
+      const ext = extByMime[req.file.mimetype] || path.extname(req.file.originalname) || '.png';
+      const filename = `clinic-${clinicId}-logo-${Date.now()}${ext}`;
+      fs.writeFileSync(path.join(clinicHeadersDir, filename), req.file.buffer);
+
+      const updated = await storage.updateClinic(clinicId, {
+        headerLogoFile: filename,
+        headerMode: clinic.headerMode === 'minimal' ? 'composed' : clinic.headerMode,
+      } as any);
+      res.json(buildClinicHeaderResponse(updated, 'admin', true));
+    } catch (error) {
+      logger.error('[Clinic Header] Error uploading logo', { error });
+      res.status(500).json({ message: 'Erro ao enviar logo' });
+    }
+  });
+
+  // DELETE — remove header image
+  app.delete('/api/clinics/:id/header/image', ensureAuthenticated, async (req, res) => {
+    try {
+      const clinicId = parseInt(req.params.id);
+      const guard = await requireClinicAdmin(clinicId, req.user!.id);
+      if (!guard.ok) return res.status(guard.status).json({ message: guard.message });
+      const clinic = guard.clinic;
+      const previous = normalizeClinicHeaderFilename(clinic.headerImageFile);
+      if (previous) {
+        const previousPath = path.join(clinicHeadersDir, previous);
+        if (fs.existsSync(previousPath)) fs.unlinkSync(previousPath);
+      }
+      const updated = await storage.updateClinic(clinicId, { headerImageFile: null } as any);
+      res.json(buildClinicHeaderResponse(updated, 'admin', true));
+    } catch (error) {
+      logger.error('[Clinic Header] Error deleting header image', { error });
+      res.status(500).json({ message: 'Erro ao remover imagem' });
+    }
+  });
+
+  // DELETE — remove logo
+  app.delete('/api/clinics/:id/header/logo', ensureAuthenticated, async (req, res) => {
+    try {
+      const clinicId = parseInt(req.params.id);
+      const guard = await requireClinicAdmin(clinicId, req.user!.id);
+      if (!guard.ok) return res.status(guard.status).json({ message: guard.message });
+      const clinic = guard.clinic;
+      const previous = normalizeClinicHeaderFilename(clinic.headerLogoFile);
+      if (previous) {
+        const previousPath = path.join(clinicHeadersDir, previous);
+        if (fs.existsSync(previousPath)) fs.unlinkSync(previousPath);
+      }
+      const updated = await storage.updateClinic(clinicId, { headerLogoFile: null } as any);
+      res.json(buildClinicHeaderResponse(updated, 'admin', true));
+    } catch (error) {
+      logger.error('[Clinic Header] Error deleting logo', { error });
+      res.status(500).json({ message: 'Erro ao remover logo' });
+    }
+  });
+
+  // GET — serve header image (public — designed for embedding in PDFs and previews)
+  app.get('/api/clinics/:id/header/image', async (req, res) => {
+    try {
+      const clinicId = parseInt(req.params.id);
+      const clinic = await storage.getClinic(clinicId);
+      if (!clinic) return res.status(404).json({ message: 'Clínica não encontrada' });
+      return sendClinicHeaderFile(clinic.headerImageFile as any, res);
+    } catch (error) {
+      res.status(500).json({ message: 'Erro ao carregar imagem' });
+    }
+  });
+
+  // GET — serve clinic logo
+  app.get('/api/clinics/:id/header/logo', async (req, res) => {
+    try {
+      const clinicId = parseInt(req.params.id);
+      const clinic = await storage.getClinic(clinicId);
+      if (!clinic) return res.status(404).json({ message: 'Clínica não encontrada' });
+      return sendClinicHeaderFile(clinic.headerLogoFile as any, res);
+    } catch (error) {
+      res.status(500).json({ message: 'Erro ao carregar logo' });
+    }
+  });
+
   // Delete clinic (admin only, must keep at least 1)
   app.delete("/api/clinics/:id", ensureAuthenticated, async (req, res) => {
     try {
