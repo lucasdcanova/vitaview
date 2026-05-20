@@ -286,7 +286,7 @@ export function usePrescriptionLogic(patient: Profile) {
 
             if (pdfWindow) {
                 const { generatePrescriptionPDF } = await import("@/lib/prescription-pdf");
-                generatePrescriptionPDF({
+                await generatePrescriptionPDF({
                     doctorName: savedData.doctorName,
                     doctorCrm: savedData.doctorCrm,
                     doctorSpecialty: savedData.doctorSpecialty || undefined,
@@ -394,7 +394,7 @@ export function usePrescriptionLogic(patient: Profile) {
 
             if (pdfWindow) {
                 const { generatePrescriptionPDF } = await import("@/lib/prescription-pdf");
-                generatePrescriptionPDF({
+                await generatePrescriptionPDF({
                     doctorName: savedData.doctorName,
                     doctorCrm: savedData.doctorCrm,
                     doctorSpecialty: savedData.doctorSpecialty || undefined,

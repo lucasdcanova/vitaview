@@ -396,7 +396,7 @@ export function CertificateForm({
                     <Button
                         variant="outline"
                         className="h-12 flex-1"
-                        onClick={() => {
+                        onClick={async () => {
                             // Quick Preview
                             const data = {
                                 type: certType,
@@ -412,7 +412,7 @@ export function CertificateForm({
                                 endTime: certEndTime,
                                 customText: customCertText
                             };
-                            const blob = generateCertificatePDF(data);
+                            const blob = await generateCertificatePDF(data);
                             const url = URL.createObjectURL(blob);
                             window.open(url, '_blank');
                         }}

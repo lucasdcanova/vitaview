@@ -1,5 +1,10 @@
 import jsPDF from "jspdf";
 import { PRESCRIPTION_TYPES, PrescriptionTypeKey } from "@/constants/special-prescription-types";
+import {
+    drawDocumentHeader,
+    drawVitaViewFooterMark,
+    fetchAndPreloadClinicHeader,
+} from "./document-header";
 
 interface SpecialPrescriptionData {
     selectedType: PrescriptionTypeKey;
@@ -15,120 +20,116 @@ interface SpecialPrescriptionData {
     };
 }
 
-export function generateSpecialPrescriptionPDF({
+export async function generateSpecialPrescriptionPDF({
     selectedType,
     patientName,
     doctorName,
     doctorCrm,
-    prescriptionItem
+    prescriptionItem,
 }: SpecialPrescriptionData) {
     const selectedTypeInfo = PRESCRIPTION_TYPES[selectedType];
+    const { header, assets } = await fetchAndPreloadClinicHeader();
 
-    const doc = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a5" // A5 para receituário especial
-    });
-
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a5" });
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 10;
-    let y = 15;
 
-    // Cor de fundo do tipo de receita
-    doc.setFillColor(selectedTypeInfo.color);
-    doc.rect(0, 0, pageWidth, 25, 'F');
+    const headerEndY = drawDocumentHeader(doc, header, assets, {
+        xOffset: 0,
+        pageWidth,
+        marginX: margin,
+        topMargin: 8,
+        showVitaViewMark: false,
+    });
 
-    // Título do receituário
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(14);
+    // Title
+    let yPos = headerEndY + 3;
+    doc.setTextColor(20, 20, 20);
+    doc.setFontSize(13);
     doc.setFont("helvetica", "bold");
-    doc.text(`RECEITUÁRIO ${selectedTypeInfo.name.toUpperCase()}`, pageWidth / 2, 12, { align: "center" });
+    doc.text(`RECEITUÁRIO ${selectedTypeInfo.name.toUpperCase()}`, pageWidth / 2, yPos + 3, { align: "center" });
+    yPos += 6;
 
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
-    doc.text(selectedTypeInfo.description, pageWidth / 2, 18, { align: "center" });
-    doc.text(`Validade: ${selectedTypeInfo.validity}`, pageWidth / 2, 22, { align: "center" });
+    doc.setTextColor(110, 110, 110);
+    doc.text(selectedTypeInfo.description, pageWidth / 2, yPos + 3, { align: "center" });
+    yPos += 4;
+    doc.text(`Validade: ${selectedTypeInfo.validity}`, pageWidth / 2, yPos + 3, { align: "center" });
+    yPos += 7;
+    doc.setLineWidth(0.4);
+    doc.setDrawColor(40, 40, 40);
+    doc.line(margin, yPos, pageWidth - margin, yPos);
+    yPos += 7;
 
-    y = 35;
-
-    // Dados do médico
+    // Emitter
     doc.setTextColor(0, 0, 0);
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
-    doc.text("IDENTIFICAÇÃO DO EMITENTE", margin, y);
-    y += 5;
-
+    doc.text("IDENTIFICAÇÃO DO EMITENTE", margin, yPos);
+    yPos += 5;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
-    doc.text(`Nome: ${doctorName || "Profissional"}`, margin, y);
-    y += 4;
-    doc.text(`CRM: ${doctorCrm || "___________"}`, margin, y);
-    y += 4;
-    doc.text(`Endereço: ___________________________________`, margin, y);
-    y += 4;
-    doc.text(`Cidade/UF: _____________ Tel: ______________`, margin, y);
-    y += 8;
+    doc.text(`Nome: ${doctorName || "Profissional"}`, margin, yPos);
+    yPos += 4;
+    doc.text(`CRM: ${doctorCrm || "___________"}`, margin, yPos);
+    yPos += 8;
 
-    // Dados do paciente
+    // Patient
     doc.setFont("helvetica", "bold");
-    doc.text("IDENTIFICAÇÃO DO PACIENTE", margin, y);
-    y += 5;
-
+    doc.text("IDENTIFICAÇÃO DO PACIENTE", margin, yPos);
+    yPos += 5;
     doc.setFont("helvetica", "normal");
-    doc.text(`Nome: ${patientName}`, margin, y);
-    y += 4;
-    doc.text(`Endereço: ___________________________________`, margin, y);
-    y += 4;
-    doc.text(`Cidade/UF: _____________`, margin, y);
-    y += 8;
+    doc.text(`Nome: ${patientName}`, margin, yPos);
+    yPos += 4;
+    doc.text(`Endereço: ___________________________________`, margin, yPos);
+    yPos += 4;
+    doc.text(`Cidade/UF: _____________`, margin, yPos);
+    yPos += 8;
 
-    // Prescrição
+    // Prescription
     doc.setFont("helvetica", "bold");
-    doc.text("PRESCRIÇÃO", margin, y);
-    y += 5;
+    doc.text("PRESCRIÇÃO", margin, yPos);
+    yPos += 5;
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(11);
-
     const prescText = `${prescriptionItem.name} - ${prescriptionItem.dosage}`;
-    doc.text(prescText, margin, y);
-    y += 5;
+    doc.text(prescText, margin, yPos);
+    yPos += 5;
 
     doc.setFontSize(9);
-    doc.text(`Quantidade: ${prescriptionItem.quantity}`, margin, y);
-    y += 4;
-    doc.text(`Posologia: ${prescriptionItem.frequency}`, margin, y);
-    y += 4;
+    doc.text(`Quantidade: ${prescriptionItem.quantity}`, margin, yPos);
+    yPos += 4;
+    doc.text(`Posologia: ${prescriptionItem.frequency}`, margin, yPos);
+    yPos += 4;
 
     if (prescriptionItem.notes) {
-        doc.text(`Obs: ${prescriptionItem.notes}`, margin, y);
-        y += 4;
+        doc.text(`Obs: ${prescriptionItem.notes}`, margin, yPos);
+        yPos += 4;
     }
 
-    y += 10;
-
-    // Data e assinatura
+    yPos += 10;
     const today = new Date();
-    const dateStr = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}`;
+    const dateStr = `${today.getDate().toString().padStart(2, "0")}/${(today.getMonth() + 1).toString().padStart(2, "0")}/${today.getFullYear()}`;
+    doc.text(`Data: ${dateStr}`, margin, yPos);
+    yPos += 15;
 
-    doc.text(`Data: ${dateStr}`, margin, y);
-    y += 15;
-
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 3;
+    doc.setDrawColor(40, 40, 40);
+    doc.line(margin, yPos, pageWidth - margin, yPos);
+    yPos += 4;
     doc.setFontSize(8);
-    doc.text("Assinatura e Carimbo do Prescritor", pageWidth / 2, y, { align: "center" });
+    doc.setTextColor(80, 80, 80);
+    doc.text("Assinatura e carimbo do prescritor", pageWidth / 2, yPos, { align: "center" });
 
-    // Aviso legal
-    y += 10;
+    yPos += 10;
     doc.setFontSize(7);
-    doc.setTextColor(100, 100, 100);
-    doc.text("Este documento deve ser preenchido manualmente pelo profissional de saúde.", pageWidth / 2, y, { align: "center" });
-    y += 3;
-    doc.text("Modelo para controle interno - A receita física oficial deve ser emitida em formulário apropriado.", pageWidth / 2, y, { align: "center" });
+    doc.setTextColor(120, 120, 120);
+    doc.text("Modelo para controle interno — a receita física oficial deve ser emitida em formulário apropriado.", pageWidth / 2, yPos, { align: "center", maxWidth: pageWidth - margin * 2 });
 
-    // Abrir PDF
-    const pdfBlob = doc.output('blob');
+    drawVitaViewFooterMark(doc, 0, pageWidth, doc.internal.pageSize.getHeight());
+
+    const pdfBlob = doc.output("blob");
     const pdfUrl = URL.createObjectURL(pdfBlob);
-    window.open(pdfUrl, '_blank');
+    window.open(pdfUrl, "_blank");
 }

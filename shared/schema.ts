@@ -498,6 +498,16 @@ export const clinics = pgTable("clinics", {
   maxProfessionals: integer("max_professionals").notNull().default(5),
   maxSecretaries: integer("max_secretaries").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  // Prescription / document letterhead
+  headerMode: text("header_mode").default("minimal"), // 'minimal' | 'image' | 'composed'
+  headerImageFile: text("header_image_file"), // file stored under uploads/clinic-headers
+  headerLogoFile: text("header_logo_file"), // file stored under uploads/clinic-headers
+  headerClinicName: text("header_clinic_name"),
+  headerAddress: text("header_address"),
+  headerPhone: text("header_phone"),
+  headerEmail: text("header_email"),
+  headerWebsite: text("header_website"),
+  headerCnpj: text("header_cnpj"),
 });
 
 // Clinic invitations schema

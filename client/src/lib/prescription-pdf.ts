@@ -1,6 +1,13 @@
 import jsPDF from "jspdf";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import {
+    drawDocumentHeader,
+    drawVitaViewFooterMark,
+    fetchAndPreloadClinicHeader,
+    type ClinicHeaderForPdf,
+    type PreloadedHeaderAssets,
+} from "./document-header";
 
 interface PrescriptionData {
     // Dados do Emitente (Médico/Clínica)
@@ -23,7 +30,7 @@ interface PrescriptionData {
     patientPhone?: string;
     patientEmail?: string;
     patientGuardianName?: string;
-    patientInsurance?: string; // Nome + Carteirinha
+    patientInsurance?: string;
     // Dados da Receita
     issueDate: Date;
     validUntil?: Date;
@@ -35,1297 +42,617 @@ interface PrescriptionData {
         format?: string;
         notes?: string;
         quantity?: string;
-        prescriptionType?: string; // padrao, especial, A, B1, B2, C
+        prescriptionType?: string;
     }[];
     observations?: string;
-}
-
-interface CertificateData {
-    type: 'afastamento' | 'comparecimento' | 'acompanhamento' | 'aptidao' | 'laudo';
-    doctorName: string;
-    doctorCrm: string;
-    doctorSpecialty?: string;
-    doctorRqe?: string;
-    clinicName?: string;
-    clinicAddress?: string;
-    clinicPhone?: string;
-    patientName: string;
-    patientDoc?: string;
-    issueDate: Date;
-    daysOff?: string;
-    cid?: string;
-    startTime?: string;
-    endTime?: string;
-    customText?: string;
+    // Custom header (preloaded by caller via fetchAndPreloadClinicHeader)
+    clinicHeader?: ClinicHeaderForPdf | null;
+    clinicHeaderAssets?: PreloadedHeaderAssets;
+    validityText?: string;
 }
 
 // Lista de medicamentos controlados
 const CONTROLLED_MEDICATIONS = [
-    'rivotril', 'clonazepam', 'alprazolam', 'diazepam', 'lorazepam', 'bromazepam',
-    'zolpidem', 'ritalina', 'metilfenidato', 'concerta', 'venvanse', 'lisdexanfetamina',
-    'morfina', 'codeina', 'tramadol', 'oxicodona', 'fentanil',
-    'fluoxetina', 'sertralina', 'escitalopram', 'paroxetina', 'venlafaxina',
-    'amitriptilina', 'nortriptilina', 'imipramina',
-    'quetiapina', 'olanzapina', 'risperidona', 'aripiprazol',
-    'carbonato de lítio', 'lítio', 'ácido valproico', 'valproato',
-    'pregabalina', 'gabapentina', 'carbamazepina', 'fenobarbital'
+    "rivotril", "clonazepam", "alprazolam", "diazepam", "lorazepam", "bromazepam",
+    "zolpidem", "ritalina", "metilfenidato", "concerta", "venvanse", "lisdexanfetamina",
+    "morfina", "codeina", "tramadol", "oxicodona", "fentanil",
+    "fluoxetina", "sertralina", "escitalopram", "paroxetina", "venlafaxina",
+    "amitriptilina", "nortriptilina", "imipramina",
+    "quetiapina", "olanzapina", "risperidona", "aripiprazol",
+    "carbonato de lítio", "lítio", "ácido valproico", "valproato",
+    "pregabalina", "gabapentina", "carbamazepina", "fenobarbital",
 ];
 
-const isControlledMedication = (medName: string): boolean => {
-    return CONTROLLED_MEDICATIONS.some(c => medName.toLowerCase().includes(c));
-};
+const isControlledMedication = (medName: string): boolean =>
+    CONTROLLED_MEDICATIONS.some((c) => medName.toLowerCase().includes(c));
 
-// Remove emojis e caracteres Unicode especiais do texto (jsPDF/Helvetica não suporta)
 const cleanTextForPDF = (text: string): string => {
-    if (!text) return '';
-    // Remove emojis comuns (💊💧💉 e outros símbolos) usando ranges conhecidos
+    if (!text) return "";
     // eslint-disable-next-line no-control-regex
-    return text.replace(/[\uD800-\uDFFF].|[\u2600-\u27BF]/g, '').trim();
+    return text.replace(/[\uD800-\uDFFF].|[☀-➿]/g, "").trim();
 };
 
-// Desenha o logo VitaView de forma minimalista (texto)
-const drawLogo = (doc: jsPDF, x: number, y: number) => {
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(150, 150, 150);
-    doc.text("VitaView.AI", x, y);
+const formatBirthDate = (raw?: string): string | undefined => {
+    if (!raw) return undefined;
+    if (raw.includes("-")) {
+        const [year, month, day] = raw.split("-");
+        if (year && month && day) return `${day}/${month}/${year}`;
+    }
+    return raw;
 };
 
-// ==========================================
-// RECEITUÁRIO BÁSICO (Minimalista - Preto)
-// ==========================================
-const generateBasicPrescription = (doc: jsPDF, data: PrescriptionData, xOffset: number = 0) => {
-    const pageWidth = 148.5; // Metade da A4 Landscape
-    const centerX = xOffset + (pageWidth / 2);
-    const margin = 10;
-    const leftX = xOffset + margin;
-    const rightX = xOffset + pageWidth - margin;
-
-    let yPos = 15;
-
-    // ===== HEADER =====
-    // Logo no canto superior direito
-    drawLogo(doc, rightX - 15, 10);
-
-    // Título
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(0, 0, 0);
-    doc.text("RECEITUÁRIO", centerX, yPos, { align: "center" });
-
-    yPos = 25;
-
-    // Linha divisória
-    doc.setDrawColor(0, 0, 0);
-    doc.setLineWidth(0.5);
-    doc.line(leftX, yPos, rightX, yPos);
-
-    yPos = 30;
-
-    // ===== DADOS DO MÉDICO =====
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "bold");
-    doc.text(`Dr(a). ${data.doctorName}`, leftX, yPos);
-
-    // CRM no final da linha (alinhado à direita)
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.text(`CRM: ${data.doctorCrm}`, rightX, yPos, { align: "right" });
-
-    yPos += 5;
-    // Especialidade + RQE no final da linha (alinhado à direita)
-    if (data.doctorSpecialty) {
-        const specialtyText = data.doctorRqe
-            ? `${data.doctorSpecialty} - RQE ${data.doctorRqe}`
-            : data.doctorSpecialty;
-        doc.text(specialtyText, rightX, yPos, { align: "right" });
-    }
-
-    yPos += 8;
-
-    // ===== DADOS DO PACIENTE =====
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "bold");
-    doc.text("Paciente:", leftX, yPos);
-    doc.setFont("helvetica", "normal");
-    doc.text(data.patientName, leftX + 20, yPos);
-
-    // Data no lado direito
-    const dateStr = format(data.issueDate, "dd/MM/yyyy", { locale: ptBR });
-    doc.setFont("helvetica", "bold");
-    doc.text("Data:", rightX - 35, yPos);
-    doc.setFont("helvetica", "normal");
-    doc.text(dateStr, rightX, yPos, { align: "right" });
-
-    yPos += 5;
-
-    // DN + CPF na mesma linha
-    doc.setFontSize(8);
-    let patientInfoLine = "";
-
-    if (data.patientBirthDate) {
-        // Formatar data de nascimento se estiver em formato ISO
-        let formattedBirthDate = data.patientBirthDate;
-        if (data.patientBirthDate.includes("-")) {
-            const [year, month, day] = data.patientBirthDate.split("-");
-            formattedBirthDate = `${day}/${month}/${year}`;
-        }
-        patientInfoLine += `DN: ${formattedBirthDate}`;
-    }
-
-    if (data.patientCpf) {
-        if (patientInfoLine) patientInfoLine += "    ";
-        patientInfoLine += `CPF: ${data.patientCpf}`;
-    }
-
-    if (patientInfoLine) {
-        doc.text(patientInfoLine, leftX, yPos);
-    }
-
-    yPos += 6;
-
-    // Linha divisória
-    doc.setLineWidth(0.3);
-    doc.line(leftX, yPos, rightX, yPos);
-
-    yPos += 10;
-
-    // ===== PRESCRIÇÃO =====
-    // Uso contínuo checkbox
-    if (data.isContinuousUse) {
-        doc.setFontSize(8);
-        doc.rect(leftX, yPos - 3, 3, 3, "S");
-        doc.text("X", leftX + 0.7, yPos - 0.5);
-        doc.text("Uso Contínuo", leftX + 5, yPos);
-        yPos += 8;
-    }
-
-    // Medicamentos
-    const rightMargin = rightX;
-    doc.setFontSize(10);
-
-    data.medications.forEach((med, index) => {
-        doc.setFont("helvetica", "bold");
-
-        // Linha 1: Nome (esquerda) | Quantidade (direita)
-        let medicationLine = cleanTextForPDF(med.name).toUpperCase();
-
-        doc.text(`${index + 1}.`, leftX, yPos);
-        doc.text(medicationLine, leftX + 7, yPos);
-
-        // Quantidade à direita (se houver)
-        if (med.quantity) {
-            doc.setFont("helvetica", "normal");
-            doc.text(med.quantity, rightMargin, yPos, { align: "right" });
-        }
-
-        yPos += 5;
-
-        // Linha 2: Dosagem + Posologia na mesma linha
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-
-        let dosagePosologia = "";
-        if (med.dosage) {
-            dosagePosologia += med.dosage;
-        }
-        if (med.frequency) {
-            if (dosagePosologia) {
-                dosagePosologia += "  -  " + med.frequency;
-            } else {
-                dosagePosologia = med.frequency;
-            }
-        }
-        // Adicionar "Uso contínuo" se for receita de uso contínuo
-        if (data.isContinuousUse && dosagePosologia) {
-            dosagePosologia += ". Uso contínuo.";
-        }
-
-        if (dosagePosologia) {
-            const maxPosologiaWidth = pageWidth - margin * 2 - 30;
-            const posologiaLines = doc.splitTextToSize(dosagePosologia, maxPosologiaWidth);
-            doc.text(posologiaLines, leftX + 7, yPos);
-        }
-
-        // Via de administração à direita (format = comprimido, cápsula, etc. => via oral)
-        if (med.format) {
-            // Determinar via de administração baseado no formato
-            let viaAdmin = "Oral"; // Default
-            const formatLower = med.format.toLowerCase();
-            if (formatLower.includes("injet") || formatLower.includes("ampola")) {
-                viaAdmin = "Injetável";
-            } else if (formatLower.includes("topico") || formatLower.includes("pomada") || formatLower.includes("creme")) {
-                viaAdmin = "Tópico";
-            } else if (formatLower.includes("gotas") || formatLower.includes("colírio")) {
-                viaAdmin = "Oftálmico";
-            } else if (formatLower.includes("inalat") || formatLower.includes("spray nasal")) {
-                viaAdmin = "Inalatório";
-            } else if (formatLower.includes("supositório")) {
-                viaAdmin = "Retal";
-            }
-            doc.text(viaAdmin, rightMargin, yPos, { align: "right" });
-        }
-
-        // Observações do medicamento (se houver)
-        if (med.notes) {
-            yPos += 4;
-            doc.setFontSize(8);
-            doc.setFont("helvetica", "italic");
-            doc.text(`Obs: ${med.notes}`, leftX + 7, yPos);
-            doc.setFont("helvetica", "normal");
-        }
-
-        yPos += 10;
-        doc.setFontSize(10);
-    });
-
-    // Observações gerais (exceto mensagem padrão de renovação)
-    if (data.observations && !data.observations.toLowerCase().includes("renovação de medicamentos")) {
-        yPos += 5;
-        doc.setFontSize(8);
-        doc.setFont("helvetica", "normal");
-        const obsLines = doc.splitTextToSize(`Observações: ${data.observations}`, pageWidth - (margin * 2));
-        doc.text(obsLines, leftX, yPos);
-        yPos += obsLines.length * 4;
-    }
-
-    // ===== RODAPÉ - Posicionado na parte inferior da página =====
-    const pageHeight = 210; // A4 landscape height
-    const signatureY = pageHeight - 45; // Assinatura a 45mm do fundo
-    const footerY = pageHeight - 15; // Validade a 15mm do fundo
-
-    // ===== ASSINATURA =====
-    doc.setLineWidth(0.3);
-    doc.setTextColor(0, 0, 0);
-    // Linha de assinatura centralizada
-    doc.line(centerX - 40, signatureY, centerX + 40, signatureY);
-
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "bold");
-    doc.text(data.doctorName, centerX, signatureY + 5, { align: "center" });
-
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.text(`CRM: ${data.doctorCrm}`, centerX, signatureY + 10, { align: "center" });
-    doc.text("Assinatura e Carimbo", centerX, signatureY + 15, { align: "center" });
-
-    // Validade
-    doc.setFontSize(7);
-    doc.setTextColor(100, 100, 100);
-    // Usar texto de validade dinâmico se fornecido, senão padrão 30 dias (ou 180 se contínuo no objeto antigo)
-    const validityText = (data as any).validityText || (data.isContinuousUse ? "Válido por 180 dias a partir da data de emissão." : "Válido por 30 dias a partir da data de emissão.");
-    doc.text(validityText, leftX, footerY);
-    const viaText = xOffset > 0 ? "2ª Via" : "1ª Via";
-    doc.text(viaText, rightX, footerY, { align: "right" });
+const resolveRouteOfAdministration = (medFormat?: string): string | null => {
+    if (!medFormat) return null;
+    const f = medFormat.toLowerCase();
+    if (f.includes("injet") || f.includes("ampola")) return "Injetável";
+    if (f.includes("topico") || f.includes("pomada") || f.includes("creme")) return "Tópico";
+    if (f.includes("gotas") || f.includes("colírio")) return "Oftálmico";
+    if (f.includes("inalat") || f.includes("spray nasal")) return "Inalatório";
+    if (f.includes("supositório")) return "Retal";
+    return "Oral";
 };
 
 // ==========================================
-// RECEITA DE CONTROLE ESPECIAL (Minimalista)
+// SHARED CONTENT HELPERS
 // ==========================================
-// ==========================================
-// RECEITA DE CONTROLE ESPECIAL (Minimalista) - A5 Landscape
-// ==========================================
-const generateControlledPrescription = (doc: jsPDF, data: PrescriptionData, xOffset: number = 0) => {
-    const pageWidth = 148.5; // A5 width
-    const centerX = xOffset + (pageWidth / 2);
-    const margin = 10;
-    const leftX = xOffset + margin;
-    const rightX = xOffset + pageWidth - margin;
 
-    let yPos = 15;
+interface BodyLayout {
+    xOffset: number;
+    pageWidth: number;
+    margin: number;
+    leftX: number;
+    rightX: number;
+    centerX: number;
+    contentWidth: number;
+}
 
-    // ===== HEADER =====
-    // Logo no canto superior direito
-    drawLogo(doc, rightX - 15, 10);
+const layoutFor = (xOffset: number, pageWidth: number, margin: number = 10): BodyLayout => ({
+    xOffset,
+    pageWidth,
+    margin,
+    leftX: xOffset + margin,
+    rightX: xOffset + pageWidth - margin,
+    centerX: xOffset + pageWidth / 2,
+    contentWidth: pageWidth - margin * 2,
+});
 
-    // Título
+/**
+ * Draws the document title + a thin divider. Returns the Y position after the divider.
+ */
+const drawDocumentTitle = (
+    doc: jsPDF,
+    layout: BodyLayout,
+    title: string,
+    yPos: number,
+    options: { subtitle?: string; subtitle2?: string; color?: [number, number, number] } = {}
+): number => {
+    const color = options.color ?? [25, 25, 25];
+    doc.setTextColor(color[0], color[1], color[2]);
+    doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(0, 0, 0);
-    doc.text("RECEITA DE CONTROLE ESPECIAL", centerX, yPos, { align: "center" });
-
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.text("1ª Via - Retenção da Farmácia", centerX, yPos + 5, { align: "center" });
-
-    yPos = 28;
-
-    // Linha divisória dupla
-    doc.setLineWidth(0.5);
-    doc.line(leftX, yPos, rightX, yPos);
-    doc.line(leftX, yPos + 1.5, rightX, yPos + 1.5);
-
-    yPos = 38;
-
-    // ===== IDENTIFICAÇÃO DO EMITENTE =====
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "bold");
-    doc.text("IDENTIFICAÇÃO DO EMITENTE", leftX, yPos);
-
-    yPos += 6;
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "bold");
-    doc.text(`Dr(a). ${data.doctorName}`, leftX, yPos);
-
-    // CRM no final da linha (alinhado à direita)
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.text(`CRM: ${data.doctorCrm}`, rightX, yPos, { align: "right" });
-
-    yPos += 5;
-    // Especialidade + RQE no final da linha (alinhado à direita)
-    if (data.doctorSpecialty) {
-        const specialtyText = data.doctorRqe
-            ? `${data.doctorSpecialty} - RQE ${data.doctorRqe}`
-            : data.doctorSpecialty;
-        doc.text(specialtyText, rightX, yPos, { align: "right" });
-    }
-
-    if (data.clinicAddress) {
-        yPos += 4;
-        doc.text(data.clinicAddress, leftX, yPos);
-    }
-    if (data.clinicPhone) {
-        doc.text(`Tel: ${data.clinicPhone}`, rightX, yPos, { align: "right" });
-    }
-
-    yPos += 8;
-
-    // Linha divisória
-    doc.setLineWidth(0.3);
-    doc.line(leftX, yPos, rightX, yPos);
-
-    yPos += 8;
-
-    // ===== DADOS DO PACIENTE =====
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "bold");
-    doc.text("DADOS DO PACIENTE", leftX, yPos);
-
-    yPos += 6;
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "bold");
-    doc.text("Nome:", leftX, yPos);
-    doc.setFont("helvetica", "normal");
-    doc.text(data.patientName, leftX + 15, yPos);
-
-    // Data no lado direito
-    const dateStr = format(data.issueDate, "dd/MM/yyyy", { locale: ptBR });
-    doc.setFont("helvetica", "bold");
-    doc.text("Data:", rightX - 35, yPos);
-    doc.setFont("helvetica", "normal");
-    doc.text(dateStr, rightX, yPos, { align: "right" });
-
-    yPos += 5;
-
-    // DN + CPF na mesma linha (com formatação dd/mm/yyyy)
-    doc.setFontSize(8);
-    let infoLine = "";
-
-    if (data.patientBirthDate) {
-        let formattedBirthDate = data.patientBirthDate;
-        if (data.patientBirthDate.includes("-")) {
-            const [year, month, day] = data.patientBirthDate.split("-");
-            formattedBirthDate = `${day}/${month}/${year}`;
-        }
-        infoLine += `DN: ${formattedBirthDate}`;
-    }
-
-    if (data.patientCpf) {
-        if (infoLine) infoLine += "    ";
-        infoLine += `CPF: ${data.patientCpf}`;
-    }
-
-    if (infoLine) {
+    doc.text(title, layout.centerX, yPos + 4, { align: "center" });
+    let nextY = yPos + 6;
+    if (options.subtitle) {
         doc.setFont("helvetica", "normal");
-        doc.text(infoLine, leftX, yPos);
-        yPos += 5;
+        doc.setFontSize(7.5);
+        doc.setTextColor(110, 110, 110);
+        doc.text(options.subtitle, layout.centerX, nextY + 3, { align: "center" });
+        nextY += 3.5;
+    }
+    if (options.subtitle2) {
+        doc.text(options.subtitle2, layout.centerX, nextY + 3, { align: "center" });
+        nextY += 3.5;
+    }
+    doc.setTextColor(0, 0, 0);
+
+    // Divider
+    nextY += 3;
+    doc.setLineWidth(0.4);
+    doc.setDrawColor(40, 40, 40);
+    doc.line(layout.leftX, nextY, layout.rightX, nextY);
+    return nextY + 5;
+};
+
+/**
+ * Draws doctor identification line.
+ */
+const drawDoctorBlock = (doc: jsPDF, layout: BodyLayout, data: PrescriptionData, yPos: number): number => {
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Dr(a). ${data.doctorName}`, layout.leftX, yPos);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(`CRM ${data.doctorCrm}`, layout.rightX, yPos, { align: "right" });
+
+    let nextY = yPos + 4.5;
+    if (data.doctorSpecialty) {
+        doc.setFontSize(8);
+        doc.setTextColor(95, 95, 95);
+        const specialty = data.doctorRqe
+            ? `${data.doctorSpecialty}  ·  RQE ${data.doctorRqe}`
+            : data.doctorSpecialty;
+        doc.text(specialty, layout.rightX, nextY, { align: "right" });
+        doc.setTextColor(0, 0, 0);
+        nextY += 4;
+    }
+    return nextY;
+};
+
+/**
+ * Draws patient identification block (name + date + secondary line).
+ */
+const drawPatientBlock = (doc: jsPDF, layout: BodyLayout, data: PrescriptionData, yPos: number): number => {
+    const dateStr = format(data.issueDate, "dd/MM/yyyy", { locale: ptBR });
+
+    doc.setFontSize(9);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "bold");
+    doc.text("Paciente", layout.leftX, yPos);
+    doc.setFont("helvetica", "normal");
+    doc.text(data.patientName, layout.leftX + 18, yPos);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("Data", layout.rightX - 25, yPos);
+    doc.setFont("helvetica", "normal");
+    doc.text(dateStr, layout.rightX, yPos, { align: "right" });
+
+    let nextY = yPos + 4.5;
+
+    // Secondary identification line
+    doc.setFontSize(8);
+    doc.setTextColor(95, 95, 95);
+    const bits: string[] = [];
+    const bd = formatBirthDate(data.patientBirthDate);
+    if (bd) bits.push(`DN ${bd}`);
+    if (data.patientCpf) bits.push(`CPF ${data.patientCpf}`);
+    if (data.patientGender) bits.push(`Sexo ${data.patientGender}`);
+    if (data.patientInsurance) bits.push(data.patientInsurance);
+    if (bits.length) {
+        doc.text(bits.join("    ·    "), layout.leftX, nextY);
+        nextY += 4;
     }
 
-    // Endereço
     if (data.patientAddress) {
-        doc.setFontSize(8);
-        doc.setFont("helvetica", "bold");
-        doc.text("Endereço:", leftX, yPos);
-        doc.setFont("helvetica", "normal");
-        const addr = data.patientAddress.length > 85 ? data.patientAddress.substring(0, 82) + "..." : data.patientAddress;
-        doc.text(addr, leftX + 20, yPos);
-        yPos += 5;
+        const addr = data.patientAddress.length > 110
+            ? data.patientAddress.slice(0, 107) + "..."
+            : data.patientAddress;
+        const wrapped = doc.splitTextToSize(addr, layout.contentWidth);
+        doc.text(wrapped, layout.leftX, nextY);
+        nextY += wrapped.length * 3.5;
     }
 
-    // Convenio (telefone removido)
-    let extraLine = "";
-    if (data.patientInsurance) extraLine += `Convênio: ${data.patientInsurance}`;
-
-    if (extraLine) {
-        doc.text(extraLine, leftX, yPos);
-        yPos += 5;
-    }
-
-    yPos += 8;
-
-    // Linha divisória
-    doc.setLineWidth(0.3);
-    doc.line(leftX, yPos, rightX, yPos);
-
-    yPos += 8;
-
-    // ===== PRESCRIÇÃO =====
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "bold");
-    doc.text("PRESCRIÇÃO", leftX, yPos);
-
-    yPos += 8;
-
-    // Medicamentos
-    const rightMargin = rightX;
-    doc.setFontSize(10);
-
-    data.medications.forEach((med, index) => {
-        doc.setFont("helvetica", "bold");
-
-        // Linha 1
-        let medicationLine = cleanTextForPDF(med.name).toUpperCase();
-        doc.text(`${index + 1}.`, leftX, yPos);
-        doc.text(medicationLine, leftX + 7, yPos);
-
-        // Quantidade à direita (obrigatório para controlados)
-        if (med.quantity) {
-            doc.setFont("helvetica", "normal");
-            doc.text(med.quantity, rightMargin, yPos, { align: "right" });
-        }
-
-        yPos += 5;
-
-        // Linha 2: Dosagem + Posologia na mesma linha
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-
-        let dosagePosologia = "";
-        if (med.dosage) {
-            dosagePosologia += med.dosage;
-        }
-        if (med.frequency) {
-            if (dosagePosologia) {
-                dosagePosologia += "  -  " + med.frequency;
-            } else {
-                dosagePosologia = med.frequency;
-            }
-        }
-        if (data.isContinuousUse && dosagePosologia) {
-            dosagePosologia += ". Uso contínuo.";
-        }
-
-        if (dosagePosologia) {
-            const maxPosologiaWidth = pageWidth - margin * 2 - 30;
-            const posologiaLines = doc.splitTextToSize(dosagePosologia, maxPosologiaWidth);
-            doc.text(posologiaLines, leftX + 7, yPos);
-        }
-
-        // Via de administração
-        if (med.format) {
-            let viaAdmin = "Oral";
-            const formatLower = med.format.toLowerCase();
-            if (formatLower.includes("injet") || formatLower.includes("ampola")) viaAdmin = "Injetável";
-            else if (formatLower.includes("topico") || formatLower.includes("pomada") || formatLower.includes("creme")) viaAdmin = "Tópico";
-            else if (formatLower.includes("gotas") || formatLower.includes("colírio")) viaAdmin = "Oftálmico";
-            else if (formatLower.includes("inalat") || formatLower.includes("spray nasal")) viaAdmin = "Inalatório";
-            else if (formatLower.includes("supositório")) viaAdmin = "Retal";
-            doc.text(viaAdmin, rightMargin, yPos, { align: "right" });
-        }
-
-        yPos += 10;
-        doc.setFontSize(10);
-    });
-
-    // ===== RODAPÉ =====
-    const pageHeight = 210; // A5 
-    const signatureY = pageHeight - 80; // Acima das caixas
-    const boxesY = pageHeight - 55;
-    const validityY = pageHeight - 12;
-
-    // ===== ASSINATURA =====
-    doc.setLineWidth(0.3);
     doc.setTextColor(0, 0, 0);
-    doc.line(centerX - 40, signatureY, centerX + 40, signatureY);
 
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "bold");
-    doc.text(data.doctorName, centerX, signatureY + 5, { align: "center" });
-
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.text(`CRM: ${data.doctorCrm}`, centerX, signatureY + 10, { align: "center" });
-    doc.text("Assinatura e Carimbo", centerX, signatureY + 15, { align: "center" });
-
-    // ===== IDENTIFICAÇÃO DO COMPRADOR =====
-    doc.setLineWidth(0.3);
-    doc.setTextColor(0, 0, 0);
-    // Largura total disponivel = pageWidth - 2*margin = 128.5
-    // Cada caixa = ~62mm
-    const boxWidth = 62;
-    doc.rect(leftX, boxesY, boxWidth, 35, "S");
-
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "bold");
-    doc.text("IDENTIFICAÇÃO DO COMPRADOR", leftX + 3, boxesY + 5);
-
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(120, 120, 120);
-    doc.text("Nome: __________________________", leftX + 3, boxesY + 12);
-    doc.text("RG: ____________ Órgão: _________", leftX + 3, boxesY + 18);
-    doc.text("Endereço: _______________________", leftX + 3, boxesY + 24);
-    doc.text("Telefone: _______________________", leftX + 3, boxesY + 30);
-
-    // ===== IDENTIFICAÇÃO DO FORNECEDOR =====
-    const box2X = rightX - boxWidth;
-    doc.rect(box2X, boxesY, boxWidth, 35, "S");
-
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "bold");
-    doc.text("IDENTIFICAÇÃO DO FORNECEDOR", box2X + 3, boxesY + 5);
-
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(120, 120, 120);
-    doc.text("Data: ___/___/______", box2X + 3, boxesY + 12);
-    doc.text("Assinatura Farmacêutico:", box2X + 3, boxesY + 18);
-    doc.text("__________________________", box2X + 3, boxesY + 24);
-    doc.text("CRF: _____________________", box2X + 3, boxesY + 30);
-
-    // Validade no rodapé
-    doc.setFontSize(7);
-    doc.setTextColor(100, 100, 100);
-    const validityText = (data as any).validityText || "Válido por 30 dias a partir da data de emissão.";
-    doc.text(validityText, leftX, validityY);
+    // Subtle divider
+    nextY += 3;
+    doc.setLineWidth(0.2);
+    doc.setDrawColor(220, 220, 220);
+    doc.line(layout.leftX, nextY, layout.rightX, nextY);
+    return nextY + 5;
 };
 
-// ==========================================
-// RECEITA TIPO A (Amarela - Opioides)
-// ==========================================
-// ==========================================
-// RECEITA TIPO A (Amarela - Opioides)
-// ==========================================
-const generateTypeAPrescription = (doc: jsPDF, data: PrescriptionData, xOffset: number = 0) => {
-    const pageWidth = 148.5;
-    const centerX = xOffset + (pageWidth / 2);
-    const rightX = xOffset + pageWidth - 10;
-    let yPos = 15;
-
-    // Header com fundo amarelo claro
-    doc.setFillColor(255, 248, 220);
-    doc.rect(xOffset, 0, pageWidth, 30, 'F');
-
-    drawLogo(doc, rightX - 15, 10);
-
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(180, 120, 0);
-    doc.text("NOTIFICAÇÃO DE RECEITA \"A\"", centerX, yPos, { align: "center" });
-
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(100, 80, 0);
-    doc.text("Entorpecentes e Psicotrópicos - Lista A1/A2 (Opioides)", centerX, yPos + 5, { align: "center" });
-    doc.text("1ª Via - Retenção da Farmácia", centerX, yPos + 9, { align: "center" });
-
-    yPos = 38;
-    doc.setTextColor(0, 0, 0);
-
-    // Usar apenas o conteúdo controlado (sem header duplicado)
-    generateControlledContent(doc, data, yPos, xOffset);
-};
-
-// ==========================================
-// RECEITA TIPO B1 (Azul - Psicotrópicos)
-// ==========================================
-// ==========================================
-// RECEITA TIPO B1 (Azul - Psicotrópicos)
-// ==========================================
-const generateTypeB1Prescription = (doc: jsPDF, data: PrescriptionData, xOffset: number = 0) => {
-    const pageWidth = 148.5;
-    const centerX = xOffset + (pageWidth / 2);
-    const rightX = xOffset + pageWidth - 10;
-    let yPos = 15;
-
-    // Header com fundo azul claro
-    doc.setFillColor(220, 235, 255);
-    doc.rect(xOffset, 0, pageWidth, 30, 'F');
-
-    drawLogo(doc, rightX - 15, 10);
-
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(30, 80, 150);
-    doc.text("NOTIFICAÇÃO DE RECEITA \"B\"", centerX, yPos, { align: "center" });
-
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(50, 80, 120);
-    doc.text("Psicotrópicos - Lista B1 (Ansiolíticos, Hipnóticos, Anticonvulsivantes)", centerX, yPos + 5, { align: "center" });
-    doc.text("1ª Via - Retenção da Farmácia", centerX, yPos + 9, { align: "center" });
-
-    yPos = 38;
-    doc.setTextColor(0, 0, 0);
-
-    // Usar estrutura controlada
-    generateControlledContent(doc, data, yPos, xOffset);
-};
-
-// ==========================================
-// RECEITA TIPO B2 (Azul - Anorexígenos)
-// ==========================================
-// ==========================================
-// RECEITA TIPO B2 (Azul - Anorexígenos)
-// ==========================================
-const generateTypeB2Prescription = (doc: jsPDF, data: PrescriptionData, xOffset: number = 0) => {
-    const pageWidth = 148.5;
-    const centerX = xOffset + (pageWidth / 2);
-    const rightX = xOffset + pageWidth - 10;
-    let yPos = 15;
-
-    // Header com fundo azul mais intenso
-    doc.setFillColor(200, 220, 255);
-    doc.rect(xOffset, 0, pageWidth, 30, 'F');
-
-    drawLogo(doc, rightX - 15, 10);
-
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(30, 60, 130);
-    doc.text("NOTIFICAÇÃO DE RECEITA \"B2\"", centerX, yPos, { align: "center" });
-
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(50, 70, 110);
-    doc.text("Psicotrópicos Anorexígenos - Lista B2", centerX, yPos + 5, { align: "center" });
-    doc.text("1ª Via - Retenção da Farmácia", centerX, yPos + 9, { align: "center" });
-
-    yPos = 38;
-    doc.setTextColor(0, 0, 0);
-
-    generateControlledContent(doc, data, yPos, xOffset);
-};
-
-// ==========================================
-// RECEITA TIPO C (Branca 2 vias - Retinoides)
-// ==========================================
-// ==========================================
-// RECEITA TIPO C (Branca 2 vias - Retinoides)
-// ==========================================
-const generateTypeCPrescription = (doc: jsPDF, data: PrescriptionData, xOffset: number = 0) => {
-    const pageWidth = 148.5;
-    const centerX = xOffset + (pageWidth / 2);
-    const rightX = xOffset + pageWidth - 10;
-    let yPos = 15;
-
-    drawLogo(doc, rightX - 15, 10);
-
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(0, 0, 0);
-    doc.text("RECEITA DE CONTROLE ESPECIAL", centerX, yPos, { align: "center" });
-
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(80, 80, 80);
-    doc.text("Retinoides, Imunossupressores - Lista C (2 vias)", centerX, yPos + 5, { align: "center" });
-    doc.text("Retinoides, Imunossupressores - Lista C (2 vias)", centerX, yPos + 5, { align: "center" });
-
-    const viaText = xOffset > 0 ? "2ª Via - Paciente" : "1ª Via - Retenção da Farmácia";
-    doc.text(viaText, centerX, yPos + 9, { align: "center" });
-
-    yPos = 38;
-    doc.setTextColor(0, 0, 0);
-
-    generateControlledContent(doc, data, yPos, xOffset);
-};
-
-// ==========================================
-// RECEITA TIPO C1 (Especial - Antidepressivos, Antipsicóticos)
-// ==========================================
-// ==========================================
-// RECEITA TIPO C1 (Especial - Antidepressivos, Antipsicóticos)
-// ==========================================
-const generateTypeC1Prescription = (doc: jsPDF, data: PrescriptionData, xOffset: number = 0) => {
-    const pageWidth = 148.5;
-    const centerX = xOffset + (pageWidth / 2);
-    const rightX = xOffset + pageWidth - 10;
-    let yPos = 15;
-
-    drawLogo(doc, rightX - 15, 10);
-
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(0, 0, 0);
-    doc.text("RECEITA DE CONTROLE ESPECIAL", centerX, yPos, { align: "center" });
-
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(80, 80, 80);
-    doc.text("Antidepressivos, Antipsicóticos - Lista C1 (2 vias)", centerX, yPos + 5, { align: "center" });
-    doc.text("Antidepressivos, Antipsicóticos - Lista C1 (2 vias)", centerX, yPos + 5, { align: "center" });
-
-    const viaText = xOffset > 0 ? "2ª Via - Paciente" : "1ª Via - Retenção da Farmácia";
-    doc.text(viaText, centerX, yPos + 9, { align: "center" });
-
-    yPos = 38;
-    doc.setTextColor(0, 0, 0);
-
-    generateControlledContent(doc, data, yPos, xOffset);
-};
-
-// ==========================================
-// RECEITA ESPECIAL (Antibióticos/Antimicrobianos)
-// ==========================================
-const generateSpecialPrescription = (doc: jsPDF, data: PrescriptionData, xOffset: number = 0) => {
-    const pageWidth = 148.5;
-    const centerX = xOffset + (pageWidth / 2);
-    const rightX = xOffset + pageWidth - 10;
-    let yPos = 15;
-
-    drawLogo(doc, rightX - 15, 10);
-
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(0, 0, 0);
-    doc.text("RECEITA DE CONTROLE ESPECIAL", centerX, yPos, { align: "center" });
-
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(80, 80, 80);
-    doc.text("Antimicrobianos - 2 vias (Retenção Farmácia)", centerX, yPos + 5, { align: "center" });
-
-    const viaText = xOffset > 0 ? "2ª Via - Paciente" : "1ª Via - Retenção da Farmácia";
-    doc.text(viaText, centerX, yPos + 9, { align: "center" });
-
-    yPos = 38;
-    doc.setTextColor(0, 0, 0);
-
-    generateControlledContent(doc, data, yPos, xOffset);
-};
-
-// Helper: Conteúdo da receita controlada (sem header)
-const generateControlledContent = (doc: jsPDF, data: PrescriptionData, startY: number, xOffset: number = 0) => {
-    const pageWidth = 148.5; // A5
-    const centerX = xOffset + (pageWidth / 2);
-    const margin = 10;
-    const leftX = xOffset + margin;
-    const rightX = xOffset + pageWidth - margin;
-
+/**
+ * Draws the medications list. Returns updated Y.
+ */
+const drawMedicationsBlock = (
+    doc: jsPDF,
+    layout: BodyLayout,
+    data: PrescriptionData,
+    startY: number
+): number => {
     let yPos = startY;
 
-    // Linha divisória
-    doc.setLineWidth(0.5);
-    doc.line(leftX, yPos - 5, rightX, yPos - 5);
-
-    // Dados do médico
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "bold");
-    doc.text(`Dr(a). ${data.doctorName}`, leftX, yPos);
-
-    // CRM no final da linha (alinhado à direita)
-    doc.setFont("helvetica", "normal");
-    doc.text(`CRM: ${data.doctorCrm}`, rightX, yPos, { align: "right" });
-
-    // Especialidade + RQE no final da linha (alinhado à direita)
-    if (data.doctorSpecialty) {
+    if (data.isContinuousUse) {
         doc.setFontSize(8);
-        const specialtyText = data.doctorRqe
-            ? `${data.doctorSpecialty} - RQE ${data.doctorRqe}`
-            : data.doctorSpecialty;
-        doc.text(specialtyText, rightX, yPos + 4, { align: "right" });
+        doc.setFont("helvetica", "normal");
+        doc.setDrawColor(40, 40, 40);
+        doc.rect(layout.leftX, yPos - 3, 3, 3, "S");
+        doc.text("X", layout.leftX + 0.7, yPos - 0.5);
+        doc.text("Uso contínuo", layout.leftX + 5, yPos);
+        yPos += 7;
     }
-
-    yPos += 12;
-
-    // Dados do paciente
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "bold");
-    doc.text("Paciente:", leftX, yPos);
-    doc.setFont("helvetica", "normal");
-    doc.text(data.patientName, leftX + 20, yPos);
-
-    const dateStr = format(data.issueDate, "dd/MM/yyyy", { locale: ptBR });
-    doc.text(`Data: ${dateStr}`, rightX, yPos, { align: "right" });
-
-    yPos += 5;
-
-    // DN + CPF na mesma linha (com formatação dd/mm/yyyy)
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-
-    let line1 = "";
-    if (data.patientBirthDate) {
-        let formattedBirthDate = data.patientBirthDate;
-        if (data.patientBirthDate.includes("-")) {
-            const [year, month, day] = data.patientBirthDate.split("-");
-            formattedBirthDate = `${day}/${month}/${year}`;
-        }
-        line1 += `DN: ${formattedBirthDate}`;
-    }
-    if (data.patientCpf) {
-        if (line1) line1 += "    ";
-        line1 += `CPF: ${data.patientCpf}`;
-    }
-
-    if (line1) {
-        doc.text(line1, leftX, yPos);
-        yPos += 4;
-    }
-
-    if (data.patientAddress) {
-        const addr = data.patientAddress.length > 80 ? data.patientAddress.substring(0, 77) + "..." : data.patientAddress;
-        doc.text(`Endereço: ${addr}`, leftX, yPos);
-        yPos += 4;
-    }
-
-    // Linha divisória
-    doc.setLineWidth(0.3);
-    doc.line(leftX, yPos, rightX, yPos);
-
-    yPos += 8;
-
-    // Medicamentos
-    const rightMargin = rightX;
-    doc.setFontSize(10);
 
     data.medications.forEach((med, index) => {
-        doc.setFont("helvetica", "bold");
-        let medicationLine = cleanTextForPDF(med.name).toUpperCase();
+        const baseLeft = layout.leftX;
+        const textLeft = baseLeft + 7;
 
-        doc.text(`${index + 1}.`, leftX, yPos);
-        doc.text(medicationLine, leftX + 7, yPos);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(0, 0, 0);
+
+        const medName = cleanTextForPDF(med.name).toUpperCase();
+        doc.text(`${index + 1}.`, baseLeft, yPos);
+        const nameWrapped = doc.splitTextToSize(medName, layout.contentWidth - 35);
+        doc.text(nameWrapped, textLeft, yPos);
+        const nameLineCount = nameWrapped.length;
 
         if (med.quantity) {
             doc.setFont("helvetica", "normal");
-            doc.text(med.quantity, rightMargin, yPos, { align: "right" });
+            doc.setFontSize(9);
+            doc.text(med.quantity, layout.rightX, yPos, { align: "right" });
         }
 
-        yPos += 5;
+        yPos += nameLineCount * 4.5 + 0.5;
 
-        // Linha 2: Dosagem + Posologia na mesma linha
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
+        doc.setTextColor(45, 45, 45);
 
-        let dosagePosologia = "";
-        if (med.dosage) {
-            dosagePosologia += med.dosage;
-        }
-        if (med.frequency) {
-            if (dosagePosologia) {
-                dosagePosologia += "  -  " + med.frequency;
-            } else {
-                dosagePosologia = med.frequency;
-            }
-        }
+        const posBits: string[] = [];
+        if (med.dosage) posBits.push(med.dosage);
+        if (med.frequency) posBits.push(med.frequency);
+        if (data.isContinuousUse) posBits.push("Uso contínuo");
+        const posologia = posBits.join("  ·  ");
 
-        if (dosagePosologia) {
-            const maxPosologiaWidth = pageWidth - margin * 2 - 30;
-            const posologiaLines = doc.splitTextToSize(dosagePosologia, maxPosologiaWidth);
-            doc.text(posologiaLines, leftX + 7, yPos);
+        if (posologia) {
+            const wrapped = doc.splitTextToSize(posologia, layout.contentWidth - 30);
+            doc.text(wrapped, textLeft, yPos);
+            yPos += wrapped.length * 3.7;
         }
 
-        // Via de administração
-        if (med.format) {
-            let viaAdmin = "Oral";
-            const formatLower = med.format.toLowerCase();
-            if (formatLower.includes("injet") || formatLower.includes("ampola")) viaAdmin = "Injetável";
-            else if (formatLower.includes("topico") || formatLower.includes("pomada") || formatLower.includes("creme")) viaAdmin = "Tópico";
-            else if (formatLower.includes("gotas") || formatLower.includes("colírio")) viaAdmin = "Oftálmico";
-            else if (formatLower.includes("inalat") || formatLower.includes("spray nasal")) viaAdmin = "Inalatório";
-            else if (formatLower.includes("supositório")) viaAdmin = "Retal";
-            doc.text(viaAdmin, rightMargin, yPos, { align: "right" });
+        const route = resolveRouteOfAdministration(med.format);
+        if (route) {
+            doc.setFontSize(8);
+            doc.setTextColor(110, 110, 110);
+            doc.text(`Via ${route.toLowerCase()}`, layout.rightX, yPos - 1, { align: "right" });
         }
 
-        yPos += 10;
-        doc.setFontSize(10);
+        if (med.notes) {
+            doc.setFontSize(8);
+            doc.setFont("helvetica", "italic");
+            doc.setTextColor(110, 110, 110);
+            const wrapped = doc.splitTextToSize(`Obs.: ${med.notes}`, layout.contentWidth - 10);
+            doc.text(wrapped, textLeft, yPos + 1);
+            yPos += wrapped.length * 3.5;
+            doc.setFont("helvetica", "normal");
+        }
+
+        yPos += 6;
+        doc.setTextColor(0, 0, 0);
     });
 
-    // Assinatura e caixas
+    if (data.observations && !data.observations.toLowerCase().includes("renovação de medicamentos")) {
+        yPos += 3;
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(90, 90, 90);
+        const lines = doc.splitTextToSize(`Observações: ${data.observations}`, layout.contentWidth);
+        doc.text(lines, layout.leftX, yPos);
+        yPos += lines.length * 3.5;
+        doc.setTextColor(0, 0, 0);
+    }
+
+    return yPos;
+};
+
+/**
+ * Draws signature block at the bottom plus validity footer.
+ */
+const drawSignatureFooter = (
+    doc: jsPDF,
+    layout: BodyLayout,
+    data: PrescriptionData,
+    options: {
+        pageHeight?: number;
+        signatureOffset?: number;
+        footerOffset?: number;
+        viaLabel?: string;
+    } = {}
+) => {
+    const pageHeight = options.pageHeight ?? 210;
+    const signatureY = pageHeight - (options.signatureOffset ?? 45);
+    const footerY = pageHeight - (options.footerOffset ?? 15);
+
+    doc.setLineWidth(0.3);
+    doc.setDrawColor(40, 40, 40);
+    doc.line(layout.centerX - 40, signatureY, layout.centerX + 40, signatureY);
+
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(0, 0, 0);
+    doc.text(data.doctorName, layout.centerX, signatureY + 5, { align: "center" });
+
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80, 80, 80);
+    doc.text(`CRM ${data.doctorCrm}`, layout.centerX, signatureY + 10, { align: "center" });
+    doc.setFontSize(7);
+    doc.text("Assinatura e carimbo", layout.centerX, signatureY + 14, { align: "center" });
+
+    doc.setTextColor(110, 110, 110);
+    doc.setFontSize(7);
+    const validityText = data.validityText
+        || (data.isContinuousUse
+            ? "Válido por 180 dias a partir da data de emissão."
+            : "Válido por 30 dias a partir da data de emissão.");
+    doc.text(validityText, layout.leftX, footerY);
+    if (options.viaLabel) {
+        doc.text(options.viaLabel, layout.rightX, footerY, { align: "right" });
+    }
+    doc.setTextColor(0, 0, 0);
+};
+
+/**
+ * Draws the buyer / dispensing pharmacist boxes (controlled prescriptions).
+ */
+const drawControlledFooter = (doc: jsPDF, layout: BodyLayout, data: PrescriptionData) => {
     const pageHeight = 210;
     const signatureY = pageHeight - 80;
     const boxesY = pageHeight - 55;
+    const validityY = pageHeight - 12;
 
+    // Signature
     doc.setLineWidth(0.3);
-    doc.line(centerX - 40, signatureY, centerX + 40, signatureY);
+    doc.setDrawColor(40, 40, 40);
+    doc.line(layout.centerX - 40, signatureY, layout.centerX + 40, signatureY);
     doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
-    doc.text(data.doctorName, centerX, signatureY + 5, { align: "center" });
+    doc.setTextColor(0, 0, 0);
+    doc.text(data.doctorName, layout.centerX, signatureY + 5, { align: "center" });
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
-    doc.text(`CRM: ${data.doctorCrm}`, centerX, signatureY + 10, { align: "center" });
+    doc.setTextColor(80, 80, 80);
+    doc.text(`CRM ${data.doctorCrm}`, layout.centerX, signatureY + 10, { align: "center" });
+    doc.setFontSize(7);
+    doc.text("Assinatura e carimbo", layout.centerX, signatureY + 14, { align: "center" });
+    doc.setTextColor(0, 0, 0);
 
-    // Caixas de identificação
+    // Buyer box
     const boxWidth = 62;
-    doc.rect(leftX, boxesY, boxWidth, 35, "S");
+    const boxHeight = 35;
+    doc.setDrawColor(180, 180, 180);
+    doc.setLineWidth(0.25);
+    doc.rect(layout.leftX, boxesY, boxWidth, boxHeight, "S");
     doc.setFontSize(7);
     doc.setFont("helvetica", "bold");
-    doc.text("IDENTIFICAÇÃO DO COMPRADOR", leftX + 3, boxesY + 5);
+    doc.text("IDENTIFICAÇÃO DO COMPRADOR", layout.leftX + 3, boxesY + 5);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(120, 120, 120);
-    doc.text("Nome: __________________________", leftX + 3, boxesY + 12);
-    doc.text("RG: ____________ Órgão: _________", leftX + 3, boxesY + 18);
-    doc.text("Endereço: _______________________", leftX + 3, boxesY + 24);
+    doc.text("Nome: __________________________", layout.leftX + 3, boxesY + 12);
+    doc.text("RG: ____________  Órgão: _________", layout.leftX + 3, boxesY + 18);
+    doc.text("Endereço: _______________________", layout.leftX + 3, boxesY + 24);
+    doc.text("Telefone: _______________________", layout.leftX + 3, boxesY + 30);
 
+    // Pharmacist box
+    const box2X = layout.rightX - boxWidth;
     doc.setTextColor(0, 0, 0);
-    const box2X = rightX - boxWidth;
-    doc.rect(box2X, boxesY, boxWidth, 35, "S");
+    doc.rect(box2X, boxesY, boxWidth, boxHeight, "S");
+    doc.setFontSize(7);
     doc.setFont("helvetica", "bold");
     doc.text("IDENTIFICAÇÃO DO FORNECEDOR", box2X + 3, boxesY + 5);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(120, 120, 120);
     doc.text("Data: ___/___/______", box2X + 3, boxesY + 12);
-    doc.text("Assinatura: ____________________", box2X + 3, boxesY + 18);
+    doc.text("Assinatura farmacêutico:", box2X + 3, boxesY + 18);
+    doc.text("__________________________", box2X + 3, boxesY + 24);
+    doc.text("CRF: _____________________", box2X + 3, boxesY + 30);
+
+    // Validity
+    doc.setFontSize(7);
+    doc.setTextColor(110, 110, 110);
+    doc.text(
+        data.validityText || "Válido por 30 dias a partir da data de emissão.",
+        layout.leftX,
+        validityY
+    );
+    doc.setTextColor(0, 0, 0);
 };
 
-// Helper: Conteúdo básico (sem header)
-const generateBasicContent = (doc: jsPDF, data: PrescriptionData, startY: number, xOffset: number = 0) => {
-    const pageWidth = 148.5; // A5
-    const centerX = xOffset + (pageWidth / 2);
-    const margin = 10;
-    const leftX = xOffset + margin;
-    const rightX = xOffset + pageWidth - margin;
+// ==========================================
+// GENERATORS
+// ==========================================
 
-    let yPos = startY;
+const generateBasicPrescription = (doc: jsPDF, data: PrescriptionData, xOffset: number = 0) => {
+    const layout = layoutFor(xOffset, 148.5);
+    const headerEndY = drawDocumentHeader(
+        doc,
+        data.clinicHeader ?? null,
+        data.clinicHeaderAssets ?? {},
+        { xOffset, pageWidth: layout.pageWidth, marginX: layout.margin, topMargin: 8 }
+    );
 
-    // Dados do médico
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.text(`Dr(a). ${data.doctorName}`, leftX, yPos);
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    doc.text(`CRM: ${data.doctorCrm}`, leftX, yPos + 5);
+    let yPos = drawDocumentTitle(doc, layout, "RECEITUÁRIO", headerEndY);
+    yPos = drawDoctorBlock(doc, layout, data, yPos);
+    yPos += 3;
+    yPos = drawPatientBlock(doc, layout, data, yPos);
+    yPos = drawMedicationsBlock(doc, layout, data, yPos);
 
-    yPos += 15;
-
-    // Paciente
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "bold");
-    doc.text("PACIENTE:", leftX, yPos);
-    doc.setFont("helvetica", "normal");
-    doc.text(data.patientName, leftX + 25, yPos);
-
-    const dateStr = format(data.issueDate, "dd/MM/yyyy", { locale: ptBR });
-    doc.text(`DATA: ${dateStr}`, rightX, yPos, { align: "right" });
-
-    yPos += 5;
-
-    // Detalhes extras do paciente
-    doc.setFontSize(8);
-    let details = "";
-    if (data.patientGender) details += `Sexo: ${data.patientGender}`;
-    if (data.patientInsurance) details += `${details ? " | " : ""}Convênio: ${data.patientInsurance}`;
-
-    if (details) {
-        doc.text(details, leftX, yPos);
-        yPos += 4;
-    }
-
-    if (data.patientAddress) {
-        const addr = data.patientAddress.length > 90 ? data.patientAddress.substring(0, 87) + "..." : data.patientAddress;
-        doc.text(`End: ${addr}`, leftX, yPos);
-        yPos += 4;
-    }
-
-    yPos += 10;
-    doc.setLineWidth(0.3);
-    doc.line(leftX, yPos, rightX, yPos);
-
-    yPos += 10;
-
-    // Medicamentos
-    const rightMargin = rightX;
-    doc.setFontSize(10);
-
-    data.medications.forEach((med, index) => {
-        doc.setFont("helvetica", "bold");
-        let medicationLine = cleanTextForPDF(med.name).toUpperCase();
-
-        doc.text(`${index + 1}.`, leftX, yPos);
-        doc.text(medicationLine, leftX + 7, yPos);
-
-        if (med.quantity) {
-            doc.setFont("helvetica", "normal");
-            doc.text(med.quantity, rightMargin, yPos, { align: "right" });
-        }
-
-        yPos += 5;
-
-        // Linha 2: Dosagem + Posologia na mesma linha
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-
-        let dosagePosologia = "";
-        if (med.dosage) {
-            dosagePosologia += med.dosage;
-        }
-        if (med.frequency) {
-            if (dosagePosologia) {
-                dosagePosologia += "  -  " + med.frequency;
-            } else {
-                dosagePosologia = med.frequency;
-            }
-        }
-
-        if (dosagePosologia) {
-            const maxPosologiaWidth = pageWidth - margin * 2 - 30;
-            const posologiaLines = doc.splitTextToSize(dosagePosologia, maxPosologiaWidth);
-            doc.text(posologiaLines, leftX + 7, yPos);
-        }
-
-        // Via de administração
-        if (med.format) {
-            let viaAdmin = "Oral";
-            const formatLower = med.format.toLowerCase();
-            if (formatLower.includes("injet") || formatLower.includes("ampola")) viaAdmin = "Injetável";
-            else if (formatLower.includes("topico") || formatLower.includes("pomada") || formatLower.includes("creme")) viaAdmin = "Tópico";
-            else if (formatLower.includes("gotas") || formatLower.includes("colírio")) viaAdmin = "Oftálmico";
-            else if (formatLower.includes("inalat") || formatLower.includes("spray nasal")) viaAdmin = "Inalatório";
-            else if (formatLower.includes("supositório")) viaAdmin = "Retal";
-            doc.text(viaAdmin, rightMargin, yPos, { align: "right" });
-        }
-
-        yPos += 10;
-        doc.setFontSize(10);
+    drawSignatureFooter(doc, layout, data, {
+        viaLabel: xOffset > 0 ? "2ª Via" : "1ª Via",
     });
+};
 
-    // Assinatura
-    const pageHeight = 210;
-    const signatureY = pageHeight - 45;
-    doc.setLineWidth(0.3);
-    doc.line(centerX - 40, signatureY, centerX + 40, signatureY);
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "bold");
-    doc.text(data.doctorName, centerX, signatureY + 5, { align: "center" });
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.text(`CRM: ${data.doctorCrm}`, centerX, signatureY + 10, { align: "center" });
+const drawColoredTitle = (
+    doc: jsPDF,
+    layout: BodyLayout,
+    headerEndY: number,
+    title: string,
+    subtitle: string,
+    color: [number, number, number]
+): number => {
+    return drawDocumentTitle(doc, layout, title, headerEndY, {
+        subtitle,
+        subtitle2: "1ª via – retenção da farmácia",
+        color,
+    });
+};
+
+const generateControlledPrescription = (
+    doc: jsPDF,
+    data: PrescriptionData,
+    xOffset: number,
+    config: { title: string; subtitle: string; color: [number, number, number] }
+) => {
+    const layout = layoutFor(xOffset, 148.5);
+    const headerEndY = drawDocumentHeader(
+        doc,
+        data.clinicHeader ?? null,
+        data.clinicHeaderAssets ?? {},
+        { xOffset, pageWidth: layout.pageWidth, marginX: layout.margin, topMargin: 8 }
+    );
+
+    let yPos = drawColoredTitle(doc, layout, headerEndY, config.title, config.subtitle, config.color);
+    yPos = drawDoctorBlock(doc, layout, data, yPos);
+    yPos += 3;
+    yPos = drawPatientBlock(doc, layout, data, yPos);
+    yPos = drawMedicationsBlock(doc, layout, data, yPos);
+
+    drawControlledFooter(doc, layout, data);
 };
 
 // ==========================================
 // FUNÇÃO PRINCIPAL DE GERAÇÃO DE RECEITA
 // ==========================================
-export const generatePrescriptionPDF = (data: PrescriptionData, targetWindow: Window | null = null) => {
-    // Agrupar medicamentos por tipo de receituário
+export const generatePrescriptionPDF = async (
+    data: PrescriptionData,
+    targetWindow: Window | null = null
+) => {
+    // Load clinic header if not already preloaded by caller.
+    let header = data.clinicHeader ?? null;
+    let assets = data.clinicHeaderAssets ?? {};
+    if (!header) {
+        const result = await fetchAndPreloadClinicHeader();
+        header = result.header;
+        assets = result.assets;
+    }
+    const enrich = (d: PrescriptionData): PrescriptionData => ({
+        ...d,
+        clinicHeader: header,
+        clinicHeaderAssets: assets,
+    });
+
     const groups: { [key: string]: typeof data.medications } = {
-        padrao: [],
-        especial: [],
-        A: [],
-        B1: [],
-        B2: [],
-        C: [],
-        C1: []  // Antidepressivos e Antipsicóticos (Receita Especial branca 2 vias)
+        padrao: [], especial: [], A: [], B1: [], B2: [], C: [], C1: [],
     };
 
-    data.medications.forEach(med => {
-        const type = med.prescriptionType || 'padrao';
+    data.medications.forEach((med) => {
+        const type = med.prescriptionType || "padrao";
         if (groups[type]) {
             groups[type].push(med);
+        } else if (isControlledMedication(med.name)) {
+            groups.B1.push(med);
         } else {
-            // Fallback: detectar controlados pelo nome se não tiver tipo definido
-            if (isControlledMedication(med.name)) {
-                groups['B1'].push(med); // Padrão para controlados sem tipo
-            } else {
-                groups['padrao'].push(med);
-            }
+            groups.padrao.push(med);
         }
     });
 
-    // Ordem de geração das páginas
-    const typeOrder: Array<keyof typeof groups> = ['padrao', 'especial', 'A', 'B1', 'B2', 'C', 'C1'];
-    const typesWithMeds = typeOrder.filter(type => groups[type].length > 0);
-
-    console.log('[PDF DEBUG] Incoming medications:', data.medications.map(m => ({ name: m.name, type: m.prescriptionType })));
-    console.log('[PDF DEBUG] Grouped:', typesWithMeds.map(t => ({ type: t, count: groups[t].length })));
+    const typeOrder: Array<keyof typeof groups> = ["padrao", "especial", "A", "B1", "B2", "C", "C1"];
+    const typesWithMeds = typeOrder.filter((t) => groups[t].length > 0);
 
     if (typesWithMeds.length === 0) {
         console.warn("Nenhum medicamento para gerar receita");
         return;
     }
 
-    // Paisagem (landscape), A4 (297x210)
-    const doc = new jsPDF({ format: 'a4', orientation: 'landscape' });
+    const doc = new jsPDF({ format: "a4", orientation: "landscape" });
     let isFirstPage = true;
 
-    typesWithMeds.forEach(type => {
-        if (!isFirstPage) {
-            doc.addPage();
-        }
+    typesWithMeds.forEach((type) => {
+        if (!isFirstPage) doc.addPage();
         isFirstPage = false;
 
-        const groupData = { ...data, medications: groups[type] };
-
-        // Definindo offsets para 2 vias na mesma página (A4 Landscape dividida ao meio)
-        // Largura total: 297mm. Metade: 148.5mm
+        const groupData = enrich({ ...data, medications: groups[type] });
         const offsets = [0, 148.5];
 
-        // Desenha linha tracejada no meio para corte
+        // Dashed cut line between vias
         doc.setLineWidth(0.1);
-        doc.setDrawColor(150, 150, 150);
-        // doc.setLineDash([3, 3], 0); // FIXME: setLineDash não existe no types do jsPDF, ver workaround
-        doc.line(148.5, 10, 148.5, 200); // Linha vertical central
-        // doc.setLineDash([], 0); // Reset dash
+        doc.setDrawColor(180, 180, 180);
+        doc.line(148.5, 8, 148.5, 202);
 
-        offsets.forEach(xOffset => {
+        offsets.forEach((xOffset) => {
             switch (type) {
-                case 'padrao':
-                    // Padrão: 30 dias, ou 180 se for uso contínuo
-                    const validityPadrao = groupData.isContinuousUse ? "Válido por 180 dias a partir da data de emissão." : "Válido por 30 dias a partir da data de emissão.";
-                    generateBasicPrescription(doc, { ...groupData, validityText: validityPadrao } as any, xOffset);
+                case "padrao": {
+                    const validityPadrao = groupData.isContinuousUse
+                        ? "Válido por 180 dias a partir da data de emissão."
+                        : "Válido por 30 dias a partir da data de emissão.";
+                    generateBasicPrescription(
+                        doc,
+                        { ...groupData, validityText: validityPadrao },
+                        xOffset
+                    );
+                    drawVitaViewFooterMark(doc, xOffset, 148.5);
                     break;
-                case 'especial':
-                    // Antibióticos: 10 dias
-                    generateSpecialPrescription(doc, { ...groupData, validityText: "Válido por 10 dias a partir da data de emissão." } as any, xOffset);
+                }
+                case "especial":
+                    generateControlledPrescription(doc, {
+                        ...groupData,
+                        validityText: "Válido por 10 dias a partir da data de emissão.",
+                    }, xOffset, {
+                        title: "RECEITA DE CONTROLE ESPECIAL",
+                        subtitle: "Antimicrobianos — 2 vias (retenção da farmácia)",
+                        color: [25, 25, 25],
+                    });
+                    drawVitaViewFooterMark(doc, xOffset, 148.5);
                     break;
-                case 'A':
-                case 'B1':
-                case 'B2':
-                case 'C':
-                case 'C1':
-                    // Controlados: 30 dias
-                    const validityControlled = "Válido por 30 dias a partir da data de emissão.";
-                    if (type === 'A') generateTypeAPrescription(doc, { ...groupData, validityText: validityControlled } as any, xOffset);
-                    else if (type === 'B1') generateTypeB1Prescription(doc, { ...groupData, validityText: validityControlled } as any, xOffset);
-                    else if (type === 'B2') generateTypeB2Prescription(doc, { ...groupData, validityText: validityControlled } as any, xOffset);
-                    else if (type === 'C') generateTypeCPrescription(doc, { ...groupData, validityText: validityControlled } as any, xOffset);
-                    else if (type === 'C1') generateTypeC1Prescription(doc, { ...groupData, validityText: validityControlled } as any, xOffset);
+                case "A":
+                    generateControlledPrescription(doc, {
+                        ...groupData,
+                        validityText: "Válido por 30 dias a partir da data de emissão.",
+                    }, xOffset, {
+                        title: "NOTIFICAÇÃO DE RECEITA A",
+                        subtitle: "Entorpecentes e psicotrópicos – Lista A1/A2 (opioides)",
+                        color: [180, 120, 0],
+                    });
+                    drawVitaViewFooterMark(doc, xOffset, 148.5);
+                    break;
+                case "B1":
+                    generateControlledPrescription(doc, {
+                        ...groupData,
+                        validityText: "Válido por 30 dias a partir da data de emissão.",
+                    }, xOffset, {
+                        title: "NOTIFICAÇÃO DE RECEITA B",
+                        subtitle: "Psicotrópicos – Lista B1 (ansiolíticos, hipnóticos, anticonvulsivantes)",
+                        color: [30, 80, 150],
+                    });
+                    drawVitaViewFooterMark(doc, xOffset, 148.5);
+                    break;
+                case "B2":
+                    generateControlledPrescription(doc, {
+                        ...groupData,
+                        validityText: "Válido por 30 dias a partir da data de emissão.",
+                    }, xOffset, {
+                        title: "NOTIFICAÇÃO DE RECEITA B2",
+                        subtitle: "Psicotrópicos anorexígenos – Lista B2",
+                        color: [30, 60, 130],
+                    });
+                    drawVitaViewFooterMark(doc, xOffset, 148.5);
+                    break;
+                case "C":
+                    generateControlledPrescription(doc, {
+                        ...groupData,
+                        validityText: "Válido por 30 dias a partir da data de emissão.",
+                    }, xOffset, {
+                        title: "RECEITA DE CONTROLE ESPECIAL",
+                        subtitle: "Retinoides, imunossupressores – Lista C (2 vias)",
+                        color: [25, 25, 25],
+                    });
+                    drawVitaViewFooterMark(doc, xOffset, 148.5);
+                    break;
+                case "C1":
+                    generateControlledPrescription(doc, {
+                        ...groupData,
+                        validityText: "Válido por 30 dias a partir da data de emissão.",
+                    }, xOffset, {
+                        title: "RECEITA DE CONTROLE ESPECIAL",
+                        subtitle: "Antidepressivos, antipsicóticos – Lista C1 (2 vias)",
+                        color: [25, 25, 25],
+                    });
+                    drawVitaViewFooterMark(doc, xOffset, 148.5);
                     break;
             }
         });
     });
 
-    // Abrir PDF em nova aba (usando janela pré-aberta se fornecida)
-    const pdfBlob = doc.output('blob');
+    const pdfBlob = doc.output("blob");
     const pdfUrl = URL.createObjectURL(pdfBlob);
 
     if (targetWindow) {
         targetWindow.location.href = pdfUrl;
     } else {
-        // Fallback para abrir nova janela (pode ser bloqueado)
-        window.open(pdfUrl, '_blank');
+        window.open(pdfUrl, "_blank");
     }
 };
 
-// ==========================================
-// ATESTADOS / CERTIFICADOS (Minimalista)
-// ==========================================
-export const generateCertificatePDF = (data: CertificateData) => {
-    const doc = new jsPDF();
-    const pageWidth = 210;
-    let yPos = 15;
-
-    // Logo no canto superior direito
-    drawLogo(doc, pageWidth - 30, 10);
-
-    // Título
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(0, 0, 0);
-    const title = data.type === 'laudo' ? "LAUDO MÉDICO" : "ATESTADO MÉDICO";
-    doc.text(title, 105, yPos, { align: "center" });
-
-    yPos = 25;
-
-    // Linha divisória
-    doc.setDrawColor(0, 0, 0);
-    doc.setLineWidth(0.5);
-    doc.line(15, yPos, pageWidth - 15, yPos);
-
-    yPos = 35;
-
-    // Dados do médico
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.text(`Dr(a). ${data.doctorName}`, 15, yPos);
-
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    doc.text(`CRM: ${data.doctorCrm}`, 15, yPos + 5);
-    if (data.doctorSpecialty) {
-        doc.text(data.doctorSpecialty, 15, yPos + 10);
-    }
-
-    if (data.clinicName) {
-        doc.setFontSize(8);
-        doc.text(data.clinicName, pageWidth - 15, yPos, { align: "right" });
-        if (data.clinicAddress) {
-            doc.text(data.clinicAddress, pageWidth - 15, yPos + 4, { align: "right" });
-        }
-        if (data.clinicPhone) {
-            doc.text(`Tel: ${data.clinicPhone}`, pageWidth - 15, yPos + 8, { align: "right" });
-        }
-    }
-
-    yPos = 60;
-
-    // Linha divisória
-    doc.setLineWidth(0.3);
-    doc.line(15, yPos, pageWidth - 15, yPos);
-
-    yPos = 80;
-
-    // Corpo do atestado
-    doc.setFontSize(11);
-    doc.setFont("times", "normal");
-    doc.setLineHeightFactor(1.5);
-
-    let text = "";
-    const dateStr = format(data.issueDate, "d 'de' MMMM 'de' yyyy", { locale: ptBR });
-
-    if (data.customText) {
-        text = data.customText;
-    } else {
-        switch (data.type) {
-            case 'afastamento':
-                text = `Atesto para os devidos fins que o(a) Sr(a). ${data.patientName}, portador(a) do documento nº ${data.patientDoc || '________________'}, foi atendido(a) nesta data e necessita de ${data.daysOff || '___'} dia(s) de afastamento de suas atividades laborais/escolares a partir desta data, por motivo de doença.`;
-                break;
-            case 'comparecimento':
-                text = `Atesto para os devidos fins que o(a) Sr(a). ${data.patientName}, portador(a) do documento nº ${data.patientDoc || '________________'}, compareceu a este serviço para atendimento médico/exames nesta data, no período das ${data.startTime || '____'} às ${data.endTime || '____'} horas.`;
-                break;
-            case 'acompanhamento':
-                text = `Atesto para os devidos fins que o(a) Sr(a). ${data.patientName}, portador(a) do documento nº ${data.patientDoc || '________________'}, compareceu a este serviço nesta data, como acompanhante de paciente sob meus cuidados.`;
-                break;
-            case 'aptidao':
-                text = `Atesto para os devidos fins que o(a) Sr(a). ${data.patientName}, portador(a) do documento nº ${data.patientDoc || '________________'}, foi examinado(a) por mim nesta data e encontra-se APTO(A) para a prática de atividades físicas.`;
-                break;
-            case 'laudo':
-                text = `Paciente: ${data.patientName}\n\n[Descrição do quadro clínico]`;
-                break;
-        }
-    }
-
-    if (data.cid) {
-        text += `\n\nCID: ${data.cid}`;
-    }
-
-    const splitText = doc.splitTextToSize(text, 170);
-    doc.text(splitText, 20, yPos);
-
-    yPos += splitText.length * 6 + 30;
-
-    // Local e Data
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.text(`Local e data: __________________, ${dateStr}.`, 105, yPos, { align: "center" });
-
-    yPos += 40;
-
-    // Assinatura
-    doc.setLineWidth(0.3);
-    doc.line(65, yPos, 145, yPos);
-
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "bold");
-    doc.text(data.doctorName, 105, yPos + 5, { align: "center" });
-
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.text(`CRM: ${data.doctorCrm}`, 105, yPos + 10, { align: "center" });
-    doc.text("Assinatura e Carimbo", 105, yPos + 15, { align: "center" });
-
-    // Abrir em nova aba
-    const pdfBlob = doc.output('blob');
-    const pdfUrl = URL.createObjectURL(pdfBlob);
-    window.open(pdfUrl, '_blank');
-};
+// Note: certificates/atestados live in lib/certificate-pdf.ts.
