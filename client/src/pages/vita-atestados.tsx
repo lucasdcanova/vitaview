@@ -1,7 +1,9 @@
 import type { Profile } from "@shared/schema";
 import { useCertificateLogic } from "@/hooks/use-certificate-logic";
+import { useHeaderConfigReminder } from "@/hooks/use-header-config-reminder";
 import { CertificateForm } from "@/components/certificates/CertificateForm";
 import { CertificateHistory } from "@/components/certificates/CertificateHistory";
+import { HeaderConfigReminderDialog } from "@/components/clinic/header-config-reminder-dialog";
 
 interface VitaCertificatesProps {
     patient: Profile;
@@ -23,6 +25,7 @@ export default function VitaCertificates({ patient }: VitaCertificatesProps) {
         isPending,
         user
     } = useCertificateLogic(patient);
+    const headerReminder = useHeaderConfigReminder();
 
     return (
         <div className="space-y-6 pb-20">
@@ -62,6 +65,12 @@ export default function VitaCertificates({ patient }: VitaCertificatesProps) {
                     />
                 </div>
             </div>
+
+            <HeaderConfigReminderDialog
+                open={headerReminder.open}
+                onOpenChange={headerReminder.setOpen}
+                onDismissForever={headerReminder.dismissForever}
+            />
         </div>
     );
 }

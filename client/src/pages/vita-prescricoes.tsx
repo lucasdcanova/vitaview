@@ -1,9 +1,11 @@
 import { usePrescriptionLogic, useCustomMedications } from "@/hooks/use-prescription-logic";
 import { useContinuousMedications } from "@/hooks/use-continuous-medications";
 import { usePrescriptionHistory } from "@/hooks/use-prescription-history";
+import { useHeaderConfigReminder } from "@/hooks/use-header-config-reminder";
 import { AlertTriangle } from "lucide-react";
 
 import { MedicationDialog } from "@/components/dialogs";
+import { HeaderConfigReminderDialog } from "@/components/clinic/header-config-reminder-dialog";
 import type { Profile } from "@shared/schema";
 
 // Sub-components
@@ -23,6 +25,7 @@ export default function VitaPrescriptions({ patient, medications: propMedication
     const customMedLogic = useCustomMedications();
     const continuousMedsLogic = useContinuousMedications(patient.id);
     const historyLogic = usePrescriptionHistory(patient.id);
+    const headerReminder = useHeaderConfigReminder();
 
     const displayMedications = continuousMedsLogic.medications.length > 0 ? continuousMedsLogic.medications : (propMedications || []);
 
@@ -118,6 +121,12 @@ export default function VitaPrescriptions({ patient, medications: propMedication
                 mode={continuousMedsLogic.editingMedication ? "edit" : "create"}
                 onRemove={() => continuousMedsLogic.handleDelete()}
                 isRemovePending={continuousMedsLogic.isPending}
+            />
+
+            <HeaderConfigReminderDialog
+                open={headerReminder.open}
+                onOpenChange={headerReminder.setOpen}
+                onDismissForever={headerReminder.dismissForever}
             />
         </div>
     );
