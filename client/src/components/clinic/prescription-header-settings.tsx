@@ -206,7 +206,7 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                     <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-primary/30 bg-primary/5 p-4">
                         <div className="space-y-1">
                             <p className="text-sm font-medium text-foreground flex items-center gap-2">
-                                <Sparkles className="h-4 w-4 text-primary" />
+                                <Sparkles className="h-4 w-4" style={{ color: "#AF9150" }} />
                                 Gerar cabeçalho com IA
                             </p>
                             <p className="text-xs text-muted-foreground leading-snug">
@@ -219,7 +219,7 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                             onClick={() => setAiDialogOpen(true)}
                             className="border-primary text-primary hover:bg-primary/10 shrink-0"
                         >
-                            <Sparkles className="h-4 w-4 mr-2" />
+                            <Sparkles className="h-4 w-4 mr-2" style={{ color: "#AF9150" }} />
                             Gerar
                         </Button>
                     </div>
