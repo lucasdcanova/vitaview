@@ -12,6 +12,7 @@ import {
     type PreloadedHeaderAssets,
 } from "./document-header";
 import { quantityWithExtenso } from "./quantity-extenso";
+import { classifyPrescriptionType } from "@/data/controlled-substances";
 
 interface PrescriptionData {
     // Dados do Emitente (Médico/Clínica)
@@ -79,19 +80,11 @@ const buildIdentity = (data: PrescriptionData): DocumentIdentity => ({
 });
 
 // Lista de medicamentos controlados
-const CONTROLLED_MEDICATIONS = [
-    "rivotril", "clonazepam", "alprazolam", "diazepam", "lorazepam", "bromazepam",
-    "zolpidem", "ritalina", "metilfenidato", "concerta", "venvanse", "lisdexanfetamina",
-    "morfina", "codeina", "tramadol", "oxicodona", "fentanil",
-    "fluoxetina", "sertralina", "escitalopram", "paroxetina", "venlafaxina",
-    "amitriptilina", "nortriptilina", "imipramina",
-    "quetiapina", "olanzapina", "risperidona", "aripiprazol",
-    "carbonato de lítio", "lítio", "ácido valproico", "valproato",
-    "pregabalina", "gabapentina", "carbamazepina", "fenobarbital",
-];
-
-const isControlledMedication = (medName: string): boolean =>
-    CONTROLLED_MEDICATIONS.some((c) => medName.toLowerCase().includes(c));
+// Legacy substring matcher kept as a defensive backstop: when a medication
+// has no `prescriptionType` flag set, we re-classify it via the official
+// Anvisa list to route it to the correct receita type.
+const inferTypeFromName = (medName: string): 'padrao' | 'especial' | 'A' | 'B1' | 'B2' | 'C' | 'C1' =>
+    classifyPrescriptionType(medName) as any;
 
 const cleanTextForPDF = (text: string): string => {
     if (!text) return "";
@@ -644,11 +637,12 @@ export const generatePrescriptionPDF = async (
     };
 
     data.medications.forEach((med) => {
-        const type = med.prescriptionType || "padrao";
+        const declared = med.prescriptionType && med.prescriptionType !== 'common'
+            ? med.prescriptionType
+            : null;
+        const type = declared || inferTypeFromName(med.name);
         if (groups[type]) {
             groups[type].push(med);
-        } else if (isControlledMedication(med.name)) {
-            groups.B1.push(med);
         } else {
             groups.padrao.push(med);
         }
