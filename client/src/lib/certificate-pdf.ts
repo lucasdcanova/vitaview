@@ -1,7 +1,6 @@
 import jsPDF from "jspdf";
 import {
     drawDocumentHeader,
-    drawVitaViewFooterMark,
     fetchAndPreloadClinicHeader,
     type ClinicHeaderForPdf,
     type PreloadedHeaderAssets,
@@ -89,13 +88,12 @@ export const generateCertificatePDF = async (data: CertificateData): Promise<Blo
     const contentWidth = pageWidth - margin * 2;
     const centerX = pageWidth / 2;
 
-    // ===== HEADER (custom letterhead or minimal) =====
+    // ===== HEADER (custom letterhead or minimal VitaView wordmark) =====
     const headerEndY = drawDocumentHeader(doc, header, assets, {
         xOffset: 0,
         pageWidth,
         marginX: margin,
         topMargin: 12,
-        showVitaViewMark: false,
     });
 
     // ===== TITLE =====
@@ -177,8 +175,6 @@ export const generateCertificatePDF = async (data: CertificateData): Promise<Blo
     }
     doc.setFontSize(7);
     doc.text("Assinatura e carimbo", centerX, signatureY + 20, { align: "center" });
-
-    drawVitaViewFooterMark(doc, 0, pageWidth, pageHeight);
 
     return doc.output("blob");
 };
