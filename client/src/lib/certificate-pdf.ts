@@ -9,6 +9,7 @@ import {
     type DocumentIdentity,
     type PreloadedHeaderAssets,
 } from "./document-header";
+import { formatSpecialty } from "./specialty-format";
 
 export interface CertificateData {
     type: "afastamento" | "comparecimento" | "acompanhamento" | "aptidao" | "laudo";
@@ -197,7 +198,8 @@ export const generateCertificatePDF = async (data: CertificateData): Promise<Blo
     doc.setTextColor(80, 80, 80);
     doc.text(formatCrm(cleanTextForPDF(data.doctorCrm), data.doctorCrmState), centerX, signatureY + 11, { align: "center" });
     if (data.doctorSpecialty) {
-        const sp = data.doctorRqe ? `${data.doctorSpecialty}  ·  RQE ${data.doctorRqe}` : data.doctorSpecialty;
+        const specialty = formatSpecialty(data.doctorSpecialty, data.doctorRqe);
+        const sp = data.doctorRqe ? `${specialty}  ·  RQE ${data.doctorRqe}` : specialty;
         doc.text(sp, centerX, signatureY + 15, { align: "center" });
     }
     doc.setFontSize(7);

@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import { formatSpecialty } from "./specialty-format";
 
 export interface ClinicHeaderForPdf {
     mode: "minimal" | "image" | "composed";
@@ -183,13 +184,15 @@ function resolveHeaderText(
 
     const crmLabel = formatCrm(identity?.doctorCrm, identity?.doctorCrmState);
 
+    const specialtyLabel = formatSpecialty(identity?.doctorSpecialty, identity?.doctorRqe, { prefixWhenNoRqe: false });
+
     const subtitleParts: string[] = [];
     if (usingComposed) {
         // Clinic mode: subtitle shows doctor identity (since clinic name is the title)
         if (identity?.doctorName && identity.doctorName !== title) {
             const docBits = [identity.doctorName];
             if (crmLabel) docBits.push(crmLabel);
-            if (identity.doctorSpecialty) docBits.push(identity.doctorSpecialty);
+            if (specialtyLabel) docBits.push(specialtyLabel);
             subtitleParts.push(docBits.join("  ·  "));
         } else if (crmLabel) {
             subtitleParts.push(crmLabel);
@@ -198,7 +201,7 @@ function resolveHeaderText(
         // Minimal mode: subtitle shows credentials of the doctor
         const bits: string[] = [];
         if (crmLabel) bits.push(crmLabel);
-        if (identity?.doctorSpecialty) bits.push(identity.doctorSpecialty);
+        if (specialtyLabel) bits.push(specialtyLabel);
         if (identity?.doctorRqe) bits.push(`RQE ${identity.doctorRqe}`);
         subtitleParts.push(bits.join("  ·  "));
     }

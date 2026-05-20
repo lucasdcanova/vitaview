@@ -13,6 +13,7 @@ import {
 } from "./document-header";
 import { quantityWithExtenso } from "./quantity-extenso";
 import { classifyPrescriptionType } from "@/data/controlled-substances";
+import { formatSpecialty } from "./specialty-format";
 
 interface PrescriptionData {
     // Dados do Emitente (Médico/Clínica)
@@ -190,9 +191,10 @@ const drawDoctorBlock = (doc: jsPDF, layout: BodyLayout, data: PrescriptionData,
     if (data.doctorSpecialty) {
         doc.setFontSize(8);
         doc.setTextColor(95, 95, 95);
+        const specialtyLabel = formatSpecialty(data.doctorSpecialty, data.doctorRqe);
         const specialty = data.doctorRqe
-            ? `${data.doctorSpecialty}  ·  RQE ${data.doctorRqe}`
-            : data.doctorSpecialty;
+            ? `${specialtyLabel}  ·  RQE ${data.doctorRqe}`
+            : specialtyLabel;
         doc.text(specialty, layout.rightX, nextY, { align: "right" });
         doc.setTextColor(0, 0, 0);
         nextY += 4;
