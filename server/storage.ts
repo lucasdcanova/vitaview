@@ -503,6 +503,7 @@ export class MemStorage implements IStorage {
       clinicRole: null,
       preferences: null,
       crm: null,
+      crmState: null,
       specialty: null,
       rqe: null,
       profilePhotoUrl: null,

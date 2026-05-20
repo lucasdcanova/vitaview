@@ -16,6 +16,8 @@ export interface AcutePrescriptionItem {
     quantity?: string;
     notes?: string;
     prescriptionType: 'padrao' | 'especial' | 'A' | 'B1' | 'B2' | 'C' | 'C1';
+    /** True when the medication name matches an entry in MEDICATION_DATABASE (DCB / generic name) */
+    isGeneric?: boolean;
 }
 
 export function useCustomMedications() {
@@ -97,6 +99,7 @@ export function usePrescriptionLogic(patient: Profile) {
     const [receituarioQuantity, setReceituarioQuantity] = useState("");
     const [editingPrescriptionId, setEditingPrescriptionId] = useState<number | null>(null);
     const [prescriptionObservations, setPrescriptionObservations] = useState("");
+    const [prescriptionCid, setPrescriptionCid] = useState("");
 
     // --- Prescription State ---
     const [acuteItems, setAcuteItems] = useState<AcutePrescriptionItem[]>(() => {
@@ -191,7 +194,8 @@ export function usePrescriptionLogic(patient: Profile) {
             daysOfUse: parseInt(receituarioDaysOfUse) || 7,
             quantity: quantity || undefined,
             notes: receituarioNotes || undefined,
-            prescriptionType: pType
+            prescriptionType: pType,
+            isGeneric: !!medInfo,
         };
 
         setAcuteItems([...acuteItems, newItem]);
@@ -243,6 +247,25 @@ export function usePrescriptionLogic(patient: Profile) {
             return;
         }
 
+        const CONTROLLED_TYPES = new Set(['especial', 'C', 'C1']);
+        const hasControlled = acuteItems.some(item => CONTROLLED_TYPES.has(item.prescriptionType));
+        if (hasControlled && !(user as any).address) {
+            toast({
+                title: "Endereço profissional obrigatório",
+                description: "Receita de controle especial exige endereço do consultório. Atualize seu perfil.",
+                variant: "destructive",
+            });
+            return;
+        }
+        if (hasControlled && !(user as any).crmState) {
+            toast({
+                title: "UF do CRM obrigatória",
+                description: "Receita de controle especial exige UF do CRM. Atualize seu perfil.",
+                variant: "destructive",
+            });
+            return;
+        }
+
         const pdfWindow = window.open('', '_blank');
         if (pdfWindow) {
             pdfWindow.document.write('<html><head><title>Gerando Receita...</title></head><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;"><div><h2>Gerando Receita...</h2><p>Por favor, aguarde.</p></div></body></html>');
@@ -252,6 +275,7 @@ export function usePrescriptionLogic(patient: Profile) {
 
         const doctorName = user.fullName || user.username || "Dr. VitaView";
         const doctorCrm = user.crm || "CRM pendente";
+        const doctorCrmState = (user as any).crmState || undefined;
         const doctorSpecialty = user.specialty || "Clínica Médica";
 
         const prescriptionData = {
@@ -265,7 +289,9 @@ export function usePrescriptionLogic(patient: Profile) {
                 dosage: item.dosage,
                 frequency: `${item.frequency}${item.daysOfUse ? ` por ${item.daysOfUse} dias` : ''}`,
                 notes: item.notes,
-                prescriptionType: item.prescriptionType
+                prescriptionType: item.prescriptionType,
+                isGeneric: item.isGeneric,
+                quantity: item.quantity,
             })),
             issueDate: new Date().toISOString(),
             validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
@@ -289,6 +315,7 @@ export function usePrescriptionLogic(patient: Profile) {
                 await generatePrescriptionPDF({
                     doctorName: savedData.doctorName,
                     doctorCrm: savedData.doctorCrm,
+                    doctorCrmState: doctorCrmState,
                     doctorSpecialty: savedData.doctorSpecialty || undefined,
                     doctorRqe: (user as any)?.rqe || undefined,
                     doctorAddress: (user as any)?.address || undefined,
@@ -307,7 +334,9 @@ export function usePrescriptionLogic(patient: Profile) {
                     issueDate: new Date(savedData.issueDate),
                     validUntil: new Date(savedData.validUntil),
                     medications: savedData.medications as any[],
-                    observations: savedData.observations || undefined
+                    observations: savedData.observations || undefined,
+                    cid: prescriptionCid || undefined,
+                    prescriptionNumber: savedData.id,
                 }, pdfWindow);
             }
 
@@ -323,6 +352,7 @@ export function usePrescriptionLogic(patient: Profile) {
             setAcuteItems([]);
             setEditingPrescriptionId(null);
             setPrescriptionObservations("");
+            setPrescriptionCid("");
 
         } catch (error: any) {
             console.error(error);
@@ -370,6 +400,7 @@ export function usePrescriptionLogic(patient: Profile) {
 
         const doctorName = user.fullName || user.username || "Dr. VitaView";
         const doctorCrm = user.crm || "CRM pendente";
+        const doctorCrmState = (user as any).crmState || undefined;
         const doctorSpecialty = user.specialty || "Clínica Médica";
 
         try {
@@ -399,6 +430,7 @@ export function usePrescriptionLogic(patient: Profile) {
                 await generatePrescriptionPDF({
                     doctorName: savedData.doctorName,
                     doctorCrm: savedData.doctorCrm,
+                    doctorCrmState: doctorCrmState,
                     doctorSpecialty: savedData.doctorSpecialty || undefined,
                     doctorRqe: (user as any)?.rqe || undefined,
                     doctorAddress: (user as any)?.address || undefined,
@@ -449,6 +481,7 @@ export function usePrescriptionLogic(patient: Profile) {
         receituarioQuantity, setReceituarioQuantity,
         editingPrescriptionId, setEditingPrescriptionId,
         prescriptionObservations, setPrescriptionObservations,
+        prescriptionCid, setPrescriptionCid,
         acuteItems, setAcuteItems,
 
         // Actions

@@ -6,10 +6,12 @@ import {
     drawDocumentHeader,
     drawDocumentWatermark,
     fetchAndPreloadClinicHeader,
+    formatCrm,
     type ClinicHeaderForPdf,
     type DocumentIdentity,
     type PreloadedHeaderAssets,
 } from "./document-header";
+import { quantityWithExtenso } from "./quantity-extenso";
 
 interface PrescriptionData {
     // Dados do Emitente (Médico/Clínica)
@@ -18,6 +20,7 @@ interface PrescriptionData {
     clinicPhone?: string;
     doctorName: string;
     doctorCrm: string;
+    doctorCrmState?: string;
     doctorSpecialty?: string;
     doctorRqe?: string;
     doctorAddress?: string;
@@ -47,8 +50,18 @@ interface PrescriptionData {
         notes?: string;
         quantity?: string;
         prescriptionType?: string;
+        /** True when the name matches a DCB (generic) in the medication database */
+        isGeneric?: boolean;
+        /** Optional explicit route, e.g. "oral", "tópico", "injetável" */
+        route?: string;
     }[];
     observations?: string;
+    /** ICD-10 code (CID-10), optional but commonly requested on controlled prescriptions */
+    cid?: string;
+    /** Sequential prescription number per clinic — used for traceability */
+    prescriptionNumber?: number | string;
+    /** Whether this rendering is for a controlled prescription (adds extenso, via, etc.) */
+    isControlledRender?: boolean;
     // Custom header (preloaded by caller via fetchAndPreloadClinicHeader)
     clinicHeader?: ClinicHeaderForPdf | null;
     clinicHeaderAssets?: PreloadedHeaderAssets;
@@ -58,6 +71,7 @@ interface PrescriptionData {
 const buildIdentity = (data: PrescriptionData): DocumentIdentity => ({
     doctorName: data.doctorName,
     doctorCrm: data.doctorCrm,
+    doctorCrmState: data.doctorCrmState,
     doctorSpecialty: data.doctorSpecialty,
     doctorRqe: data.doctorRqe,
     doctorAddress: data.doctorAddress,
@@ -177,7 +191,7 @@ const drawDoctorBlock = (doc: jsPDF, layout: BodyLayout, data: PrescriptionData,
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
-    doc.text(`CRM ${data.doctorCrm}`, layout.rightX, yPos, { align: "right" });
+    doc.text(formatCrm(data.doctorCrm, data.doctorCrmState), layout.rightX, yPos, { align: "right" });
 
     let nextY = yPos + 4.5;
     if (data.doctorSpecialty) {
@@ -189,6 +203,17 @@ const drawDoctorBlock = (doc: jsPDF, layout: BodyLayout, data: PrescriptionData,
         doc.text(specialty, layout.rightX, nextY, { align: "right" });
         doc.setTextColor(0, 0, 0);
         nextY += 4;
+    }
+    if (data.doctorAddress) {
+        doc.setFontSize(7.5);
+        doc.setTextColor(110, 110, 110);
+        const addrWrapped = doc.splitTextToSize(data.doctorAddress, layout.contentWidth);
+        doc.text(addrWrapped[0], layout.leftX, nextY);
+        if (data.doctorPhone) {
+            doc.text(data.doctorPhone, layout.rightX, nextY, { align: "right" });
+        }
+        doc.setTextColor(0, 0, 0);
+        nextY += 3.6;
     }
     return nextY;
 };
@@ -277,14 +302,32 @@ const drawMedicationsBlock = (
 
         const medName = cleanTextForPDF(med.name).toUpperCase();
         doc.text(`${index + 1}.`, baseLeft, yPos);
-        const nameWrapped = doc.splitTextToSize(medName, layout.contentWidth - 35);
+        const nameWrapped = doc.splitTextToSize(medName, layout.contentWidth - 45);
         doc.text(nameWrapped, textLeft, yPos);
         const nameLineCount = nameWrapped.length;
+
+        // DCB / Marca tag right after the name
+        const tagX = textLeft + doc.getTextWidth(nameWrapped[nameWrapped.length - 1] || medName) + 2;
+        doc.setFontSize(6.5);
+        doc.setFont("helvetica", "normal");
+        if (med.isGeneric === true) {
+            doc.setTextColor(60, 110, 60);
+            doc.text("(DCB)", tagX, yPos - 0.6);
+        } else if (med.isGeneric === false) {
+            doc.setTextColor(120, 90, 30);
+            doc.text("(comercial)", tagX, yPos - 0.6);
+        }
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
 
         if (med.quantity) {
             doc.setFont("helvetica", "normal");
             doc.setFontSize(9);
-            doc.text(med.quantity, layout.rightX, yPos, { align: "right" });
+            const qty = data.isControlledRender
+                ? (quantityWithExtenso(med.quantity) || med.quantity)
+                : med.quantity;
+            doc.text(qty, layout.rightX, yPos, { align: "right" });
         }
 
         yPos += nameLineCount * 4.5 + 0.5;
@@ -305,7 +348,8 @@ const drawMedicationsBlock = (
             yPos += wrapped.length * 3.7;
         }
 
-        const route = resolveRouteOfAdministration(med.format);
+        const route = med.route || resolveRouteOfAdministration(med.format)
+            || (data.isControlledRender ? "Oral" : null);
         if (route) {
             doc.setFontSize(8);
             doc.setTextColor(110, 110, 110);
@@ -370,7 +414,7 @@ const drawSignatureFooter = (
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(80, 80, 80);
-    doc.text(`CRM ${data.doctorCrm}`, layout.centerX, signatureY + 10, { align: "center" });
+    doc.text(formatCrm(data.doctorCrm, data.doctorCrmState), layout.centerX, signatureY + 10, { align: "center" });
     doc.setFontSize(7);
     doc.text("Assinatura e carimbo", layout.centerX, signatureY + 14, { align: "center" });
 
@@ -378,8 +422,8 @@ const drawSignatureFooter = (
     doc.setFontSize(7);
     const validityText = data.validityText
         || (data.isContinuousUse
-            ? "Válido por 180 dias a partir da data de emissão."
-            : "Válido por 30 dias a partir da data de emissão.");
+            ? "Receita de uso contínuo — sujeita ao critério da farmácia/drogaria."
+            : "Sem prazo legal de validade — sujeita ao critério da farmácia/drogaria.");
     doc.text(validityText, layout.leftX, footerY);
     if (options.viaLabel) {
         doc.text(options.viaLabel, layout.rightX, footerY, { align: "right" });
@@ -407,14 +451,15 @@ const drawControlledFooter = (doc: jsPDF, layout: BodyLayout, data: Prescription
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(80, 80, 80);
-    doc.text(`CRM ${data.doctorCrm}`, layout.centerX, signatureY + 10, { align: "center" });
+    doc.text(formatCrm(data.doctorCrm, data.doctorCrmState), layout.centerX, signatureY + 10, { align: "center" });
     doc.setFontSize(7);
     doc.text("Assinatura e carimbo", layout.centerX, signatureY + 14, { align: "center" });
     doc.setTextColor(0, 0, 0);
 
-    // Buyer box
     const boxWidth = 62;
     const boxHeight = 35;
+
+    // Buyer box (left)
     doc.setDrawColor(180, 180, 180);
     doc.setLineWidth(0.25);
     doc.rect(layout.leftX, boxesY, boxWidth, boxHeight, "S");
@@ -428,21 +473,22 @@ const drawControlledFooter = (doc: jsPDF, layout: BodyLayout, data: Prescription
     doc.text("Endereço: _______________________", layout.leftX + 3, boxesY + 24);
     doc.text("Telefone: _______________________", layout.leftX + 3, boxesY + 30);
 
-    // Pharmacist box
+    // Pharmacy box (right) — RDC 20/2011 nomenclatura
     const box2X = layout.rightX - boxWidth;
     doc.setTextColor(0, 0, 0);
     doc.rect(box2X, boxesY, boxWidth, boxHeight, "S");
     doc.setFontSize(7);
     doc.setFont("helvetica", "bold");
-    doc.text("IDENTIFICAÇÃO DO FORNECEDOR", box2X + 3, boxesY + 5);
+    doc.text("IDENTIFICAÇÃO DA FARMÁCIA / DROGARIA", box2X + 3, boxesY + 5);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(120, 120, 120);
-    doc.text("Data: ___/___/______", box2X + 3, boxesY + 12);
-    doc.text("Assinatura farmacêutico:", box2X + 3, boxesY + 18);
-    doc.text("__________________________", box2X + 3, boxesY + 24);
-    doc.text("CRF: _____________________", box2X + 3, boxesY + 30);
+    doc.text("Razão social: ___________________", box2X + 3, boxesY + 11);
+    doc.text("CNPJ: __________________________", box2X + 3, boxesY + 16);
+    doc.text("Endereço: ______________________", box2X + 3, boxesY + 21);
+    doc.text("Farmacêutico: __________________", box2X + 3, boxesY + 26);
+    doc.text("CRF: ____________  Data: __/__/____", box2X + 3, boxesY + 31);
 
-    // Validity
+    // Validity + prescription number on the same baseline
     doc.setFontSize(7);
     doc.setTextColor(110, 110, 110);
     doc.text(
@@ -450,6 +496,9 @@ const drawControlledFooter = (doc: jsPDF, layout: BodyLayout, data: Prescription
         layout.leftX,
         validityY
     );
+    if (data.prescriptionNumber) {
+        doc.text(`Nº ${data.prescriptionNumber}`, layout.rightX, validityY, { align: "right" });
+    }
     doc.setTextColor(0, 0, 0);
 };
 
@@ -543,12 +592,22 @@ const generateControlledPrescription = (
         subtitle: config.subtitle,
         subtitle2: "1ª via – retenção da farmácia",
     });
-    yPos = drawDoctorBlock(doc, layout, data, yPos);
+    const controlledData: PrescriptionData = { ...data, isControlledRender: true };
+    yPos = drawDoctorBlock(doc, layout, controlledData, yPos);
     yPos += 3;
-    yPos = drawPatientBlock(doc, layout, data, yPos);
-    yPos = drawMedicationsBlock(doc, layout, data, yPos);
+    yPos = drawPatientBlock(doc, layout, controlledData, yPos);
+    yPos = drawMedicationsBlock(doc, layout, controlledData, yPos);
 
-    drawControlledFooter(doc, layout, data);
+    if (controlledData.cid) {
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(40, 40, 40);
+        doc.text(`CID-10: ${controlledData.cid}`, layout.leftX, yPos + 2);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(0, 0, 0);
+    }
+
+    drawControlledFooter(doc, layout, controlledData);
 
     drawDocumentFooter(doc, data.clinicHeader ?? null, {
         xOffset,
@@ -621,12 +680,9 @@ export const generatePrescriptionPDF = async (
         offsets.forEach((xOffset) => {
             switch (type) {
                 case "padrao": {
-                    const validity = groupData.isContinuousUse
-                        ? "Válido por 180 dias a partir da data de emissão."
-                        : "Válido por 30 dias a partir da data de emissão.";
                     generateBasicPrescription(
                         doc,
-                        { ...groupData, validityText: validity },
+                        groupData,
                         xOffset,
                         { title: "RECEITUÁRIO" }
                     );

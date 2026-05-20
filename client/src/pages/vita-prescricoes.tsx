@@ -88,6 +88,8 @@ export default function VitaPrescriptions({ patient, medications: propMedication
                         items={logic.acuteItems}
                         observations={logic.prescriptionObservations}
                         onObservationsChange={logic.setPrescriptionObservations}
+                        cid={logic.prescriptionCid}
+                        onCidChange={logic.setPrescriptionCid}
                         onRemoveItem={logic.removeAcuteItem}
                         onEditItem={logic.editAcuteItem}
                         onSaveAndPrint={logic.handleSaveAndPrintPrescription}

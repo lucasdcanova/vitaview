@@ -3005,7 +3005,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       // Whitelist allowed fields to prevent injection of sensitive fields
       const allowedFields = [
-        'fullName', 'email', 'phoneNumber', 'crm', 'specialty', 'rqe',
+        'fullName', 'email', 'phoneNumber', 'crm', 'crmState', 'specialty', 'rqe',
         'address', 'birthDate', 'gender', 'preferences', 'password'
       ];
 
@@ -5732,6 +5732,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         {
           doctorName: user?.fullName || user?.username || 'Profissional',
           crm: user?.crm || null,
+          crmState: (user as any)?.crmState || null,
           specialty: user?.specialty || null,
           rqe: user?.rqe || null,
           clinicName: clinic.headerClinicName || clinic.name || null,

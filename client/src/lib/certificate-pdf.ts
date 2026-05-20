@@ -4,6 +4,7 @@ import {
     drawDocumentHeader,
     drawDocumentWatermark,
     fetchAndPreloadClinicHeader,
+    formatCrm,
     type ClinicHeaderForPdf,
     type DocumentIdentity,
     type PreloadedHeaderAssets,
@@ -13,6 +14,7 @@ export interface CertificateData {
     type: "afastamento" | "comparecimento" | "acompanhamento" | "aptidao" | "laudo";
     doctorName: string;
     doctorCrm: string;
+    doctorCrmState?: string;
     doctorSpecialty?: string;
     doctorRqe?: string;
     doctorAddress?: string;
@@ -80,6 +82,7 @@ export const generateCertificateText = (data: CertificateData): string => {
 const buildIdentity = (data: CertificateData): DocumentIdentity => ({
     doctorName: data.doctorName,
     doctorCrm: data.doctorCrm,
+    doctorCrmState: data.doctorCrmState,
     doctorSpecialty: data.doctorSpecialty,
     doctorRqe: data.doctorRqe,
     doctorAddress: data.doctorAddress,
@@ -192,7 +195,7 @@ export const generateCertificatePDF = async (data: CertificateData): Promise<Blo
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(80, 80, 80);
-    doc.text(`CRM ${cleanTextForPDF(data.doctorCrm)}`, centerX, signatureY + 11, { align: "center" });
+    doc.text(formatCrm(cleanTextForPDF(data.doctorCrm), data.doctorCrmState), centerX, signatureY + 11, { align: "center" });
     if (data.doctorSpecialty) {
         const sp = data.doctorRqe ? `${data.doctorSpecialty}  ·  RQE ${data.doctorRqe}` : data.doctorSpecialty;
         doc.text(sp, centerX, signatureY + 15, { align: "center" });

@@ -14,6 +14,7 @@ export const users = pgTable("users", {
   phoneNumber: text("phone_number"),
   address: text("address"),
   crm: text("crm"), // CRM or professional registration number
+  crmState: text("crm_state"), // UF (state) of the CRM, e.g. "SP", "RJ" — required for legal prescriptions
   specialty: text("specialty"), // Medical specialty
   rqe: text("rqe"), // RQE - Registro de Qualificação de Especialidade
   profilePhotoUrl: text("profile_photo_url"), // URL/path to user's profile photo

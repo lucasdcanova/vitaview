@@ -16,10 +16,24 @@ export interface DocumentIdentity {
     /** Doctor full name used when no clinic name is set */
     doctorName?: string | null;
     doctorCrm?: string | null;
+    /** UF (state) of the CRM, e.g. "SP". Required for legally valid prescriptions. */
+    doctorCrmState?: string | null;
     doctorSpecialty?: string | null;
     doctorRqe?: string | null;
     doctorAddress?: string | null;
     doctorPhone?: string | null;
+}
+
+/**
+ * Formats a CRM into the legal Brazilian format "CRM/UF 123456".
+ * Falls back to the bare number if no UF is available.
+ */
+export function formatCrm(crm?: string | null, uf?: string | null): string {
+    if (!crm) return "";
+    const cleanCrm = crm.replace(/^crm[\s/-]*/i, "").trim();
+    const cleanUf = (uf || "").trim().toUpperCase();
+    if (cleanUf) return `CRM/${cleanUf} ${cleanCrm}`;
+    return `CRM ${cleanCrm}`;
 }
 
 export interface PreloadedHeaderAssets {
@@ -167,21 +181,23 @@ function resolveHeaderText(
     // Title — prefer clinic name; fall back to doctor's name
     const title = (usingComposed && header?.clinicName) || identity?.doctorName || "VitaView.AI";
 
+    const crmLabel = formatCrm(identity?.doctorCrm, identity?.doctorCrmState);
+
     const subtitleParts: string[] = [];
     if (usingComposed) {
         // Clinic mode: subtitle shows doctor identity (since clinic name is the title)
         if (identity?.doctorName && identity.doctorName !== title) {
             const docBits = [identity.doctorName];
-            if (identity.doctorCrm) docBits.push(`CRM ${identity.doctorCrm}`);
+            if (crmLabel) docBits.push(crmLabel);
             if (identity.doctorSpecialty) docBits.push(identity.doctorSpecialty);
             subtitleParts.push(docBits.join("  ·  "));
-        } else if (identity?.doctorCrm) {
-            subtitleParts.push(`CRM ${identity.doctorCrm}`);
+        } else if (crmLabel) {
+            subtitleParts.push(crmLabel);
         }
     } else {
         // Minimal mode: subtitle shows credentials of the doctor
         const bits: string[] = [];
-        if (identity?.doctorCrm) bits.push(`CRM ${identity.doctorCrm}`);
+        if (crmLabel) bits.push(crmLabel);
         if (identity?.doctorSpecialty) bits.push(identity.doctorSpecialty);
         if (identity?.doctorRqe) bits.push(`RQE ${identity.doctorRqe}`);
         subtitleParts.push(bits.join("  ·  "));
@@ -342,7 +358,8 @@ export function drawDocumentFooter(
     if (identity?.doctorName && (!usingComposed || identity.doctorName !== header?.clinicName)) {
         primaryParts.push(identity.doctorName);
     }
-    if (identity?.doctorCrm) primaryParts.push(`CRM ${identity.doctorCrm}`);
+    const footerCrm = formatCrm(identity?.doctorCrm, identity?.doctorCrmState);
+    if (footerCrm) primaryParts.push(footerCrm);
 
     const secondaryParts: string[] = [];
     if (usingComposed) {

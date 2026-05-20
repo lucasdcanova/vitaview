@@ -10,6 +10,7 @@ import logger from "../logger";
 export interface HeaderGenerationInput {
     doctorName: string;
     crm?: string | null;
+    crmState?: string | null;
     specialty?: string | null;
     rqe?: string | null;
     clinicName?: string | null;
@@ -50,7 +51,10 @@ function buildSecondary(input: HeaderGenerationInput): string | undefined {
     if (input.clinicName && input.doctorName && input.clinicName !== input.doctorName) {
         bits.push(input.doctorName);
     }
-    if (input.crm) bits.push(`CRM ${input.crm}`);
+    if (input.crm) {
+        const uf = (input.crmState || "").trim().toUpperCase();
+        bits.push(uf ? `CRM/${uf} ${input.crm}` : `CRM ${input.crm}`);
+    }
     if (input.specialty) bits.push(input.specialty);
     if (input.rqe) bits.push(`RQE ${input.rqe}`);
     return bits.join("  ·  ") || undefined;
