@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BrandLoader } from "@/components/ui/brand-loader";
-import { Upload, Trash2, Image as ImageIcon, Save, Eye } from "lucide-react";
+import { Upload, Trash2, Image as ImageIcon, Save, Eye, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { HeaderAiGeneratorDialog } from "@/components/clinic/header-ai-generator-dialog";
 
 export type ClinicHeader = {
     clinicId: number;
@@ -38,6 +39,7 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
     });
 
     const [draft, setDraft] = useState<ClinicHeader | null>(null);
+    const [aiDialogOpen, setAiDialogOpen] = useState(false);
     const imageInputRef = useRef<HTMLInputElement | null>(null);
     const logoInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -198,6 +200,36 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                         onClick={() => handleSelectMode("minimal")}
                     />
                 </div>
+
+                {/* AI generator entry point */}
+                {canEdit && (
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-primary/30 bg-primary/5 p-4">
+                        <div className="space-y-1">
+                            <p className="text-sm font-medium text-foreground flex items-center gap-2">
+                                <Sparkles className="h-4 w-4 text-primary" />
+                                Gerar cabeçalho com IA
+                            </p>
+                            <p className="text-xs text-muted-foreground leading-snug">
+                                A IA propõe variações de layout no estilo clássico institucional usando seus dados de perfil.
+                            </p>
+                        </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setAiDialogOpen(true)}
+                            className="border-primary text-primary hover:bg-primary/10 shrink-0"
+                        >
+                            <Sparkles className="h-4 w-4 mr-2" />
+                            Gerar
+                        </Button>
+                    </div>
+                )}
+
+                <HeaderAiGeneratorDialog
+                    clinicId={draft.clinicId}
+                    open={aiDialogOpen}
+                    onOpenChange={setAiDialogOpen}
+                />
 
                 {/* Image mode */}
                 {draft.headerMode === "image" && (
