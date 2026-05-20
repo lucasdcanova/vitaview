@@ -2,7 +2,6 @@ import jsPDF from "jspdf";
 import { PRESCRIPTION_TYPES, PrescriptionTypeKey } from "@/constants/special-prescription-types";
 import {
     drawDocumentHeader,
-    drawVitaViewFooterMark,
     fetchAndPreloadClinicHeader,
 } from "./document-header";
 
@@ -39,7 +38,6 @@ export async function generateSpecialPrescriptionPDF({
         pageWidth,
         marginX: margin,
         topMargin: 8,
-        showVitaViewMark: false,
     });
 
     // Title
@@ -126,8 +124,6 @@ export async function generateSpecialPrescriptionPDF({
     doc.setFontSize(7);
     doc.setTextColor(120, 120, 120);
     doc.text("Modelo para controle interno — a receita física oficial deve ser emitida em formulário apropriado.", pageWidth / 2, yPos, { align: "center", maxWidth: pageWidth - margin * 2 });
-
-    drawVitaViewFooterMark(doc, 0, pageWidth, doc.internal.pageSize.getHeight());
 
     const pdfBlob = doc.output("blob");
     const pdfUrl = URL.createObjectURL(pdfBlob);

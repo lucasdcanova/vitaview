@@ -3,7 +3,6 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
     drawDocumentHeader,
-    drawVitaViewFooterMark,
     fetchAndPreloadClinicHeader,
     type ClinicHeaderForPdf,
     type PreloadedHeaderAssets,
@@ -572,7 +571,6 @@ export const generatePrescriptionPDF = async (
                         { ...groupData, validityText: validityPadrao },
                         xOffset
                     );
-                    drawVitaViewFooterMark(doc, xOffset, 148.5);
                     break;
                 }
                 case "especial":
@@ -584,7 +582,6 @@ export const generatePrescriptionPDF = async (
                         subtitle: "Antimicrobianos — 2 vias (retenção da farmácia)",
                         color: [25, 25, 25],
                     });
-                    drawVitaViewFooterMark(doc, xOffset, 148.5);
                     break;
                 case "A":
                     generateControlledPrescription(doc, {
@@ -595,7 +592,6 @@ export const generatePrescriptionPDF = async (
                         subtitle: "Entorpecentes e psicotrópicos – Lista A1/A2 (opioides)",
                         color: [180, 120, 0],
                     });
-                    drawVitaViewFooterMark(doc, xOffset, 148.5);
                     break;
                 case "B1":
                     generateControlledPrescription(doc, {
@@ -606,7 +602,6 @@ export const generatePrescriptionPDF = async (
                         subtitle: "Psicotrópicos – Lista B1 (ansiolíticos, hipnóticos, anticonvulsivantes)",
                         color: [30, 80, 150],
                     });
-                    drawVitaViewFooterMark(doc, xOffset, 148.5);
                     break;
                 case "B2":
                     generateControlledPrescription(doc, {
@@ -617,7 +612,6 @@ export const generatePrescriptionPDF = async (
                         subtitle: "Psicotrópicos anorexígenos – Lista B2",
                         color: [30, 60, 130],
                     });
-                    drawVitaViewFooterMark(doc, xOffset, 148.5);
                     break;
                 case "C":
                     generateControlledPrescription(doc, {
@@ -628,7 +622,6 @@ export const generatePrescriptionPDF = async (
                         subtitle: "Retinoides, imunossupressores – Lista C (2 vias)",
                         color: [25, 25, 25],
                     });
-                    drawVitaViewFooterMark(doc, xOffset, 148.5);
                     break;
                 case "C1":
                     generateControlledPrescription(doc, {
@@ -639,7 +632,6 @@ export const generatePrescriptionPDF = async (
                         subtitle: "Antidepressivos, antipsicóticos – Lista C1 (2 vias)",
                         color: [25, 25, 25],
                     });
-                    drawVitaViewFooterMark(doc, xOffset, 148.5);
                     break;
             }
         });

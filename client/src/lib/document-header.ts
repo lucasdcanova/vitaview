@@ -194,13 +194,50 @@ export function drawDocumentHeader(
         return baseline + 4;
     }
 
-    // ===== MINIMAL MODE (default) =====
-    const minimalSeparatorY = topMargin + 8;
-    doc.setDrawColor(220, 220, 220);
+    // ===== MINIMAL MODE (default — VitaView wordmark) =====
+    return drawMinimalVitaViewHeader(doc, {
+        leftX,
+        rightX,
+        topMargin,
+    });
+}
+
+/**
+ * Default header used when the clinic has no custom letterhead configured.
+ * Renders a small "VitaView.AI" wordmark with a subtle tagline and a thin rule.
+ */
+function drawMinimalVitaViewHeader(
+    doc: jsPDF,
+    layout: { leftX: number; rightX: number; topMargin: number }
+): number {
+    const baselineY = layout.topMargin + 4;
+
+    // Wordmark — "VitaView" bold + ".AI" lighter
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(20, 20, 20);
+    const vitaText = "VitaView";
+    doc.text(vitaText, layout.leftX, baselineY);
+    const vitaWidth = doc.getTextWidth(vitaText);
+
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(140, 140, 140);
+    doc.text(".AI", layout.leftX + vitaWidth + 0.5, baselineY);
+
+    // Tagline aligned to the right
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(140, 140, 140);
+    doc.text("Plataforma médica · vitaview.ai", layout.rightX, baselineY, { align: "right" });
+
+    // Thin divider
+    const dividerY = baselineY + 3;
+    doc.setDrawColor(210, 210, 210);
     doc.setLineWidth(0.3);
-    doc.line(leftX, minimalSeparatorY, rightX, minimalSeparatorY);
-    if (showMark) drawVitaViewFooterMark(doc, xOffset, pageWidth);
-    return minimalSeparatorY + 4;
+    doc.line(layout.leftX, dividerY, layout.rightX, dividerY);
+
+    doc.setTextColor(0, 0, 0);
+    return dividerY + 5;
 }
 
 /**
