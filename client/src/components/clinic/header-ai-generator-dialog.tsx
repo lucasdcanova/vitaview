@@ -96,7 +96,7 @@ export function HeaderAiGeneratorDialog({ clinicId, open, onOpenChange }: Props)
             <DialogContent className="max-w-3xl">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <Sparkles className="h-5 w-5 text-primary" />
+                        <Sparkles className="h-5 w-5" style={{ color: "#AF9150" }} />
                         Gerar cabeçalho com IA
                     </DialogTitle>
                     <DialogDescription>
