@@ -485,8 +485,7 @@ const generateBasicPrescription = (
         xOffset,
         pageWidth: layout.pageWidth,
         pageHeight: PAGE_HEIGHT_LANDSCAPE,
-        identity,
-        clinicName: data.clinicHeader?.clinicName,
+        assets: data.clinicHeaderAssets ?? {},
     });
 
     let yPos = drawDocumentTitle(doc, layout, config.title, headerEndY, {
@@ -537,8 +536,7 @@ const generateControlledPrescription = (
         xOffset,
         pageWidth: layout.pageWidth,
         pageHeight: PAGE_HEIGHT_LANDSCAPE,
-        identity,
-        clinicName: data.clinicHeader?.clinicName,
+        assets: data.clinicHeaderAssets ?? {},
     });
 
     let yPos = drawDocumentTitle(doc, layout, config.title, headerEndY, {
