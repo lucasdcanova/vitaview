@@ -74,10 +74,12 @@ export function YesNoToggle({
     hint,
 }: {
     label: string;
-    value: boolean;
+    value: boolean | null;
     onChange: (v: boolean) => void;
     hint?: string;
 }) {
+    const isYes = value === true;
+    const isNo = value === false;
     return (
         <div className="flex items-start justify-between gap-3 rounded-md border border-border bg-background px-3 py-2.5">
             <div className="min-w-0 flex-1">
@@ -92,7 +94,7 @@ export function YesNoToggle({
                     onClick={() => onChange(false)}
                     className={cn(
                         "px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
-                        !value
+                        isNo
                             ? "bg-foreground text-background"
                             : "text-muted-foreground hover:bg-muted"
                     )}
@@ -104,7 +106,7 @@ export function YesNoToggle({
                     onClick={() => onChange(true)}
                     className={cn(
                         "px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
-                        value
+                        isYes
                             ? "bg-foreground text-background"
                             : "text-muted-foreground hover:bg-muted"
                     )}

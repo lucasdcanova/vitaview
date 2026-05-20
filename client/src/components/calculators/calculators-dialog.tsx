@@ -33,6 +33,9 @@ import { BodySurfaceCalculator } from "./cards/body-surface";
 import { HomaIrCalculator } from "./cards/homa-ir";
 import { LdlFriedewaldCalculator } from "./cards/ldl-friedewald";
 import { WaistHipCalculator } from "./cards/waist-hip";
+import { KatzCalculator } from "./cards/katz";
+import { LawtonCalculator } from "./cards/lawton";
+import { Gds15Calculator } from "./cards/gds-15";
 
 type CalculatorEntry = {
     id: string;
@@ -139,6 +142,30 @@ const CALCULATORS: CalculatorEntry[] = [
         description: "Rastreio e gravidade de ansiedade",
         keywords: ["gad", "ansiedade", "rastreio"],
         Component: Gad7Calculator,
+    },
+    {
+        id: "katz",
+        name: "Katz (ABVD)",
+        category: "Geriatria",
+        description: "Atividades básicas de vida diária",
+        keywords: ["katz", "abvd", "funcionalidade", "independência", "idoso"],
+        Component: KatzCalculator,
+    },
+    {
+        id: "lawton",
+        name: "Lawton-Brody (AIVD)",
+        category: "Geriatria",
+        description: "Atividades instrumentais de vida diária",
+        keywords: ["lawton", "brody", "aivd", "funcionalidade", "idoso"],
+        Component: LawtonCalculator,
+    },
+    {
+        id: "gds-15",
+        name: "GDS-15",
+        category: "Geriatria",
+        description: "Escala de depressão geriátrica (Yesavage)",
+        keywords: ["gds", "yesavage", "depressão", "geriátrica", "idoso"],
+        Component: Gds15Calculator,
     },
 ];
 
