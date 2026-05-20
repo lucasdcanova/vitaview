@@ -403,6 +403,7 @@ export function CertificateForm({
                                 type: certType,
                                 doctorName: user?.fullName || user?.username || "Dr. VitaView",
                                 doctorCrm: user?.crm || "CRM pendente",
+                                doctorCrmState: (user as any)?.crmState || undefined,
                                 doctorSpecialty: (user as any)?.specialty || undefined,
                                 doctorRqe: (user as any)?.rqe || undefined,
                                 doctorAddress: (user as any)?.address || undefined,

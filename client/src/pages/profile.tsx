@@ -126,6 +126,7 @@ const profileSchema = z.object({
   email: z.string().email({ message: "Email inválido" }),
   phoneNumber: z.string().optional(),
   crm: z.string().optional(),
+  crmState: z.string().optional(),
   specialty: z.string().optional(),
   rqe: z.string().optional(),
   address: z.string().optional(),
@@ -208,6 +209,7 @@ export default function Profile() {
       email: user?.email || "",
       phoneNumber: user?.phoneNumber || "",
       crm: user?.crm || "",
+      crmState: (user as any)?.crmState || "",
       specialty: user?.specialty || "",
       rqe: (user as any)?.rqe || "",
       address: user?.address || "",
@@ -233,6 +235,7 @@ export default function Profile() {
         email: user.email || "",
         phoneNumber: user.phoneNumber || "",
         crm: user.crm || "",
+        crmState: (user as any).crmState || "",
         specialty: user.specialty || "",
         rqe: (user as any).rqe || "",
         address: user.address || "",
@@ -628,19 +631,39 @@ export default function Profile() {
 
                                 <h3 className="text-base sm:text-lg font-medium text-foreground mb-3">Dados Profissionais</h3>
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                  <FormField
-                                    control={profileForm.control}
-                                    name="crm"
-                                    render={({ field }) => (
-                                      <FormItem>
-                                        <FormLabel>CRM / Registro</FormLabel>
-                                        <FormControl>
-                                          <Input {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                      </FormItem>
-                                    )}
-                                  />
+                                  <div className="grid grid-cols-3 gap-3">
+                                    <FormField
+                                      control={profileForm.control}
+                                      name="crm"
+                                      render={({ field }) => (
+                                        <FormItem className="col-span-2">
+                                          <FormLabel>CRM / Registro</FormLabel>
+                                          <FormControl>
+                                            <Input {...field} placeholder="Ex: 123456" />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    <FormField
+                                      control={profileForm.control}
+                                      name="crmState"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>UF</FormLabel>
+                                          <FormControl>
+                                            <Input
+                                              {...field}
+                                              maxLength={2}
+                                              placeholder="SP"
+                                              onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                            />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                  </div>
                                   <FormField
                                     control={profileForm.control}
                                     name="specialty"

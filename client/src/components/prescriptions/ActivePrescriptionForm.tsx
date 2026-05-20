@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Trash2, FileText, AlertTriangle, Save, Printer, Pencil } from "lucide-react";
 import { PrescriptionTypeBadge } from "@/components/dialogs";
@@ -10,6 +11,8 @@ interface ActivePrescriptionFormProps {
     items: AcutePrescriptionItem[];
     observations: string;
     onObservationsChange: (value: string) => void;
+    cid?: string;
+    onCidChange?: (value: string) => void;
     onRemoveItem: (id: string) => void;
     onEditItem: (id: string) => void;
     onSaveAndPrint: () => void;
@@ -18,15 +21,20 @@ interface ActivePrescriptionFormProps {
     isSigning?: boolean;
 }
 
+const CONTROLLED_TYPES = new Set(['especial', 'C', 'C1']);
+
 export function ActivePrescriptionForm({
     items,
     observations,
     onObservationsChange,
+    cid,
+    onCidChange,
     onRemoveItem,
     onEditItem,
     onSaveAndPrint,
     isEditing,
 }: ActivePrescriptionFormProps) {
+    const hasControlled = items.some(item => CONTROLLED_TYPES.has(item.prescriptionType));
     // Don't render anything when empty - MedicationSelector already provides context
     if (items.length === 0) {
         return null;
@@ -93,6 +101,19 @@ export function ActivePrescriptionForm({
                 </div>
 
                 <div className="p-4 bg-white border-t border-gray-200 space-y-4">
+                    {hasControlled && onCidChange && (
+                        <div>
+                            <label className="text-sm font-medium text-gray-700 mb-1.5 block">
+                                CID-10 {hasControlled && <span className="text-xs text-gray-500 font-normal">(opcional — usado pela farmácia em receita controlada)</span>}
+                            </label>
+                            <Input
+                                placeholder="Ex: F32.1, J45.0"
+                                value={cid || ""}
+                                onChange={(e) => onCidChange(e.target.value.toUpperCase())}
+                                className="bg-white"
+                            />
+                        </div>
+                    )}
                     <div>
                         <label className="text-sm font-medium text-gray-700 mb-1.5 block">
                             Observações Gerais (opcional)
