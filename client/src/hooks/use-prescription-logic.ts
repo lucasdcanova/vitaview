@@ -5,7 +5,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import type { Profile, Prescription } from "@shared/schema";
-import { MEDICATION_DATABASE, CONTROLLED_MEDICATIONS } from "@/components/dialogs";
+import { MEDICATION_DATABASE } from "@/components/dialogs";
+import { classifyPrescriptionType } from "@/data/controlled-substances";
 
 export interface AcutePrescriptionItem {
     id: string;
@@ -164,24 +165,18 @@ export function usePrescriptionLogic(patient: Profile) {
 
         const baseName = medicationName.split(" ")[0];
         const medInfo = MEDICATION_DATABASE.find(m => m.name.toLowerCase() === baseName.toLowerCase());
-        let pType: 'padrao' | 'especial' | 'A' | 'B1' | 'B2' | 'C' | 'C1' = 'padrao';
 
-        if (medInfo) {
-            if (medInfo.category) {
-                const controlled = CONTROLLED_MEDICATIONS.find(c => c.name.toLowerCase() === baseName.toLowerCase());
-                if (controlled) {
-                    pType = controlled.prescriptionType as any;
-                } else if (medInfo.prescriptionType) {
-                    pType = medInfo.prescriptionType as any;
-                }
-            }
-            if (['Amoxicilina', 'Azitromicina', 'Ciprofloxacino', 'Claritromicina'].includes(medInfo.name)) {
-                pType = 'especial';
-            }
-        } else {
-            const controlled = CONTROLLED_MEDICATIONS.find(c => c.name.toLowerCase() === baseName.toLowerCase());
-            if (controlled) {
-                pType = controlled.prescriptionType as any;
+        // Anvisa-based classification (Portaria 344/98 + RDC 20/2011)
+        // — single source of truth, replaces the legacy CONTROLLED_MEDICATIONS array
+        let pType = classifyPrescriptionType(medicationName) as
+            | 'padrao' | 'especial' | 'A' | 'B1' | 'B2' | 'C' | 'C1';
+
+        // Fall back to the medication's own hint when the classifier couldn't
+        // resolve (e.g. compound brand names not in the DCB list)
+        if (pType === 'padrao' && medInfo?.prescriptionType) {
+            const hint = medInfo.prescriptionType;
+            if (hint !== 'common') {
+                pType = hint as typeof pType;
             }
         }
 

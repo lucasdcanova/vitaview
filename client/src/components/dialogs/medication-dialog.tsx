@@ -1,6 +1,7 @@
 import { UseFormReturn } from "react-hook-form";
 import { z } from "zod";
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { MEDICATION_EXTENSIONS } from "@/data/medication-extensions";
 import {
     Dialog,
     DialogContent,
@@ -41,7 +42,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { CustomMedication } from "@shared/schema";
 
 // Helper function to render prescription type badge with appropriate colors
-export const PrescriptionTypeBadge = ({ type }: { type?: 'common' | 'especial' | 'A' | 'B1' | 'B2' | 'C' | 'C1' }) => {
+export const PrescriptionTypeBadge = ({ type }: { type?: 'common' | 'especial' | 'A' | 'B1' | 'B2' | 'C' | 'C1' | 'padrao' }) => {
     if (!type || type === 'common') return null;
 
     const badgeConfig: Record<string, { label: string; className: string }> = {
@@ -168,16 +169,18 @@ interface MedicationPresentation {
     duration?: number; // Duração do tratamento em dias
 }
 
-interface MedicationInfo {
+export interface MedicationInfo {
     name: string;
     presentations: MedicationPresentation[];
     category: string;
     route: string;
     isControlled?: boolean;
-    prescriptionType?: 'common' | 'especial' | 'A' | 'B1' | 'B2' | 'C' | 'C1'; // Tipo de receituário (C1 = Especial)
+    prescriptionType?: 'common' | 'especial' | 'A' | 'B1' | 'B2' | 'C' | 'C1' | 'padrao'; // Tipo de receituário (C1 = Especial)
     commonFrequencies?: string[];
     notes?: string;
 }
+
+export type { MedicationPresentation };
 
 // Banco de dados de medicamentos com apresentações
 export const MEDICATION_DATABASE: MedicationInfo[] = [
@@ -3746,6 +3749,7 @@ export const MEDICATION_DATABASE: MedicationInfo[] = [
         commonFrequencies: ["0 e 3 meses"],
         notes: "Via Subcutânea. Vírus atenuado.",
     },
+    ...MEDICATION_EXTENSIONS,
 ];
 
 // Interface para item de medicamento com apresentação
@@ -3755,7 +3759,7 @@ interface MedicationListItem {
     format: string;       // Formato: "comprimido"
     dosage?: string;      // Dosagem: "500"
     unit?: string;        // Unidade: "mg"
-    prescriptionType?: 'common' | 'especial' | 'A' | 'B1' | 'B2' | 'C' | 'C1';
+    prescriptionType?: 'common' | 'especial' | 'A' | 'B1' | 'B2' | 'C' | 'C1' | 'padrao';
 }
 
 // Mapear formatos para categorias amigáveis
