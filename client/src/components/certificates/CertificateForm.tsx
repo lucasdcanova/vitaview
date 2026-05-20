@@ -29,6 +29,7 @@ import { toast } from "@/hooks/use-toast";
 import { CertificateTemplate } from "@shared/schema";
 import { generateCertificateText, generateCertificatePDF } from "@/lib/certificate-pdf";
 import { BrandLoader } from "@/components/ui/brand-loader";
+import { useAuth } from "@/hooks/use-auth";
 
 interface CertificateFormProps {
     certType: 'afastamento' | 'comparecimento' | 'acompanhamento' | 'aptidao' | 'laudo';
@@ -70,6 +71,7 @@ export function CertificateForm({
     const [templateName, setTemplateName] = useState("");
     const [isSaveTemplateOpen, setIsSaveTemplateOpen] = useState(false);
     const queryClient = useQueryClient();
+    const { user } = useAuth();
 
     const { data: templates = [], isLoading: isLoadingTemplates } = useQuery<CertificateTemplate[]>({
         queryKey: ['/api/certificate-templates'],
@@ -397,12 +399,15 @@ export function CertificateForm({
                         variant="outline"
                         className="h-12 flex-1"
                         onClick={async () => {
-                            // Quick Preview
                             const data = {
                                 type: certType,
-                                doctorName: "Dr. Exemplo", // Preview usually needs dummy or current doctor if available
-                                doctorCrm: "CRM 123456",
-                                patientName: "Nome do Paciente",
+                                doctorName: user?.fullName || user?.username || "Dr. VitaView",
+                                doctorCrm: user?.crm || "CRM pendente",
+                                doctorSpecialty: (user as any)?.specialty || undefined,
+                                doctorRqe: (user as any)?.rqe || undefined,
+                                doctorAddress: (user as any)?.address || undefined,
+                                doctorPhone: (user as any)?.phoneNumber || undefined,
+                                patientName: patientName || "Nome do Paciente",
                                 patientDoc: patientDoc,
                                 issueDate: new Date(),
                                 daysOff: certDays,

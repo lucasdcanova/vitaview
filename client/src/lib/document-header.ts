@@ -25,7 +25,11 @@ export interface DocumentIdentity {
 export interface PreloadedHeaderAssets {
     image?: { dataUrl: string; aspect: number };
     logo?: { dataUrl: string; aspect: number };
+    /** The VitaView default VV mark (rasterized PNG) — always present after preload */
+    vitaViewMark?: { dataUrl: string; aspect: number };
 }
+
+const VITAVIEW_MARK_URL = "/logo-icon-transparent.png";
 
 async function loadImageForPdf(
     url: string
@@ -58,12 +62,12 @@ async function loadImageForPdf(
 export async function preloadHeaderAssets(
     header: ClinicHeaderForPdf | undefined | null
 ): Promise<PreloadedHeaderAssets> {
-    if (!header) return {};
-    const [image, logo] = await Promise.all([
-        header.imageUrl ? loadImageForPdf(header.imageUrl) : Promise.resolve(undefined),
-        header.logoUrl ? loadImageForPdf(header.logoUrl) : Promise.resolve(undefined),
+    const [image, logo, vitaViewMark] = await Promise.all([
+        header?.imageUrl ? loadImageForPdf(header.imageUrl) : Promise.resolve(undefined),
+        header?.logoUrl ? loadImageForPdf(header.logoUrl) : Promise.resolve(undefined),
+        loadImageForPdf(VITAVIEW_MARK_URL),
     ]);
-    return { image, logo };
+    return { image, logo, vitaViewMark };
 }
 
 export async function fetchAndPreloadClinicHeader(): Promise<{
@@ -102,99 +106,49 @@ const INK_MUTED = { r: 150, g: 150, b: 150 };
 const LINE_GRAY = { r: 210, g: 210, b: 210 };
 const ACCENT = { r: 175, g: 145, b: 80 }; // warm gold accent
 
-function getInitials(name?: string | null, max: number = 2): string {
-    if (!name) return "VV";
-    const parts = name
-        .trim()
-        .replace(/[^\p{L}\s]/gu, "")
-        .split(/\s+/)
-        .filter(Boolean);
-    if (parts.length === 0) return "VV";
-    if (parts.length === 1) return parts[0].slice(0, max).toUpperCase();
-    const first = parts[0][0];
-    const last = parts[parts.length - 1][0];
-    return (first + last).toUpperCase();
-}
-
 /**
- * Draws the VitaView two-interlocked-V monogram as vector strokes inside the
- * supplied bounding box. Outline-only — no fills — to keep the document
- * lightweight on ink.
- */
-function drawVitaViewMonogram(
-    doc: jsPDF,
-    cx: number,
-    cy: number,
-    size: number,
-    color: { r: number; g: number; b: number } = INK
-) {
-    const prevDraw = doc.getDrawColor();
-    doc.setDrawColor(color.r, color.g, color.b);
-    doc.setLineWidth(Math.max(0.4, size * 0.05));
-    doc.setLineCap("round");
-    doc.setLineJoin("round");
-
-    // Base coordinate system 48 × 48, V strokes 8..40 horizontally, 12..36 vertically
-    const scale = size / 48;
-    const ox = cx - size / 2;
-    const oy = cy - size / 2;
-    const pt = (x: number, y: number): [number, number] => [ox + x * scale, oy + y * scale];
-
-    // First V: (8,12) → (18,36) → (28,12)
-    let p1 = pt(8, 12), p2 = pt(18, 36), p3 = pt(28, 12);
-    doc.line(p1[0], p1[1], p2[0], p2[1]);
-    doc.line(p2[0], p2[1], p3[0], p3[1]);
-
-    // Second V: (20,12) → (30,36) → (40,12)
-    p1 = pt(20, 12); p2 = pt(30, 36); p3 = pt(40, 12);
-    doc.line(p1[0], p1[1], p2[0], p2[1]);
-    doc.line(p2[0], p2[1], p3[0], p3[1]);
-
-    doc.setDrawColor(prevDraw);
-}
-
-/**
- * Outlined monogram box that hosts the VitaView mark (or a doctor-supplied
- * logo). Very thin border + transparent fill so it consumes minimal ink.
+ * Renders the actual VitaView VV PNG (or a clinic-supplied logo) inside a
+ * subtle outlined box. Pure outlines + raster image — no large filled areas.
  */
 function drawMonogramBox(
     doc: jsPDF,
     x: number,
     y: number,
     size: number,
-    options: { logo?: PreloadedHeaderAssets["logo"] }
+    options: {
+        logo?: PreloadedHeaderAssets["logo"];
+        vitaViewMark?: PreloadedHeaderAssets["vitaViewMark"];
+    }
 ) {
-    // Subtle accent corner: 1mm warm-gold notch on the top-left for a custom feel
     doc.setDrawColor(LINE_GRAY.r, LINE_GRAY.g, LINE_GRAY.b);
     doc.setLineWidth(0.5);
     doc.rect(x, y, size, size, "S");
 
-    // Top-left accent
+    // Top-left warm-gold accent notch
     doc.setDrawColor(ACCENT.r, ACCENT.g, ACCENT.b);
     doc.setLineWidth(0.8);
     doc.line(x, y + 2.4, x, y);
     doc.line(x, y, x + 2.4, y);
 
-    if (options.logo) {
-        const padding = 0.6;
+    const mark = options.logo ?? options.vitaViewMark;
+    if (mark) {
+        const padding = 1.2;
         const maxW = size - padding * 2;
         const maxH = size - padding * 2;
         let w = maxW;
-        let h = w / options.logo.aspect;
+        let h = w / mark.aspect;
         if (h > maxH) {
             h = maxH;
-            w = h * options.logo.aspect;
+            w = h * mark.aspect;
         }
         doc.addImage(
-            options.logo.dataUrl,
+            mark.dataUrl,
             "PNG",
             x + (size - w) / 2,
             y + (size - h) / 2,
             w,
             h
         );
-    } else {
-        drawVitaViewMonogram(doc, x + size / 2, y + size / 2, size * 0.78);
     }
 }
 
@@ -304,7 +258,10 @@ export function drawDocumentHeader(
     const monogramSize = 13;
     const monogramX = leftX;
     const monogramY = topMargin;
-    drawMonogramBox(doc, monogramX, monogramY, monogramSize, { logo: assets.logo });
+    drawMonogramBox(doc, monogramX, monogramY, monogramSize, {
+        logo: assets.logo,
+        vitaViewMark: assets.vitaViewMark,
+    });
 
     const textX = monogramX + monogramSize + 5;
     const textBaselineY = monogramY + 5;
@@ -439,8 +396,10 @@ export function drawDocumentFooter(
 }
 
 /**
- * Draws a low-opacity watermark mark in the body. Uses the VitaView monogram
- * with the doctor's initials below — minimal ink because of the alpha layer.
+ * Renders a faint logo watermark centered on the page. Uses the clinic's
+ * uploaded logo when present, otherwise the VitaView default mark. The same
+ * source file the user uploads for the header acts as the watermark, so it
+ * stays consistent and clients can use their own brand.
  */
 export function drawDocumentWatermark(
     doc: jsPDF,
@@ -448,30 +407,33 @@ export function drawDocumentWatermark(
         xOffset: number;
         pageWidth: number;
         pageHeight: number;
-        identity?: DocumentIdentity;
-        clinicName?: string | null;
+        assets?: PreloadedHeaderAssets;
     }
 ): void {
-    const text = getInitials(options.clinicName || options.identity?.doctorName, 3);
-    const centerX = options.xOffset + options.pageWidth / 2;
-    const centerY = options.pageHeight / 2;
+    const mark = options.assets?.logo ?? options.assets?.vitaViewMark;
+    if (!mark) return;
 
     const docAny = doc as any;
     if (typeof docAny.setGState !== "function" || typeof docAny.GState !== "function") {
-        return; // GState not supported, skip rather than risk a heavy mark
+        return;
     }
 
-    const transparentState = docAny.GState({ opacity: 0.06 });
+    const targetSize = Math.min(options.pageWidth, options.pageHeight) * 0.42;
+    let w = targetSize;
+    let h = w / mark.aspect;
+    if (h > targetSize) {
+        h = targetSize;
+        w = h * mark.aspect;
+    }
+
+    const cx = options.xOffset + options.pageWidth / 2;
+    const cy = options.pageHeight / 2;
+
+    const transparentState = docAny.GState({ opacity: 0.05 });
     const opaqueState = docAny.GState({ opacity: 1 });
     docAny.setGState(transparentState);
-
-    doc.setFont("times", "bold");
-    doc.setFontSize(110);
-    doc.setTextColor(INK.r, INK.g, INK.b);
-    doc.text(text, centerX, centerY + 5, { align: "center" });
-
+    doc.addImage(mark.dataUrl, "PNG", cx - w / 2, cy - h / 2, w, h);
     docAny.setGState(opaqueState);
-    doc.setTextColor(0, 0, 0);
 }
 
 /**

@@ -115,8 +115,7 @@ export const generateCertificatePDF = async (data: CertificateData): Promise<Blo
         xOffset: 0,
         pageWidth,
         pageHeight,
-        identity,
-        clinicName: header?.clinicName,
+        assets,
     });
 
     // Title
