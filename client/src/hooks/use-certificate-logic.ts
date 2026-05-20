@@ -4,6 +4,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { generateCertificatePDF } from "@/lib/certificate-pdf";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { notifyDocumentGenerated } from "@/hooks/use-header-config-reminder";
 import type { Certificate } from "@shared/schema";
 
 interface PatientData {
@@ -118,6 +119,7 @@ export function useCertificateLogic(patient: PatientData) {
 
                 const url = window.URL.createObjectURL(blob);
                 if (newTab) newTab.location.href = url;
+                notifyDocumentGenerated();
             } catch (e) {
                 console.error(e);
                 newTab?.close();

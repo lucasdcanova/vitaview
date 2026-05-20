@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import type { Profile, Prescription } from "@shared/schema";
 import { MEDICATION_DATABASE } from "@/components/dialogs";
 import { classifyPrescriptionType } from "@/data/controlled-substances";
+import { notifyDocumentGenerated } from "@/hooks/use-header-config-reminder";
 
 export interface AcutePrescriptionItem {
     id: string;
@@ -344,6 +345,7 @@ export function usePrescriptionLogic(patient: Profile) {
 
             const successMsg = editingPrescriptionId ? "Receita atualizada, assinada e gerada!" : "Receita salva, assinada e gerada!";
             toast({ title: "Sucesso", description: successMsg });
+            notifyDocumentGenerated();
             setAcuteItems([]);
             setEditingPrescriptionId(null);
             setPrescriptionObservations("");
@@ -457,6 +459,7 @@ export function usePrescriptionLogic(patient: Profile) {
             }
 
             toast({ title: "Sucesso", description: "Receita renovada, assinada e gerada!" });
+            notifyDocumentGenerated();
 
         } catch (error: any) {
             console.error(error);
