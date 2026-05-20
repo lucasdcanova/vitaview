@@ -55,6 +55,7 @@ export function useSpecialPrescription(patient: { name: string }) {
             patientName: patient.name,
             doctorName: user.fullName || user.username || "",
             doctorCrm: user.crm || "",
+            doctorCrmState: (user as any)?.crmState || undefined,
             prescriptionItem
         });
 
