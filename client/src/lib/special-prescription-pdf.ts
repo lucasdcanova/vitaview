@@ -3,6 +3,7 @@ import { PRESCRIPTION_TYPES, PrescriptionTypeKey } from "@/constants/special-pre
 import {
     drawDocumentHeader,
     fetchAndPreloadClinicHeader,
+    formatCrm,
 } from "./document-header";
 
 interface SpecialPrescriptionData {
@@ -10,6 +11,7 @@ interface SpecialPrescriptionData {
     patientName: string;
     doctorName: string;
     doctorCrm: string;
+    doctorCrmState?: string;
     prescriptionItem: {
         name?: string;
         dosage?: string;
@@ -24,6 +26,7 @@ export async function generateSpecialPrescriptionPDF({
     patientName,
     doctorName,
     doctorCrm,
+    doctorCrmState,
     prescriptionItem,
 }: SpecialPrescriptionData) {
     const selectedTypeInfo = PRESCRIPTION_TYPES[selectedType];
@@ -70,7 +73,7 @@ export async function generateSpecialPrescriptionPDF({
     doc.setFontSize(9);
     doc.text(`Nome: ${doctorName || "Profissional"}`, margin, yPos);
     yPos += 4;
-    doc.text(`CRM: ${doctorCrm || "___________"}`, margin, yPos);
+    doc.text(formatCrm(doctorCrm, doctorCrmState) || "CRM: ___________", margin, yPos);
     yPos += 8;
 
     // Patient
