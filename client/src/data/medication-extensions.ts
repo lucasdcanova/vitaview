@@ -8,7 +8,7 @@
  * é a fonte da verdade em tempo de uso.
  */
 
-import type { MedicationInfo } from "@/components/dialogs/medication-dialog";
+import type { MedicationInfo } from "./medication-database-core";
 
 export const MEDICATION_EXTENSIONS: MedicationInfo[] = [
     // ============================================================
