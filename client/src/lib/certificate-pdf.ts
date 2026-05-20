@@ -121,8 +121,8 @@ export const generateCertificatePDF = async (data: CertificateData): Promise<Blo
         assets,
     });
 
-    // Title
-    let yPos = headerEndY + 6;
+    // Title — generous breathing room between the header and the document title
+    let yPos = headerEndY + 22;
     doc.setTextColor(20, 20, 20);
     doc.setFontSize(16);
     doc.setFont("times", "bold");
