@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { formatSpecialty } from "./specialty-format";
 
 interface ExamRequestData {
     // Dados do Médico
@@ -77,9 +78,10 @@ const generateExamRequestContent = (doc: jsPDF, data: ExamRequestData) => {
 
     yPos += 6;
     if (data.doctorSpecialty) {
+        const specialtyLabel = formatSpecialty(data.doctorSpecialty, data.doctorRqe);
         const specialtyText = data.doctorRqe
-            ? `${data.doctorSpecialty} - RQE ${data.doctorRqe}`
-            : data.doctorSpecialty;
+            ? `${specialtyLabel} - RQE ${data.doctorRqe}`
+            : specialtyLabel;
         doc.text(specialtyText, rightX, yPos, { align: "right" });
     }
 

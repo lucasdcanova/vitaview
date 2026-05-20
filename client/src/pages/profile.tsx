@@ -697,8 +697,12 @@ export default function Profile() {
                                       <FormItem>
                                         <FormLabel>RQE</FormLabel>
                                         <FormControl>
-                                          <Input {...field} />
+                                          <Input {...field} placeholder="Ex: 12345" />
                                         </FormControl>
+                                        <p className="text-xs text-muted-foreground mt-1 leading-snug">
+                                          Com RQE, seus documentos exibem a forma "especialista" (ex.: Oftalmologista).
+                                          Sem RQE, exibe apenas "Área de atuação: <em>{"<especialidade>"}</em>" — exigência da Resolução CFM 1.974/2011.
+                                        </p>
                                         <FormMessage />
                                       </FormItem>
                                     )}
