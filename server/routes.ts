@@ -34,6 +34,7 @@ import {
 } from "@shared/anamnesis-templates";
 import { ensurePremium } from "./middleware/ensure-premium";
 import { resolveAnamnesisTemplate } from "./services/anamnesis-template-resolver";
+import { generateHeaderVariations } from "./services/header-generator";
 import { biometricTwoFactorAuth } from "./auth/biometric-2fa";
 import { advancedSecurity } from "./middleware/advanced-security";
 import { ensureAuthenticated } from "./middleware/auth.middleware";
@@ -5712,6 +5713,40 @@ export async function registerRoutes(app: Express): Promise<void> {
     } catch (error) {
       logger.error('[Clinic Header] Error updating header', { error });
       res.status(500).json({ message: 'Erro ao atualizar cabeçalho' });
+    }
+  });
+
+  // POST — generate header variations with AI (returns JSON specs to render client-side)
+  app.post('/api/clinics/:id/header/ai-generate', ensureAuthenticated, async (req, res) => {
+    try {
+      const clinicId = parseInt(req.params.id);
+      if (isNaN(clinicId)) return res.status(400).json({ message: 'ID inválido' });
+
+      const guard = await requireClinicAdmin(clinicId, req.user!.id);
+      if (!guard.ok) return res.status(guard.status).json({ message: guard.message });
+
+      const user = await storage.getUser(req.user!.id);
+      const clinic = guard.clinic;
+
+      const result = await generateHeaderVariations(
+        {
+          doctorName: user?.fullName || user?.username || 'Profissional',
+          crm: user?.crm || null,
+          specialty: user?.specialty || null,
+          rqe: user?.rqe || null,
+          clinicName: clinic.headerClinicName || clinic.name || null,
+          address: clinic.headerAddress || user?.address || null,
+          phone: clinic.headerPhone || user?.phoneNumber || null,
+          email: clinic.headerEmail || null,
+          website: clinic.headerWebsite || null,
+        },
+        { userId: req.user!.id, clinicId }
+      );
+
+      res.json(result);
+    } catch (error) {
+      logger.error('[Clinic Header] AI generation failed', { error });
+      res.status(500).json({ message: 'Falha ao gerar cabeçalho' });
     }
   });
 
