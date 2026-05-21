@@ -622,6 +622,75 @@ const generateControlledPrescription = (
  * frame and content is rendered inside the AI-identified body bbox.
  * Renders one via at a given xOffset/pageWidth/pageHeight slot.
  */
+/**
+ * Hybrid controlled prescription for letterhead mode: uses the letterhead's
+ * top band (cabeçalho only) and falls back to VitaView's traditional controlled
+ * layout for the body + footer (with the regulatory buyer/pharmacy boxes).
+ * Standard via slot 148.5 x 210 (landscape 2-via).
+ */
+const generateLetterheadControlledPrescription = (
+    doc: jsPDF,
+    data: PrescriptionData,
+    xOffset: number,
+    config: { title: string; subtitle: string }
+) => {
+    const VIA_WIDTH = 148.5;
+    const VIA_HEIGHT = 210;
+    const layout = layoutFor(xOffset, VIA_WIDTH);
+    const header = data.clinicHeader;
+    const assets = data.clinicHeaderAssets ?? {};
+
+    // Header band: top portion of the letterhead PDF, defined by bbox.top
+    const headerBandHeightMm = header?.bodyBbox
+        ? Math.min(header.bodyBbox.top * VIA_HEIGHT, 60)
+        : 40;
+
+    if (assets.image) {
+        // Draw the full letterhead, then mask everything below the header band with white.
+        // This preserves the doctor's branded header without dragging in the bottom artwork.
+        doc.addImage(assets.image.dataUrl, "PNG", xOffset, 0, VIA_WIDTH, VIA_HEIGHT);
+        doc.setFillColor(255, 255, 255);
+        doc.rect(xOffset, headerBandHeightMm, VIA_WIDTH, VIA_HEIGHT - headerBandHeightMm, "F");
+
+        // Thin divider between letterhead band and the document body
+        doc.setDrawColor(40, 40, 40);
+        doc.setLineWidth(0.3);
+        doc.line(layout.leftX, headerBandHeightMm + 2, layout.rightX, headerBandHeightMm + 2);
+    }
+
+    // VitaView's standard watermark in the body area (clinic logo if available, else VV mark)
+    drawDocumentWatermark(doc, {
+        xOffset,
+        pageWidth: VIA_WIDTH,
+        pageHeight: VIA_HEIGHT,
+        assets,
+    });
+
+    let yPos = headerBandHeightMm + 8;
+    yPos = drawDocumentTitle(doc, layout, config.title, yPos, {
+        subtitle: config.subtitle,
+        subtitle2: xOffset > 0 ? "2ª via – paciente" : "1ª via – retenção da farmácia",
+    });
+
+    const controlledData: PrescriptionData = { ...data, isControlledRender: true };
+    yPos = drawDoctorBlock(doc, layout, controlledData, yPos);
+    yPos += 3;
+    yPos = drawPatientBlock(doc, layout, controlledData, yPos);
+    yPos = drawMedicationsBlock(doc, layout, controlledData, yPos);
+
+    if (controlledData.cid) {
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(40, 40, 40);
+        doc.text(`CID-10: ${controlledData.cid}`, layout.leftX, yPos + 2);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(0, 0, 0);
+    }
+
+    // Traditional VitaView controlled footer (signature + buyer/pharmacy boxes + validity)
+    drawControlledFooter(doc, layout, controlledData);
+};
+
 const drawLetterheadControlledFooter = (
     doc: jsPDF,
     layout: BodyLayout,
@@ -874,13 +943,34 @@ export const generatePrescriptionPDF = async (
 
             [0, VIA_WIDTH].forEach((xOffset, idx) => {
                 const viaLabel = idx === 0 ? "1ª via" : "2ª via";
+
+                // Controlled prescriptions in letterhead mode use a hybrid layout:
+                // letterhead's header band on top, VitaView's traditional controlled
+                // footer (buyer/pharmacy boxes + validity) at the bottom. This avoids
+                // the letterhead artwork interfering with regulatory layout.
+                if (config.controlled) {
+                    const validityByType: Record<string, string> = {
+                        especial: "Válido por 10 dias a partir da data de emissão.",
+                        C: "Válido por 30 dias a partir da data de emissão.",
+                        C1: "Válido por 30 dias a partir da data de emissão.",
+                    };
+                    generateLetterheadControlledPrescription(doc, {
+                        ...groupData,
+                        validityText: validityByType[type] || "Válido por 30 dias a partir da data de emissão.",
+                    }, xOffset, {
+                        title: config.title,
+                        subtitle: config.subtitle ?? "",
+                    });
+                    return;
+                }
+
                 const subtitle = config.subtitle
                     ? `${config.subtitle} · ${viaLabel}`
                     : viaLabel;
                 generateLetterheadPrescription(doc, groupData, {
                     title: config.title,
                     subtitle,
-                    controlled: config.controlled,
+                    controlled: false,
                     xOffset,
                     pageWidth: VIA_WIDTH,
                     pageHeight: VIA_HEIGHT,
