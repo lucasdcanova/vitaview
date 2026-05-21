@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BrandLoader } from "@/components/ui/brand-loader";
-import { Upload, Trash2, Image as ImageIcon, Save, Eye, Sparkles, FileText } from "lucide-react";
+import { Upload, Trash2, Image as ImageIcon, Save, Eye, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HeaderAiGeneratorDialog } from "@/components/clinic/header-ai-generator-dialog";
 
@@ -278,17 +278,29 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                 {/* Image / Letterhead mode */}
                 {(draft.headerMode === "image" || draft.headerMode === "letterhead") && (
                     <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-4">
-                        <Label className="text-sm font-medium">Imagem do timbrado</Label>
-                        <div className="text-xs text-muted-foreground space-y-1.5">
-                            <p>PNG, JPG, WebP ou SVG. Recomendado: largura mínima 1800px, proporção 8:1 ou 6:1 (estilo letterhead).</p>
-                            <p className="flex items-start gap-1.5">
-                                <FileText className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: "#AF9150" }} />
-                                <span>
-                                    <strong>PDF do seu receituário completo?</strong> Pode enviar direto. A IA identifica
-                                    onde o conteúdo entra e usa o <strong>design inteiro do PDF</strong> como moldura
-                                    dos seus documentos (cabeçalho, rodapé, bordas).
-                                </span>
-                            </p>
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="space-y-1 min-w-0">
+                                <Label className="text-sm font-medium">Imagem do timbrado</Label>
+                                <p className="text-xs text-muted-foreground leading-snug">
+                                    PNG, JPG, WebP, SVG ou PDF. Recomendado: largura mínima 1800px. Em PDF, a IA usa o design inteiro como moldura.
+                                </p>
+                            </div>
+                            {canEdit && !draft.headerImageUrl && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => imageInputRef.current?.click()}
+                                    disabled={uploadImage.isPending || isProcessingPdf}
+                                    className="shrink-0"
+                                >
+                                    {uploadImage.isPending || isProcessingPdf ? (
+                                        <BrandLoader className="h-4 w-4 mr-2" />
+                                    ) : (
+                                        <Upload className="h-4 w-4 mr-2" />
+                                    )}
+                                    {isProcessingPdf ? "Processando..." : "Enviar arquivo"}
+                                </Button>
+                            )}
                         </div>
                         {draft.headerMode === "letterhead" && (
                             <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
@@ -338,22 +350,9 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                                     </div>
                                 )}
                             </div>
-                        ) : canEdit ? (
-                            <Button
-                                variant="outline"
-                                onClick={() => imageInputRef.current?.click()}
-                                disabled={uploadImage.isPending || isProcessingPdf}
-                            >
-                                {uploadImage.isPending || isProcessingPdf ? (
-                                    <BrandLoader className="h-4 w-4 mr-2" />
-                                ) : (
-                                    <Upload className="h-4 w-4 mr-2" />
-                                )}
-                                {isProcessingPdf ? "Processando PDF com IA..." : "Enviar imagem ou PDF"}
-                            </Button>
-                        ) : (
+                        ) : !canEdit ? (
                             <p className="text-sm text-muted-foreground">Nenhuma imagem enviada.</p>
-                        )}
+                        ) : null}
                         <input
                             ref={imageInputRef}
                             type="file"
