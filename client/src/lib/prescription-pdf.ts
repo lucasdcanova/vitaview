@@ -7,6 +7,7 @@ import {
     drawDocumentWatermark,
     drawLetterheadBackground,
     fetchAndPreloadClinicHeader,
+    formatBrazilianPhone,
     formatCrm,
     isLetterheadMode,
     isPreprintedMode,
@@ -227,7 +228,7 @@ const drawDoctorBlock = (doc: jsPDF, layout: BodyLayout, data: PrescriptionData,
         const addrWrapped = doc.splitTextToSize(data.doctorAddress, layout.contentWidth);
         doc.text(addrWrapped[0], layout.leftX, nextY);
         if (data.doctorPhone) {
-            doc.text(data.doctorPhone, layout.rightX, nextY, { align: "right" });
+            doc.text(formatBrazilianPhone(data.doctorPhone), layout.rightX, nextY, { align: "right" });
         }
         doc.setTextColor(0, 0, 0);
         nextY += 3.6;
@@ -353,7 +354,7 @@ const drawDoctorBlockCompact = (doc: jsPDF, layout: BodyLayout, data: Prescripti
         doc.text(leftBits.join("  ·  "), layout.leftX, nextY);
     }
     if (data.doctorPhone) {
-        doc.text(data.doctorPhone, layout.rightX, nextY, { align: "right" });
+        doc.text(formatBrazilianPhone(data.doctorPhone), layout.rightX, nextY, { align: "right" });
     }
     doc.setTextColor(0, 0, 0);
     return nextY + 4;
@@ -717,7 +718,7 @@ const drawEmitenteBox = (
 
     // Line 3: Phone · Address (tertiary)
     const bits: string[] = [];
-    if (data.doctorPhone) bits.push(data.doctorPhone);
+    if (data.doctorPhone) bits.push(formatBrazilianPhone(data.doctorPhone));
     if (data.doctorAddress) {
         const addr = data.doctorAddress.length > 60 ? data.doctorAddress.slice(0, 57) + "..." : data.doctorAddress;
         bits.push(addr);

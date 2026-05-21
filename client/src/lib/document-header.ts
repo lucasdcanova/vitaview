@@ -69,6 +69,26 @@ export interface DocumentIdentity {
 }
 
 /**
+ * Formats a Brazilian phone number into "(DD) NNNNN-NNNN" (mobile) or "(DD) NNNN-NNNN" (landline).
+ * Strips the +55 country code and any non-digit characters before formatting. Falls back to the
+ * raw input when the digit count doesn't match either national format.
+ */
+export function formatBrazilianPhone(raw?: string | null): string {
+    if (!raw) return "";
+    const digits = String(raw).replace(/\D/g, "");
+    let national = digits;
+    if (national.length >= 12 && national.startsWith("55")) national = national.slice(2);
+    if (national.length >= 11 && national.startsWith("0")) national = national.slice(1);
+    if (national.length === 11) {
+        return `(${national.slice(0, 2)}) ${national.slice(2, 7)}-${national.slice(7)}`;
+    }
+    if (national.length === 10) {
+        return `(${national.slice(0, 2)}) ${national.slice(2, 6)}-${national.slice(6)}`;
+    }
+    return raw;
+}
+
+/**
  * Formats a CRM into the legal Brazilian format "CRM/UF 123456".
  * Falls back to the bare number if no UF is available.
  */
@@ -257,7 +277,7 @@ function resolveHeaderText(
         const contact: string[] = [];
         if (header?.address) contact.push(header.address);
         const inline: string[] = [];
-        if (header?.phone) inline.push(header.phone);
+        if (header?.phone) inline.push(formatBrazilianPhone(header.phone));
         if (header?.email) inline.push(header.email);
         if (header?.website) inline.push(header.website);
         if (inline.length) contact.push(inline.join("  ·  "));
@@ -437,13 +457,13 @@ export function drawDocumentFooter(
     if (usingComposed) {
         if (header?.address) secondaryParts.push(header.address);
         const contact: string[] = [];
-        if (header?.phone) contact.push(header.phone);
+        if (header?.phone) contact.push(formatBrazilianPhone(header.phone));
         if (header?.email) contact.push(header.email);
         if (header?.website) contact.push(header.website);
         if (contact.length) secondaryParts.push(contact.join("  ·  "));
     } else {
         if (identity?.doctorAddress) secondaryParts.push(identity.doctorAddress);
-        if (identity?.doctorPhone) secondaryParts.push(identity.doctorPhone);
+        if (identity?.doctorPhone) secondaryParts.push(formatBrazilianPhone(identity.doctorPhone));
     }
 
     const primaryLine = primaryParts.join("  ·  ");
