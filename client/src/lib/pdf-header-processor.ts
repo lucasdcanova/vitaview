@@ -21,13 +21,12 @@ export interface HeaderBoundingBox {
 }
 
 export interface ProcessedHeader {
-    /** Final cropped header as PNG dataURL */
+    /** Full first-page render as PNG dataURL — used as the document background */
     pngDataUrl: string;
-    /** Full first-page render as PNG dataURL — useful for preview */
-    fullPageDataUrl: string;
+    /** Body region where document content (medication list, atestado text) goes */
+    bodyBbox: HeaderBoundingBox;
     confidence: "high" | "medium" | "low";
     fallback: boolean;
-    bbox: HeaderBoundingBox;
 }
 
 const TARGET_WIDTH = 2400; // High-res, downsized server-side when generating PDFs
@@ -58,21 +57,6 @@ async function renderPdfFirstPage(file: File): Promise<HTMLCanvasElement> {
 
     await page.render({ canvasContext: ctx, viewport }).promise;
     return canvas;
-}
-
-function cropCanvas(source: HTMLCanvasElement, bbox: HeaderBoundingBox): HTMLCanvasElement {
-    const sx = Math.round(bbox.left * source.width);
-    const sy = Math.round(bbox.top * source.height);
-    const sw = Math.max(1, Math.round((bbox.right - bbox.left) * source.width));
-    const sh = Math.max(1, Math.round((bbox.bottom - bbox.top) * source.height));
-
-    const out = document.createElement("canvas");
-    out.width = sw;
-    out.height = sh;
-    const ctx = out.getContext("2d");
-    if (!ctx) throw new Error("Canvas 2D context indisponível");
-    ctx.drawImage(source, sx, sy, sw, sh, 0, 0, sw, sh);
-    return out;
 }
 
 /** Downscale a PNG dataURL to fit max width while keeping aspect, returns dataURL. */
@@ -130,29 +114,29 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 }
 
 /**
- * Full pipeline: PDF File → cropped letterhead PNG ready to upload.
+ * Full pipeline: PDF File → full-page letterhead PNG + body bbox.
+ * The result is uploaded to /api/clinics/:id/header/letterhead and the entire
+ * PDF design becomes the document template; the AI-identified body region
+ * tells the renderer where to drop the prescription content.
  */
 export async function processPdfHeader(file: File, clinicId: number): Promise<ProcessedHeader> {
     const canvas = await renderPdfFirstPage(file);
-    const fullPageDataUrl = downscaleForUpload(canvas, 1800);
+    const pngDataUrl = downscaleForUpload(canvas, 1800);
 
-    let bbox: HeaderBoundingBox = { top: 0, bottom: 0.22, left: 0, right: 1 };
+    let bodyBbox: HeaderBoundingBox = { top: 0.18, bottom: 0.85, left: 0.08, right: 0.92 };
     let confidence: ProcessedHeader["confidence"] = "low";
     let fallback = true;
 
     try {
-        const result = await analyzeBboxViaServer(clinicId, fullPageDataUrl);
-        bbox = result.bbox;
+        const result = await analyzeBboxViaServer(clinicId, pngDataUrl);
+        bodyBbox = result.bbox;
         confidence = result.confidence;
         fallback = result.fallback;
     } catch (err) {
         console.warn("[pdf-header-processor] análise falhou, usando bbox padrão", err);
     }
 
-    const cropped = cropCanvas(canvas, bbox);
-    const pngDataUrl = downscaleForUpload(cropped, 2000);
-
-    return { pngDataUrl, fullPageDataUrl, confidence, fallback, bbox };
+    return { pngDataUrl, bodyBbox, confidence, fallback };
 }
 
 export function dataUrlToFile(dataUrl: string, filename: string): File {

@@ -16,7 +16,7 @@ export type ClinicHeader = {
     role: string;
     isAdmin: boolean;
     name: string;
-    headerMode: "minimal" | "image" | "composed";
+    headerMode: "minimal" | "image" | "composed" | "letterhead";
     headerImageUrl: string | null;
     headerLogoUrl: string | null;
     headerClinicName: string | null;
@@ -25,6 +25,7 @@ export type ClinicHeader = {
     headerEmail: string | null;
     headerWebsite: string | null;
     headerCnpj: string | null;
+    headerBodyBbox: { top: number; bottom: number; left: number; right: number } | null;
 };
 
 interface Props {
@@ -173,14 +174,30 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
         try {
             const { processPdfHeader, dataUrlToFile } = await import("@/lib/pdf-header-processor");
             const result = await processPdfHeader(file, header.clinicId);
-            const png = dataUrlToFile(result.pngDataUrl, `header-pdf-${Date.now()}.png`);
-            await uploadImage.mutateAsync(png);
+
+            const png = dataUrlToFile(result.pngDataUrl, `letterhead-${Date.now()}.png`);
+            const form = new FormData();
+            form.append("image", png);
+            form.append("bodyBbox", JSON.stringify(result.bodyBbox));
+            const res = await fetch(`/api/clinics/${header.clinicId}/header/letterhead`, {
+                method: "POST",
+                body: form,
+                credentials: "include",
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || "Erro ao salvar timbrado");
+            }
+            const data = await res.json();
+            queryClient.setQueryData(["/api/clinics/header/active"], data);
+            setDraft(data);
+
             const note = result.fallback
-                ? "Não consegui detectar o cabeçalho automaticamente — usei o topo do documento. Ajuste se necessário."
+                ? "Salvei o timbrado, mas não consegui identificar com precisão a área do corpo. Você pode testar uma receita pra ajustar."
                 : result.confidence === "low"
-                    ? "Cabeçalho extraído, mas a confiança foi baixa. Confira o resultado."
-                    : "Cabeçalho extraído do PDF e ajustado.";
-            toast({ title: "PDF processado", description: note });
+                    ? "Timbrado salvo, mas a confiança foi baixa. Vale conferir o resultado."
+                    : "Timbrado salvo. O design do PDF agora é a moldura completa dos seus documentos.";
+            toast({ title: "Timbrado processado", description: note });
         } catch (e: any) {
             toast({ title: "Erro", description: e.message || "Falha ao processar PDF.", variant: "destructive" });
         } finally {
@@ -206,9 +223,9 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                 {/* Mode selector */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <ModeCard
-                        title="Imagem"
-                        description="Envie sua arte de timbrado pronta."
-                        active={draft.headerMode === "image"}
+                        title="Imagem ou timbrado"
+                        description="Envie banner em PNG/JPG ou um PDF do seu receituário completo."
+                        active={draft.headerMode === "image" || draft.headerMode === "letterhead"}
                         disabled={!canEdit}
                         onClick={() => handleSelectMode("image")}
                     />
@@ -258,8 +275,8 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                     onOpenChange={setAiDialogOpen}
                 />
 
-                {/* Image mode */}
-                {draft.headerMode === "image" && (
+                {/* Image / Letterhead mode */}
+                {(draft.headerMode === "image" || draft.headerMode === "letterhead") && (
                     <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-4">
                         <Label className="text-sm font-medium">Imagem do timbrado</Label>
                         <div className="text-xs text-muted-foreground space-y-1.5">
@@ -267,11 +284,23 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                             <p className="flex items-start gap-1.5">
                                 <FileText className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: "#AF9150" }} />
                                 <span>
-                                    <strong>Tem um PDF do seu timbrado?</strong> Pode enviar direto. A IA identifica
-                                    a região do cabeçalho e ajusta automaticamente ao formato da plataforma.
+                                    <strong>PDF do seu receituário completo?</strong> Pode enviar direto. A IA identifica
+                                    onde o conteúdo entra e usa o <strong>design inteiro do PDF</strong> como moldura
+                                    dos seus documentos (cabeçalho, rodapé, bordas).
                                 </span>
                             </p>
                         </div>
+                        {draft.headerMode === "letterhead" && (
+                            <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
+                                <p className="text-xs text-foreground flex items-center gap-1.5">
+                                    <Sparkles className="h-3.5 w-3.5" style={{ color: "#AF9150" }} />
+                                    <span>
+                                        <strong>Modo timbrado ativo.</strong> Receitas e atestados são gerados em
+                                        portrait (1 via por página) usando o seu PDF como moldura completa.
+                                    </span>
+                                </p>
+                            </div>
+                        )}
                         {draft.headerImageUrl ? (
                             <div className="space-y-3">
                                 <div className="rounded-lg border border-border bg-white p-3">

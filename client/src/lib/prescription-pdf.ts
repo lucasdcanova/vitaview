@@ -5,8 +5,10 @@ import {
     drawDocumentFooter,
     drawDocumentHeader,
     drawDocumentWatermark,
+    drawLetterheadBackground,
     fetchAndPreloadClinicHeader,
     formatCrm,
+    isLetterheadMode,
     type ClinicHeaderForPdf,
     type DocumentIdentity,
     type PreloadedHeaderAssets,
@@ -614,6 +616,97 @@ const generateControlledPrescription = (
 };
 
 // ==========================================
+/**
+ * Generates a single prescription page inside the user's letterhead PDF.
+ * Used when the clinic uploaded a full-page letterhead — the PDF becomes the
+ * entire template and content is rendered inside the AI-identified body bbox.
+ */
+const generateLetterheadPrescription = (
+    doc: jsPDF,
+    data: PrescriptionData,
+    config: { title: string; subtitle?: string; controlled: boolean }
+) => {
+    const pageWidth = 210;
+    const pageHeight = 297;
+    const area = drawLetterheadBackground(
+        doc,
+        data.clinicHeader ?? null,
+        data.clinicHeaderAssets ?? {},
+        { xOffset: 0, pageWidth, pageHeight }
+    );
+    if (!area) return; // safety, should not happen since we check upstream
+
+    const layout: BodyLayout = {
+        xOffset: 0,
+        pageWidth,
+        margin: area.contentX,
+        leftX: area.contentX,
+        rightX: area.contentX + area.contentWidth,
+        centerX: area.contentX + area.contentWidth / 2,
+        contentWidth: area.contentWidth,
+    };
+
+    let yPos = area.contentY + 2;
+
+    // Title
+    doc.setTextColor(20, 20, 20);
+    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.text(config.title, layout.centerX, yPos + 5, { align: "center" });
+    yPos += 7;
+    if (config.subtitle) {
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(110, 110, 110);
+        doc.text(config.subtitle, layout.centerX, yPos + 3, { align: "center" });
+        yPos += 4;
+    }
+    yPos += 6;
+
+    const contentData: PrescriptionData = { ...data, isControlledRender: config.controlled };
+
+    yPos = drawDoctorBlock(doc, layout, contentData, yPos);
+    yPos += 2;
+    yPos = drawPatientBlock(doc, layout, contentData, yPos);
+    yPos = drawMedicationsBlock(doc, layout, contentData, yPos);
+
+    if (config.controlled && contentData.cid) {
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(40, 40, 40);
+        doc.text(`CID-10: ${contentData.cid}`, layout.leftX, yPos + 2);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(0, 0, 0);
+        yPos += 6;
+    }
+
+    // Signature anchored near the bottom of the body area
+    const contentBottomY = area.contentY + area.contentHeight;
+    const signatureY = Math.min(Math.max(yPos + 10, contentBottomY - 28), contentBottomY - 12);
+
+    doc.setLineWidth(0.3);
+    doc.setDrawColor(40, 40, 40);
+    doc.line(layout.centerX - 40, signatureY, layout.centerX + 40, signatureY);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(0, 0, 0);
+    doc.text(data.doctorName, layout.centerX, signatureY + 5, { align: "center" });
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80, 80, 80);
+    doc.text(formatCrm(data.doctorCrm, data.doctorCrmState), layout.centerX, signatureY + 9.5, { align: "center" });
+    doc.setFontSize(6.5);
+    doc.text("Assinatura e carimbo", layout.centerX, signatureY + 13, { align: "center" });
+
+    if (config.controlled && data.prescriptionNumber) {
+        doc.setFontSize(6.5);
+        doc.setTextColor(110, 110, 110);
+        doc.text(`Nº ${data.prescriptionNumber}`, layout.rightX, contentBottomY - 2, { align: "right" });
+    }
+    doc.setTextColor(0, 0, 0);
+};
+
+// ==========================================
 // FUNÇÃO PRINCIPAL DE GERAÇÃO DE RECEITA
 // ==========================================
 export const generatePrescriptionPDF = async (
@@ -655,6 +748,50 @@ export const generatePrescriptionPDF = async (
 
     if (typesWithMeds.length === 0) {
         console.warn("Nenhum medicamento para gerar receita");
+        return;
+    }
+
+    // When a full-page letterhead is active, switch to portrait single-via mode:
+    // the doctor's PDF design is the entire frame and the content goes inside the body bbox.
+    if (isLetterheadMode(header)) {
+        const doc = new jsPDF({ format: "a4", orientation: "portrait" });
+        let isFirstPage = true;
+
+        typesWithMeds.forEach((type) => {
+            const groupData = enrich({ ...data, medications: groups[type] });
+            const config = (() => {
+                switch (type) {
+                    case "padrao": return { title: "RECEITUÁRIO", subtitle: undefined, controlled: false };
+                    case "A": return { title: "RECEITUÁRIO", subtitle: "Cópia paciente — Notificação A (opioides)", controlled: false };
+                    case "B1": return { title: "RECEITUÁRIO", subtitle: "Cópia paciente — Notificação B1 (psicotrópicos)", controlled: false };
+                    case "B2": return { title: "RECEITUÁRIO", subtitle: "Cópia paciente — Notificação B2 (anorexígenos)", controlled: false };
+                    case "especial": return { title: "RECEITA DE CONTROLE ESPECIAL", subtitle: "Antimicrobianos — 2 vias", controlled: true };
+                    case "C": return { title: "RECEITA DE CONTROLE ESPECIAL", subtitle: "Retinoides / imunossupressores", controlled: true };
+                    case "C1": return { title: "RECEITA DE CONTROLE ESPECIAL", subtitle: "Antidepressivos / antipsicóticos", controlled: true };
+                }
+                return { title: "RECEITUÁRIO", subtitle: undefined, controlled: false };
+            })();
+
+            // For controlled prescriptions we still emit 2 vias — but each on its own page
+            const copies = config.controlled ? 2 : 1;
+            for (let i = 0; i < copies; i++) {
+                if (!isFirstPage) doc.addPage();
+                isFirstPage = false;
+                const copySubtitle = config.controlled
+                    ? `${config.subtitle ?? ""}${config.subtitle ? " · " : ""}${i === 0 ? "1ª via – retenção da farmácia" : "2ª via – paciente"}`
+                    : config.subtitle;
+                generateLetterheadPrescription(doc, groupData, {
+                    title: config.title,
+                    subtitle: copySubtitle,
+                    controlled: config.controlled,
+                });
+            }
+        });
+
+        const pdfBlob = doc.output("blob");
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        if (targetWindow) targetWindow.location.href = pdfUrl;
+        else window.open(pdfUrl, "_blank");
         return;
     }
 

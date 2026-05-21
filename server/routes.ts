@@ -5573,7 +5573,7 @@ export async function registerRoutes(app: Express): Promise<void> {
     role: string;
     isAdmin: boolean;
     name: string;
-    headerMode: 'minimal' | 'image' | 'composed';
+    headerMode: 'minimal' | 'image' | 'composed' | 'letterhead';
     headerImageUrl: string | null;
     headerLogoUrl: string | null;
     headerClinicName: string | null;
@@ -5582,6 +5582,7 @@ export async function registerRoutes(app: Express): Promise<void> {
     headerEmail: string | null;
     headerWebsite: string | null;
     headerCnpj: string | null;
+    headerBodyBbox: { top: number; bottom: number; left: number; right: number } | null;
   };
 
   const buildClinicHeaderResponse = (
@@ -5592,6 +5593,24 @@ export async function registerRoutes(app: Express): Promise<void> {
     const mode = (clinic.headerMode as ClinicHeaderResponse['headerMode']) || 'minimal';
     const imageFile = normalizeClinicHeaderFilename(clinic.headerImageFile);
     const logoFile = normalizeClinicHeaderFilename(clinic.headerLogoFile);
+
+    let bodyBbox: ClinicHeaderResponse['headerBodyBbox'] = null;
+    if (clinic.headerBodyBbox && typeof clinic.headerBodyBbox === 'string') {
+      try {
+        const parsed = JSON.parse(clinic.headerBodyBbox);
+        if (
+          typeof parsed?.top === 'number' &&
+          typeof parsed?.bottom === 'number' &&
+          typeof parsed?.left === 'number' &&
+          typeof parsed?.right === 'number'
+        ) {
+          bodyBbox = parsed;
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
     return {
       clinicId: clinic.id,
       role,
@@ -5606,6 +5625,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       headerEmail: clinic.headerEmail ?? null,
       headerWebsite: clinic.headerWebsite ?? null,
       headerCnpj: clinic.headerCnpj ?? null,
+      headerBodyBbox: bodyBbox,
     };
   };
 
@@ -5695,7 +5715,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       const update: Record<string, any> = {};
       if (typeof req.body?.headerMode === 'string') {
         const mode = req.body.headerMode;
-        if (!['minimal', 'image', 'composed'].includes(mode)) {
+        if (!['minimal', 'image', 'composed', 'letterhead'].includes(mode)) {
           return res.status(400).json({ message: 'Modo de cabeçalho inválido' });
         }
         update.headerMode = mode;
@@ -5805,12 +5825,68 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       const updated = await storage.updateClinic(clinicId, {
         headerImageFile: filename,
-        headerMode: clinic.headerMode === 'minimal' ? 'image' : clinic.headerMode,
+        // Clear letterhead bbox — this is a banner-style image upload
+        headerBodyBbox: null,
+        headerMode: clinic.headerMode === 'letterhead' ? 'image' : (clinic.headerMode === 'minimal' ? 'image' : clinic.headerMode),
       } as any);
       res.json(buildClinicHeaderResponse(updated, 'admin', true));
     } catch (error) {
       logger.error('[Clinic Header] Error uploading header image', { error });
       res.status(500).json({ message: 'Erro ao enviar imagem de cabeçalho' });
+    }
+  });
+
+  // POST — upload full-page letterhead (PDF first page rendered as PNG) + body bbox
+  app.post('/api/clinics/:id/header/letterhead', ensureAuthenticated, clinicHeaderUpload.single('image'), async (req, res) => {
+    try {
+      const clinicId = parseInt(req.params.id);
+      if (isNaN(clinicId)) return res.status(400).json({ message: 'ID inválido' });
+      if (!req.file) return res.status(400).json({ message: 'Nenhuma imagem enviada' });
+
+      const guard = await requireClinicAdmin(clinicId, req.user!.id);
+      if (!guard.ok) return res.status(guard.status).json({ message: guard.message });
+      const clinic = guard.clinic;
+
+      // Parse + validate body bbox from form field
+      let bbox: { top: number; bottom: number; left: number; right: number } | null = null;
+      if (typeof req.body?.bodyBbox === 'string') {
+        try {
+          const parsed = JSON.parse(req.body.bodyBbox);
+          const top = Math.min(0.6, Math.max(0, parseFloat(parsed.top)));
+          const bottom = Math.min(1, Math.max(0.4, parseFloat(parsed.bottom)));
+          const left = Math.min(0.35, Math.max(0, parseFloat(parsed.left ?? 0)));
+          const right = Math.min(1, Math.max(0.65, parseFloat(parsed.right ?? 1)));
+          if (bottom - top >= 0.3 && right - left >= 0.5) {
+            bbox = { top, bottom, left, right };
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      if (!bbox) bbox = { top: 0.18, bottom: 0.85, left: 0.08, right: 0.92 };
+
+      const previous = normalizeClinicHeaderFilename(clinic.headerImageFile);
+      if (previous) {
+        const previousPath = path.join(clinicHeadersDir, previous);
+        if (fs.existsSync(previousPath)) fs.unlinkSync(previousPath);
+      }
+
+      const extByMime: Record<string, string> = {
+        'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp',
+      };
+      const ext = extByMime[req.file.mimetype] || '.png';
+      const filename = `clinic-${clinicId}-letterhead-${Date.now()}${ext}`;
+      fs.writeFileSync(path.join(clinicHeadersDir, filename), req.file.buffer);
+
+      const updated = await storage.updateClinic(clinicId, {
+        headerImageFile: filename,
+        headerBodyBbox: JSON.stringify(bbox),
+        headerMode: 'letterhead',
+      } as any);
+      res.json(buildClinicHeaderResponse(updated, 'admin', true));
+    } catch (error) {
+      logger.error('[Clinic Header] Error uploading letterhead', { error });
+      res.status(500).json({ message: 'Erro ao enviar timbrado' });
     }
   });
 
@@ -5861,7 +5937,11 @@ export async function registerRoutes(app: Express): Promise<void> {
         const previousPath = path.join(clinicHeadersDir, previous);
         if (fs.existsSync(previousPath)) fs.unlinkSync(previousPath);
       }
-      const updated = await storage.updateClinic(clinicId, { headerImageFile: null } as any);
+      const updated = await storage.updateClinic(clinicId, {
+        headerImageFile: null,
+        headerBodyBbox: null,
+        headerMode: clinic.headerMode === 'letterhead' ? 'minimal' : clinic.headerMode,
+      } as any);
       res.json(buildClinicHeaderResponse(updated, 'admin', true));
     } catch (error) {
       logger.error('[Clinic Header] Error deleting header image', { error });

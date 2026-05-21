@@ -1,8 +1,15 @@
 import jsPDF from "jspdf";
 import { formatSpecialty } from "./specialty-format";
 
+export interface BodyBbox {
+    top: number;
+    bottom: number;
+    left: number;
+    right: number;
+}
+
 export interface ClinicHeaderForPdf {
-    mode: "minimal" | "image" | "composed";
+    mode: "minimal" | "image" | "composed" | "letterhead";
     imageUrl?: string | null;
     logoUrl?: string | null;
     clinicName?: string | null;
@@ -11,6 +18,13 @@ export interface ClinicHeaderForPdf {
     email?: string | null;
     website?: string | null;
     cnpj?: string | null;
+    /** Body region (0..1) for "letterhead" mode — where document content goes */
+    bodyBbox?: BodyBbox | null;
+}
+
+/** Returns true when the clinic has a full-page letterhead PDF active. */
+export function isLetterheadMode(header: ClinicHeaderForPdf | null | undefined): boolean {
+    return !!(header && header.mode === "letterhead" && header.imageUrl && header.bodyBbox);
 }
 
 export interface DocumentIdentity {
@@ -103,6 +117,7 @@ export async function fetchAndPreloadClinicHeader(): Promise<{
             email: data.headerEmail,
             website: data.headerWebsite,
             cnpj: data.headerCnpj,
+            bodyBbox: data.headerBodyBbox ?? null,
         };
         const assets = await preloadHeaderAssets(header);
         return { header, assets };
@@ -236,6 +251,30 @@ export interface DocumentHeaderOptions {
     marginX?: number;
     topMargin?: number;
     identity?: DocumentIdentity;
+}
+
+/**
+ * Renders the full clinic letterhead PNG as the background of the current PDF
+ * page and returns the content area where document body should be drawn
+ * (already in mm). Used for full-page letterhead mode where the doctor's
+ * PDF is the entire document template.
+ */
+export function drawLetterheadBackground(
+    doc: jsPDF,
+    header: ClinicHeaderForPdf | null | undefined,
+    assets: PreloadedHeaderAssets,
+    options: { xOffset?: number; pageWidth: number; pageHeight: number }
+): { contentX: number; contentY: number; contentWidth: number; contentHeight: number } | null {
+    if (!header || header.mode !== "letterhead" || !assets.image || !header.bodyBbox) return null;
+    const xOffset = options.xOffset ?? 0;
+    doc.addImage(assets.image.dataUrl, "PNG", xOffset, 0, options.pageWidth, options.pageHeight);
+
+    const bbox = header.bodyBbox;
+    const contentX = xOffset + bbox.left * options.pageWidth;
+    const contentY = bbox.top * options.pageHeight;
+    const contentWidth = (bbox.right - bbox.left) * options.pageWidth;
+    const contentHeight = (bbox.bottom - bbox.top) * options.pageHeight;
+    return { contentX, contentY, contentWidth, contentHeight };
 }
 
 export function drawDocumentHeader(
