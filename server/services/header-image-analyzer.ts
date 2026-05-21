@@ -159,6 +159,160 @@ Regras de bbox:
  * as a red rectangle overlay, and asks GPT-Vision to check whether the rectangle
  * collides with any pre-printed element. If yes, returns a refined bbox.
  */
+export interface PreprintedMarginsResult {
+    /** Physical paper dimensions in millimeters as inferred or provided. */
+    paperWidthMm: number;
+    paperHeightMm: number;
+    orientation: "landscape" | "portrait";
+    /** Margins where the pre-printed elements occupy (system must leave these free). */
+    topMm: number;
+    bottomMm: number;
+    leftMm: number;
+    rightMm: number;
+    confidence: "high" | "medium" | "low";
+    /** True when AI couldn't analyze and we returned safe defaults. */
+    fallback: boolean;
+}
+
+const DEFAULT_PAPER_W = 210;
+const DEFAULT_PAPER_H = 148.5;
+
+function defaultPreprintedMargins(): PreprintedMarginsResult {
+    return {
+        paperWidthMm: DEFAULT_PAPER_W,
+        paperHeightMm: DEFAULT_PAPER_H,
+        orientation: "landscape",
+        topMm: 35,
+        bottomMm: 18,
+        leftMm: 14,
+        rightMm: 14,
+        confidence: "low",
+        fallback: true,
+    };
+}
+
+function clampMm(v: any, min: number, max: number, fallback: number): number {
+    const n = parseFloat(v);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.max(min, Math.min(max, n));
+}
+
+/**
+ * Receives a photo/scan of the doctor's pre-printed prescription paper (which already
+ * has letterhead, signature line, regulatory boxes, etc.) and asks GPT-Vision to identify
+ * the FREE WRITE area, returning margins in millimeters relative to the assumed paper size.
+ *
+ * Assumes the paper is half-A4 landscape (210 x 148.5 mm) by default — the most common
+ * format for Brazilian medical prescription pads.
+ */
+export async function analyzePreprintedMargins(
+    pngDataUrl: string,
+    context: { userId?: number; clinicId?: number; paperWidthMm?: number; paperHeightMm?: number }
+): Promise<PreprintedMarginsResult> {
+    const paperW = context.paperWidthMm ?? DEFAULT_PAPER_W;
+    const paperH = context.paperHeightMm ?? DEFAULT_PAPER_H;
+    const orientation: "landscape" | "portrait" = paperW >= paperH ? "landscape" : "portrait";
+
+    if (!openai) {
+        logger.warn("[HeaderImageAnalyzer] OpenAI not configured, using fallback preprinted margins");
+        return { ...defaultPreprintedMargins(), paperWidthMm: paperW, paperHeightMm: paperH, orientation };
+    }
+
+    const taskName = "clinic-preprinted-margin-analysis";
+    const model = ModelRouter.getModel(taskName, "simple");
+
+    const systemPrompt = `Você analisa fotos/scans de receituários médicos brasileiros JÁ IMPRESSOS em papel físico (com timbrado do consultório, linha de assinatura, possivelmente caixas regulatórias da RDC 20/2011, etc).
+
+O médico vai imprimir o conteúdo digital (paciente, data, medicamentos) NESTE papel físico. Sua tarefa é identificar a ÁREA LIVRE no centro do papel — onde NÃO há nenhum elemento pré-impresso — e retornar as margens em MILÍMETROS.
+
+Premissa: o papel é ${paperW} x ${paperH} mm (${orientation === "landscape" ? "paisagem" : "retrato"}). O eixo X (largura) vai de 0 a ${paperW}mm da esquerda pra direita; o eixo Y (altura) vai de 0 a ${paperH}mm de cima pra baixo.
+
+Identifique:
+- topMm: distância em mm do TOPO do papel até onde a área livre começa (depois do cabeçalho/timbrado).
+- bottomMm: distância em mm da BORDA INFERIOR até onde a área livre termina (antes da linha de assinatura/caixas/rodapé).
+- leftMm: margem esquerda livre (geralmente 8-15mm).
+- rightMm: margem direita livre (geralmente 8-15mm).
+
+Adicione 2-3mm de margem de segurança em cada borda entre o último elemento pré-impresso e a área livre.
+
+Responda APENAS com JSON:
+{
+  "topMm": 30,
+  "bottomMm": 18,
+  "leftMm": 12,
+  "rightMm": 12,
+  "confidence": "high|medium|low",
+  "excludedElements": ["cabeçalho com logo no topo", "linha de assinatura embaixo", "caixa de COMPRADOR no canto inferior esquerdo"]
+}
+
+Regras:
+- topMm + bottomMm devem deixar pelo menos 50% da altura útil (a área central tem que caber medicamentos).
+- leftMm + rightMm devem deixar pelo menos 70% da largura útil.
+- Confidence "high" só se tiver certeza absoluta de que não há elementos dentro da área livre.`;
+
+    try {
+        const response = await openai.chat.completions.create({
+            model,
+            response_format: { type: "json_object" },
+            messages: [
+                { role: "system", content: systemPrompt },
+                {
+                    role: "user",
+                    content: [
+                        {
+                            type: "text",
+                            text: `Analise este receituário pré-impresso (${paperW}x${paperH}mm ${orientation}) e identifique as margens livres em mm.`,
+                        },
+                        { type: "image_url", image_url: { url: pngDataUrl, detail: "low" } },
+                    ],
+                },
+            ],
+            temperature: 0.1,
+            max_tokens: 250,
+        });
+
+        if (response.usage) {
+            await ModelRouter.trackUsage(taskName, model, response.usage, context.userId, context.clinicId);
+        }
+
+        const raw = response.choices[0]?.message?.content;
+        if (!raw) throw new Error("Empty response");
+        const parsed = JSON.parse(raw);
+
+        const topMm = clampMm(parsed.topMm, 0, paperH * 0.6, 35);
+        const bottomMm = clampMm(parsed.bottomMm, 0, paperH * 0.5, 18);
+        const leftMm = clampMm(parsed.leftMm, 0, paperW * 0.3, 14);
+        const rightMm = clampMm(parsed.rightMm, 0, paperW * 0.3, 14);
+
+        // Sanity check: must leave enough area for content
+        const usefulHeight = paperH - topMm - bottomMm;
+        const usefulWidth = paperW - leftMm - rightMm;
+        if (usefulHeight < paperH * 0.4 || usefulWidth < paperW * 0.6) {
+            logger.warn("[HeaderImageAnalyzer] Preprinted margins leave too little useful area, using defaults", { topMm, bottomMm, leftMm, rightMm });
+            return { ...defaultPreprintedMargins(), paperWidthMm: paperW, paperHeightMm: paperH, orientation };
+        }
+
+        const confidence: PreprintedMarginsResult["confidence"] = ["high", "medium", "low"].includes(parsed.confidence)
+            ? parsed.confidence
+            : "medium";
+
+        return {
+            paperWidthMm: paperW,
+            paperHeightMm: paperH,
+            orientation,
+            topMm,
+            bottomMm,
+            leftMm,
+            rightMm,
+            confidence,
+            fallback: false,
+        };
+    } catch (err) {
+        logger.error("[HeaderImageAnalyzer] Preprinted analysis failed", { error: (err as Error).message });
+        return { ...defaultPreprintedMargins(), paperWidthMm: paperW, paperHeightMm: paperH, orientation };
+    }
+}
+
 export async function validateBboxOverlap(
     annotatedPngDataUrl: string,
     currentBbox: HeaderBoundingBox,

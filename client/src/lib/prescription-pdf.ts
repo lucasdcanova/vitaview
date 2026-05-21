@@ -9,9 +9,11 @@ import {
     fetchAndPreloadClinicHeader,
     formatCrm,
     isLetterheadMode,
+    isPreprintedMode,
     type ClinicHeaderForPdf,
     type DocumentIdentity,
     type PreloadedHeaderAssets,
+    type PreprintedConfig,
 } from "./document-header";
 import { quantityWithExtenso } from "./quantity-extenso";
 import { classifyPrescriptionType } from "@/data/controlled-substances";
@@ -854,6 +856,64 @@ const drawLetterheadControlledFooter = (
     doc.setTextColor(0, 0, 0);
 };
 
+/**
+ * Renders inside a pre-printed physical paper: the paper already has the doctor's
+ * letterhead, signature line, regulatory boxes, etc. The system draws ONLY the
+ * content (patient, date, medications, CID) inside the configured margins. No
+ * header, footer, watermark, signature, or boxes — the physical paper has them.
+ */
+const generatePreprintedPrescription = (
+    doc: jsPDF,
+    data: PrescriptionData,
+    cfg: PreprintedConfig,
+    config: { title: string; subtitle?: string; controlled: boolean }
+) => {
+    const pageWidth = cfg.paperWidthMm;
+    const pageHeight = cfg.paperHeightMm;
+    const layout: BodyLayout = {
+        xOffset: 0,
+        pageWidth,
+        margin: cfg.leftMm,
+        leftX: cfg.leftMm,
+        rightX: pageWidth - cfg.rightMm,
+        centerX: pageWidth / 2,
+        contentWidth: pageWidth - cfg.leftMm - cfg.rightMm,
+    };
+
+    let yPos = cfg.topMm;
+
+    // Minimal title (single line, no divider) — keeps a clean reference but doesn't waste space
+    doc.setTextColor(40, 40, 40);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.text(config.title, layout.centerX, yPos, { align: "center" });
+    yPos += 4;
+    if (config.subtitle) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7);
+        doc.setTextColor(110, 110, 110);
+        doc.text(config.subtitle, layout.centerX, yPos, { align: "center" });
+        yPos += 3.5;
+    }
+    yPos += 2;
+    doc.setTextColor(0, 0, 0);
+
+    const contentData: PrescriptionData = { ...data, isControlledRender: config.controlled };
+    yPos = drawDoctorBlockCompact(doc, layout, contentData, yPos);
+    yPos += 1.5;
+    yPos = drawPatientBlockCompact(doc, layout, contentData, yPos);
+    yPos = drawMedicationsBlock(doc, layout, contentData, yPos);
+
+    if (config.controlled && contentData.cid) {
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(40, 40, 40);
+        doc.text(`CID-10: ${contentData.cid}`, layout.leftX, yPos + 2);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(0, 0, 0);
+    }
+};
+
 const generateLetterheadPrescription = (
     doc: jsPDF,
     data: PrescriptionData,
@@ -990,6 +1050,56 @@ export const generatePrescriptionPDF = async (
 
     if (typesWithMeds.length === 0) {
         console.warn("Nenhum medicamento para gerar receita");
+        return;
+    }
+
+    // Pre-printed mode: doctor prints into a physical paper that already has the
+    // letterhead, signature line, regulatory boxes. We generate a blank PDF and
+    // only place the content within the configured margins.
+    if (isPreprintedMode(header) && header?.preprinted) {
+        const cfg = header.preprinted;
+        const doc = new jsPDF({
+            unit: "mm",
+            format: [cfg.paperWidthMm, cfg.paperHeightMm],
+            orientation: cfg.orientation,
+        });
+        let isFirstPage = true;
+
+        typesWithMeds.forEach((type) => {
+            const groupData = enrich({ ...data, medications: groups[type] });
+            const config = (() => {
+                switch (type) {
+                    case "padrao": return { title: "RECEITUÁRIO", subtitle: undefined, controlled: false };
+                    case "A": return { title: "RECEITUÁRIO", subtitle: "Cópia paciente — Notificação A (opioides)", controlled: false };
+                    case "B1": return { title: "RECEITUÁRIO", subtitle: "Cópia paciente — Notificação B1 (psicotrópicos)", controlled: false };
+                    case "B2": return { title: "RECEITUÁRIO", subtitle: "Cópia paciente — Notificação B2 (anorexígenos)", controlled: false };
+                    case "especial": return { title: "RECEITA DE CONTROLE ESPECIAL", subtitle: "Antimicrobianos", controlled: true };
+                    case "C": return { title: "RECEITA DE CONTROLE ESPECIAL", subtitle: "Retinoides / imunossupressores", controlled: true };
+                    case "C1": return { title: "RECEITA DE CONTROLE ESPECIAL", subtitle: "Antidepressivos / antipsicóticos", controlled: true };
+                }
+                return { title: "RECEITUÁRIO", subtitle: undefined, controlled: false };
+            })();
+
+            // Controlled prescriptions normally need 2 vias; in preprinted mode that means 2 sheets.
+            const sheets = config.controlled ? 2 : 1;
+            for (let i = 0; i < sheets; i++) {
+                if (!isFirstPage) doc.addPage();
+                isFirstPage = false;
+                const sheetSubtitle = config.controlled
+                    ? `${config.subtitle ?? ""}${config.subtitle ? " · " : ""}${i === 0 ? "1ª via — farmácia" : "2ª via — paciente"}`
+                    : config.subtitle;
+                generatePreprintedPrescription(doc, groupData, cfg, {
+                    title: config.title,
+                    subtitle: sheetSubtitle || undefined,
+                    controlled: config.controlled,
+                });
+            }
+        });
+
+        const pdfBlob = doc.output("blob");
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        if (targetWindow) targetWindow.location.href = pdfUrl;
+        else window.open(pdfUrl, "_blank");
         return;
     }
 

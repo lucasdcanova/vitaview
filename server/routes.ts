@@ -35,7 +35,7 @@ import {
 import { ensurePremium } from "./middleware/ensure-premium";
 import { resolveAnamnesisTemplate } from "./services/anamnesis-template-resolver";
 import { generateHeaderVariations } from "./services/header-generator";
-import { analyzeHeaderRegion, validateBboxOverlap } from "./services/header-image-analyzer";
+import { analyzeHeaderRegion, validateBboxOverlap, analyzePreprintedMargins } from "./services/header-image-analyzer";
 import { biometricTwoFactorAuth } from "./auth/biometric-2fa";
 import { advancedSecurity } from "./middleware/advanced-security";
 import { ensureAuthenticated } from "./middleware/auth.middleware";
@@ -5568,12 +5568,22 @@ export async function registerRoutes(app: Express): Promise<void> {
     return trimmed.slice(0, 240);
   };
 
+  type PreprintedConfigShape = {
+    paperWidthMm: number;
+    paperHeightMm: number;
+    orientation: 'landscape' | 'portrait';
+    topMm: number;
+    bottomMm: number;
+    leftMm: number;
+    rightMm: number;
+  };
+
   type ClinicHeaderResponse = {
     clinicId: number;
     role: string;
     isAdmin: boolean;
     name: string;
-    headerMode: 'minimal' | 'image' | 'composed' | 'letterhead';
+    headerMode: 'minimal' | 'image' | 'composed' | 'letterhead' | 'preprinted';
     headerImageUrl: string | null;
     headerLogoUrl: string | null;
     headerClinicName: string | null;
@@ -5583,6 +5593,42 @@ export async function registerRoutes(app: Express): Promise<void> {
     headerWebsite: string | null;
     headerCnpj: string | null;
     headerBodyBbox: { top: number; bottom: number; left: number; right: number } | null;
+    preprintedConfig: PreprintedConfigShape | null;
+  };
+
+  const sanitizePreprintedConfig = (raw: any): PreprintedConfigShape | null => {
+    if (!raw || typeof raw !== 'object') return null;
+    const paperWidthMm = parseFloat(raw.paperWidthMm);
+    const paperHeightMm = parseFloat(raw.paperHeightMm);
+    if (!Number.isFinite(paperWidthMm) || !Number.isFinite(paperHeightMm)) return null;
+    if (paperWidthMm < 50 || paperWidthMm > 500 || paperHeightMm < 50 || paperHeightMm > 500) return null;
+
+    const orientation: 'landscape' | 'portrait' = raw.orientation === 'portrait' ? 'portrait' : 'landscape';
+
+    const clampMargin = (v: any, maxFraction: number, fallback: number): number => {
+      const n = parseFloat(v);
+      if (!Number.isFinite(n) || n < 0) return fallback;
+      const max = (orientation === 'landscape' ? paperHeightMm : paperHeightMm) * maxFraction;
+      return Math.min(n, max);
+    };
+    const topMm = clampMargin(raw.topMm, 0.65, 30);
+    const bottomMm = clampMargin(raw.bottomMm, 0.5, 18);
+    const leftMaxFraction = 0.4;
+    const leftMm = (() => {
+      const n = parseFloat(raw.leftMm);
+      if (!Number.isFinite(n) || n < 0) return 12;
+      return Math.min(n, paperWidthMm * leftMaxFraction);
+    })();
+    const rightMm = (() => {
+      const n = parseFloat(raw.rightMm);
+      if (!Number.isFinite(n) || n < 0) return 12;
+      return Math.min(n, paperWidthMm * leftMaxFraction);
+    })();
+
+    if (paperHeightMm - topMm - bottomMm < paperHeightMm * 0.25) return null;
+    if (paperWidthMm - leftMm - rightMm < paperWidthMm * 0.4) return null;
+
+    return { paperWidthMm, paperHeightMm, orientation, topMm, bottomMm, leftMm, rightMm };
   };
 
   const buildClinicHeaderResponse = (
@@ -5611,6 +5657,15 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
     }
 
+    let preprintedConfig: PreprintedConfigShape | null = null;
+    if (clinic.preprintedConfig && typeof clinic.preprintedConfig === 'string') {
+      try {
+        preprintedConfig = sanitizePreprintedConfig(JSON.parse(clinic.preprintedConfig));
+      } catch {
+        /* ignore */
+      }
+    }
+
     return {
       clinicId: clinic.id,
       role,
@@ -5626,6 +5681,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       headerWebsite: clinic.headerWebsite ?? null,
       headerCnpj: clinic.headerCnpj ?? null,
       headerBodyBbox: bodyBbox,
+      preprintedConfig,
     };
   };
 
@@ -5715,7 +5771,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       const update: Record<string, any> = {};
       if (typeof req.body?.headerMode === 'string') {
         const mode = req.body.headerMode;
-        if (!['minimal', 'image', 'composed', 'letterhead'].includes(mode)) {
+        if (!['minimal', 'image', 'composed', 'letterhead', 'preprinted'].includes(mode)) {
           return res.status(400).json({ message: 'Modo de cabeçalho inválido' });
         }
         update.headerMode = mode;
@@ -5723,6 +5779,17 @@ export async function registerRoutes(app: Express): Promise<void> {
       for (const field of HEADER_TEXT_FIELDS) {
         if (field in (req.body || {})) {
           update[field] = sanitizeHeaderTextValue(req.body[field]);
+        }
+      }
+      if ('preprintedConfig' in (req.body || {})) {
+        if (req.body.preprintedConfig === null) {
+          update.preprintedConfig = null;
+        } else {
+          const sanitized = sanitizePreprintedConfig(req.body.preprintedConfig);
+          if (!sanitized) {
+            return res.status(400).json({ message: 'Configuração de papel pré-impresso inválida' });
+          }
+          update.preprintedConfig = JSON.stringify(sanitized);
         }
       }
 
@@ -5823,6 +5890,36 @@ export async function registerRoutes(app: Express): Promise<void> {
     } catch (error) {
       logger.error('[Clinic Header] Bbox validation failed', { error });
       res.status(500).json({ message: 'Falha ao validar bbox' });
+    }
+  });
+
+  // POST — analyze a photo of the doctor's pre-printed prescription paper, returning margins in mm
+  app.post('/api/clinics/:id/header/analyze-preprinted', ensureAuthenticated, async (req, res) => {
+    try {
+      const clinicId = parseInt(req.params.id);
+      if (isNaN(clinicId)) return res.status(400).json({ message: 'ID inválido' });
+
+      const guard = await requireClinicAdmin(clinicId, req.user!.id);
+      if (!guard.ok) return res.status(guard.status).json({ message: guard.message });
+
+      const { imageDataUrl, paperWidthMm, paperHeightMm } = req.body || {};
+      if (typeof imageDataUrl !== 'string' || !imageDataUrl.startsWith('data:image/')) {
+        return res.status(400).json({ message: 'Imagem inválida' });
+      }
+      if (imageDataUrl.length > 6_500_000) {
+        return res.status(413).json({ message: 'Imagem muito grande para análise' });
+      }
+
+      const result = await analyzePreprintedMargins(imageDataUrl, {
+        userId: req.user!.id,
+        clinicId,
+        paperWidthMm: typeof paperWidthMm === 'number' ? paperWidthMm : undefined,
+        paperHeightMm: typeof paperHeightMm === 'number' ? paperHeightMm : undefined,
+      });
+      res.json(result);
+    } catch (error) {
+      logger.error('[Clinic Header] Preprinted analysis failed', { error });
+      res.status(500).json({ message: 'Falha ao analisar receituário' });
     }
   });
 
