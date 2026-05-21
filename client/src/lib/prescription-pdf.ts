@@ -617,29 +617,39 @@ const generateControlledPrescription = (
 
 // ==========================================
 /**
- * Generates a single prescription page inside the user's letterhead PDF.
+ * Generates a single prescription via inside the user's letterhead PDF.
  * Used when the clinic uploaded a full-page letterhead — the PDF becomes the
- * entire template and content is rendered inside the AI-identified body bbox.
+ * frame and content is rendered inside the AI-identified body bbox.
+ * Renders one via at a given xOffset/pageWidth/pageHeight slot.
  */
 const generateLetterheadPrescription = (
     doc: jsPDF,
     data: PrescriptionData,
-    config: { title: string; subtitle?: string; controlled: boolean }
+    config: {
+        title: string;
+        subtitle?: string;
+        controlled: boolean;
+        xOffset?: number;
+        pageWidth?: number;
+        pageHeight?: number;
+        viaLabel?: string;
+    }
 ) => {
-    const pageWidth = 210;
-    const pageHeight = 297;
+    const xOffset = config.xOffset ?? 0;
+    const pageWidth = config.pageWidth ?? 210;
+    const pageHeight = config.pageHeight ?? 297;
     const area = drawLetterheadBackground(
         doc,
         data.clinicHeader ?? null,
         data.clinicHeaderAssets ?? {},
-        { xOffset: 0, pageWidth, pageHeight }
+        { xOffset, pageWidth, pageHeight }
     );
     if (!area) return; // safety, should not happen since we check upstream
 
     const layout: BodyLayout = {
-        xOffset: 0,
+        xOffset,
         pageWidth,
-        margin: area.contentX,
+        margin: area.contentX - xOffset,
         leftX: area.contentX,
         rightX: area.contentX + area.contentWidth,
         centerX: area.contentX + area.contentWidth / 2,
@@ -680,8 +690,78 @@ const generateLetterheadPrescription = (
         yPos += 6;
     }
 
-    // Signature anchored near the bottom of the body area
     const contentBottomY = area.contentY + area.contentHeight;
+
+    if (config.controlled) {
+        // Controlled prescription footer: signature + buyer/pharmacy boxes + validity
+        const validityY = contentBottomY - 3;
+        const boxesHeight = 32;
+        const boxesY = validityY - 6 - boxesHeight;
+        const signatureY = boxesY - 18;
+
+        // Signature
+        doc.setLineWidth(0.3);
+        doc.setDrawColor(40, 40, 40);
+        doc.line(layout.centerX - 40, signatureY, layout.centerX + 40, signatureY);
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(0, 0, 0);
+        doc.text(data.doctorName, layout.centerX, signatureY + 4.5, { align: "center" });
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(80, 80, 80);
+        doc.text(formatCrm(data.doctorCrm, data.doctorCrmState), layout.centerX, signatureY + 9, { align: "center" });
+        doc.setFontSize(6.5);
+        doc.text("Assinatura e carimbo", layout.centerX, signatureY + 12.5, { align: "center" });
+        doc.setTextColor(0, 0, 0);
+
+        // Buyer + Pharmacy boxes — fit within content width
+        const gap = 4;
+        const boxWidth = (layout.contentWidth - gap) / 2;
+
+        doc.setDrawColor(180, 180, 180);
+        doc.setLineWidth(0.25);
+        doc.rect(layout.leftX, boxesY, boxWidth, boxesHeight, "S");
+        doc.setFontSize(6.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(0, 0, 0);
+        doc.text("IDENTIFICAÇÃO DO COMPRADOR", layout.leftX + 2.5, boxesY + 4);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(120, 120, 120);
+        doc.text("Nome: __________________________", layout.leftX + 2.5, boxesY + 10);
+        doc.text("RG: ____________  Órgão: _________", layout.leftX + 2.5, boxesY + 16);
+        doc.text("Endereço: _______________________", layout.leftX + 2.5, boxesY + 22);
+        doc.text("Telefone: _______________________", layout.leftX + 2.5, boxesY + 28);
+
+        const box2X = layout.leftX + boxWidth + gap;
+        doc.setTextColor(0, 0, 0);
+        doc.rect(box2X, boxesY, boxWidth, boxesHeight, "S");
+        doc.setFont("helvetica", "bold");
+        doc.text("IDENTIFICAÇÃO DA FARMÁCIA / DROGARIA", box2X + 2.5, boxesY + 4);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(120, 120, 120);
+        doc.text("Razão social: ___________________", box2X + 2.5, boxesY + 9);
+        doc.text("CNPJ: __________________________", box2X + 2.5, boxesY + 14);
+        doc.text("Endereço: ______________________", box2X + 2.5, boxesY + 19);
+        doc.text("Farmacêutico: __________________", box2X + 2.5, boxesY + 24);
+        doc.text("CRF: ____________  Data: __/__/__", box2X + 2.5, boxesY + 29);
+
+        // Validity + prescription number
+        doc.setFontSize(6.5);
+        doc.setTextColor(110, 110, 110);
+        doc.text(
+            data.validityText || "Válido por 30 dias a partir da data de emissão.",
+            layout.leftX,
+            validityY
+        );
+        if (data.prescriptionNumber) {
+            doc.text(`Nº ${data.prescriptionNumber}`, layout.rightX, validityY, { align: "right" });
+        }
+        doc.setTextColor(0, 0, 0);
+        return;
+    }
+
+    // Non-controlled: signature anchored near the bottom of the body area
     const signatureY = Math.min(Math.max(yPos + 10, contentBottomY - 28), contentBottomY - 12);
 
     doc.setLineWidth(0.3);
@@ -697,12 +777,6 @@ const generateLetterheadPrescription = (
     doc.text(formatCrm(data.doctorCrm, data.doctorCrmState), layout.centerX, signatureY + 9.5, { align: "center" });
     doc.setFontSize(6.5);
     doc.text("Assinatura e carimbo", layout.centerX, signatureY + 13, { align: "center" });
-
-    if (config.controlled && data.prescriptionNumber) {
-        doc.setFontSize(6.5);
-        doc.setTextColor(110, 110, 110);
-        doc.text(`Nº ${data.prescriptionNumber}`, layout.rightX, contentBottomY - 2, { align: "right" });
-    }
     doc.setTextColor(0, 0, 0);
 };
 
@@ -751,13 +825,19 @@ export const generatePrescriptionPDF = async (
         return;
     }
 
-    // When a full-page letterhead is active, switch to portrait single-via mode:
-    // the doctor's PDF design is the entire frame and the content goes inside the body bbox.
+    // When a full-page letterhead is active, render in landscape A4 with 2 vias side-by-side.
+    // Each via is a 148.5x210 slot — the letterhead PDF is drawn scaled into each slot,
+    // and content is placed inside the AI-identified body bbox of that slot.
     if (isLetterheadMode(header)) {
-        const doc = new jsPDF({ format: "a4", orientation: "portrait" });
+        const doc = new jsPDF({ format: "a4", orientation: "landscape" });
         let isFirstPage = true;
+        const VIA_WIDTH = 148.5;
+        const VIA_HEIGHT = 210;
 
         typesWithMeds.forEach((type) => {
+            if (!isFirstPage) doc.addPage();
+            isFirstPage = false;
+
             const groupData = enrich({ ...data, medications: groups[type] });
             const config = (() => {
                 switch (type) {
@@ -772,20 +852,25 @@ export const generatePrescriptionPDF = async (
                 return { title: "RECEITUÁRIO", subtitle: undefined, controlled: false };
             })();
 
-            // For controlled prescriptions we still emit 2 vias — but each on its own page
-            const copies = config.controlled ? 2 : 1;
-            for (let i = 0; i < copies; i++) {
-                if (!isFirstPage) doc.addPage();
-                isFirstPage = false;
-                const copySubtitle = config.controlled
-                    ? `${config.subtitle ?? ""}${config.subtitle ? " · " : ""}${i === 0 ? "1ª via – retenção da farmácia" : "2ª via – paciente"}`
-                    : config.subtitle;
+            // Thin cut line between vias
+            doc.setLineWidth(0.1);
+            doc.setDrawColor(180, 180, 180);
+            doc.line(VIA_WIDTH, 8, VIA_WIDTH, 202);
+
+            [0, VIA_WIDTH].forEach((xOffset, idx) => {
+                const viaLabel = idx === 0 ? "1ª via" : "2ª via";
+                const subtitle = config.subtitle
+                    ? `${config.subtitle} · ${viaLabel}`
+                    : viaLabel;
                 generateLetterheadPrescription(doc, groupData, {
                     title: config.title,
-                    subtitle: copySubtitle,
+                    subtitle,
                     controlled: config.controlled,
+                    xOffset,
+                    pageWidth: VIA_WIDTH,
+                    pageHeight: VIA_HEIGHT,
                 });
-            }
+            });
         });
 
         const pdfBlob = doc.output("blob");

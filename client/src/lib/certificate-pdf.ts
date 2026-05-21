@@ -115,12 +115,17 @@ export const generateCertificatePDF = async (data: CertificateData): Promise<Blo
 
     if (letterheadActive) {
         const area = drawLetterheadBackground(doc, header, assets, { xOffset: 0, pageWidth, pageHeight })!;
-        // Use the body bbox as our drawing canvas — the letterhead provides its own header/footer/watermark
-        margin = area.contentX;
-        contentWidth = area.contentWidth;
+        // Use the body bbox as our drawing canvas — the letterhead provides its own header/footer/watermark.
+        // A safety inset prevents accidental overlap with pre-printed labels on the letterhead
+        // (e.g., "PACIENTE:", "DATA:") that the AI bbox might not have fully excluded.
+        const SAFETY_INSET_TOP = 14;
+        const SAFETY_INSET_BOTTOM = 8;
+        const SAFETY_INSET_X = 4;
+        margin = area.contentX + SAFETY_INSET_X;
+        contentWidth = area.contentWidth - SAFETY_INSET_X * 2;
         centerX = area.contentX + area.contentWidth / 2;
-        yPos = area.contentY;
-        contentBottomY = area.contentY + area.contentHeight;
+        yPos = area.contentY + SAFETY_INSET_TOP;
+        contentBottomY = area.contentY + area.contentHeight - SAFETY_INSET_BOTTOM;
     } else {
         margin = 20;
         contentWidth = pageWidth - margin * 2;
@@ -145,22 +150,22 @@ export const generateCertificatePDF = async (data: CertificateData): Promise<Blo
 
     // Subtle underline under the title
     const titleWidth = doc.getTextWidth(title);
-    yPos += 2;
+    yPos += 3;
     doc.setDrawColor(40, 40, 40);
     doc.setLineWidth(0.4);
     doc.line(centerX - titleWidth / 2 - 4, yPos, centerX + titleWidth / 2 + 4, yPos);
-    yPos += 14;
+    yPos += 22;
 
     // Body
     doc.setTextColor(20, 20, 20);
     doc.setFontSize(12);
     doc.setFont("times", "normal");
-    doc.setLineHeightFactor(1.6);
+    doc.setLineHeightFactor(1.7);
 
     const text = generateCertificateText(data);
     const splitText = doc.splitTextToSize(text, contentWidth);
     doc.text(splitText, margin, yPos, { align: "justify", maxWidth: contentWidth });
-    yPos += splitText.length * 7 + 12;
+    yPos += splitText.length * 7.5 + 18;
 
     if (data.cid) {
         doc.setFont("times", "bold");
