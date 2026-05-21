@@ -1353,6 +1353,7 @@ export class MemStorage implements IStorage {
       headerEmail: null,
       headerWebsite: null,
       headerCnpj: null,
+      headerBodyBbox: null,
     };
     this.clinicsMap.set(id, newClinic);
 

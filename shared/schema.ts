@@ -500,7 +500,7 @@ export const clinics = pgTable("clinics", {
   maxSecretaries: integer("max_secretaries").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   // Prescription / document letterhead
-  headerMode: text("header_mode").default("minimal"), // 'minimal' | 'image' | 'composed'
+  headerMode: text("header_mode").default("minimal"), // 'minimal' | 'image' | 'composed' | 'letterhead'
   headerImageFile: text("header_image_file"), // file stored under uploads/clinic-headers
   headerLogoFile: text("header_logo_file"), // file stored under uploads/clinic-headers
   headerClinicName: text("header_clinic_name"),
@@ -509,6 +509,9 @@ export const clinics = pgTable("clinics", {
   headerEmail: text("header_email"),
   headerWebsite: text("header_website"),
   headerCnpj: text("header_cnpj"),
+  // For "letterhead" mode: body region where content should be placed
+  // JSON shape: { top: 0..1, bottom: 0..1, left: 0..1, right: 0..1 }
+  headerBodyBbox: text("header_body_bbox"),
 });
 
 // Clinic invitations schema

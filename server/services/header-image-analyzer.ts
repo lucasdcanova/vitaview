@@ -27,9 +27,9 @@ export interface HeaderAnalysisResult {
     fallback: boolean;
 }
 
-/** Default fallback: top 22% of the page, full width. */
+/** Default fallback for body region: leave room for top header (~18%) and footer (~15%), margins 8%. */
 function defaultBbox(): HeaderBoundingBox {
-    return { top: 0, bottom: 0.22, left: 0, right: 1 };
+    return { top: 0.18, bottom: 0.85, left: 0.08, right: 0.92 };
 }
 
 function clamp(v: number, min = 0, max = 1): number {
@@ -39,11 +39,12 @@ function clamp(v: number, min = 0, max = 1): number {
 
 function sanitizeBbox(raw: any): HeaderBoundingBox | null {
     if (!raw || typeof raw !== "object") return null;
-    const top = clamp(parseFloat(raw.top), 0, 0.95);
-    const bottom = clamp(parseFloat(raw.bottom), 0.05, 1);
-    const left = clamp(parseFloat(raw.left ?? 0), 0, 0.5);
-    const right = clamp(parseFloat(raw.right ?? 1), 0.5, 1);
-    if (bottom - top < 0.04) return null; // too thin
+    const top = clamp(parseFloat(raw.top), 0, 0.6);
+    const bottom = clamp(parseFloat(raw.bottom), 0.4, 1);
+    const left = clamp(parseFloat(raw.left ?? 0), 0, 0.35);
+    const right = clamp(parseFloat(raw.right ?? 1), 0.65, 1);
+    if (bottom - top < 0.3) return null; // body too thin
+    if (right - left < 0.5) return null; // body too narrow
     return { top, bottom, left, right };
 }
 
@@ -59,30 +60,29 @@ export async function analyzeHeaderRegion(
     const taskName = "clinic-header-region-analysis";
     const model = ModelRouter.getModel(taskName, "simple"); // gpt-4o-mini supports vision
 
-    const systemPrompt = `Você analisa imagens de timbrados/cabeçalhos médicos para identificar a região institucional da página.
+    const systemPrompt = `Você analisa imagens de timbrados/cabeçalhos médicos (PDFs enviados pelo médico) para identificar onde o CORPO do documento deve ser inserido.
 
-A imagem é a primeira página de um arquivo enviado pelo médico — pode ser:
-1. Um timbrado completo já no formato de letterhead (banner horizontal estreito)
-2. Uma página A4 completa onde o cabeçalho ocupa só o topo (geralmente 15-25% da altura)
-3. Apenas a logo isolada da clínica
+O médico envia o desenho COMPLETO do receituário/atestado dele — cabeçalho (logo, nome, contato), bordas decorativas, marca d'água, rodapé com endereço, área de assinatura. A plataforma vai usar esse desenho INTEIRO como fundo de página e precisa saber onde encaixar o conteúdo gerado (lista de medicamentos, texto do atestado, etc).
 
-Sua tarefa: identificar a região retangular que contém TODOS os elementos institucionais do cabeçalho (logo, nome da clínica, médico, endereço, contato). Ignore o corpo do documento, miolo da receita, marcadores de assinatura, espaços em branco abaixo do cabeçalho.
+Sua tarefa: identificar a região retangular do CORPO — o espaço em branco/útil onde o conteúdo do documento deve ser escrito, evitando o cabeçalho, o rodapé, as bordas decorativas e qualquer elemento gráfico.
 
 Responda APENAS com JSON válido:
 {
-  "bbox": { "top": 0.0, "bottom": 0.25, "left": 0.0, "right": 1.0 },
+  "bbox": { "top": 0.18, "bottom": 0.82, "left": 0.10, "right": 0.90 },
   "confidence": "high|medium|low"
 }
 
-Os valores top/bottom/left/right são frações de 0 a 1 (top=0 é o topo, bottom=1 é a base, left=0 é a borda esquerda).
+Os valores são frações de 0 a 1 (top=0 é o topo da página, top=1 é a base).
 
 Regras:
-- Se a imagem inteira já É o cabeçalho (formato banner): retorne { top: 0, bottom: 1, left: 0, right: 1 } e confidence "high"
-- Se for uma página A4 completa: retorne o bbox apenas da faixa superior com cabeçalho (tipicamente top: 0, bottom: 0.15-0.30)
+- O CORPO é tipicamente o miolo da página, abaixo do cabeçalho e acima do rodapé/assinatura. Valores típicos: top entre 0.15 e 0.30, bottom entre 0.75 e 0.90.
+- Considere margens laterais das bordas decorativas (left ~0.08-0.15, right ~0.85-0.92).
+- Se a página é apenas um cabeçalho (sem rodapé desenhado), use bottom alto (0.85-0.95) — o conteúdo desce até quase o fim.
+- NUNCA retorne uma área menor que 30% da altura ou 50% da largura.
 - Confidence:
-  - "high" se você identificou claramente o limite do cabeçalho
+  - "high" se você identificou claramente os limites do corpo
   - "medium" se há ambiguidade
-  - "low" se você não tem certeza`;
+  - "low" se a estrutura do timbrado é incomum`;
 
     try {
         const response = await openai.chat.completions.create({
@@ -95,7 +95,7 @@ Regras:
                     content: [
                         {
                             type: "text",
-                            text: "Analise esta imagem e identifique a região do cabeçalho institucional. Retorne o bbox em frações da imagem.",
+                            text: "Analise este timbrado/receituário e identifique a região do CORPO onde o conteúdo do documento deve ser inserido. Retorne o bbox em frações da imagem.",
                         },
                         {
                             type: "image_url",

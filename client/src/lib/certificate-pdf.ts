@@ -3,8 +3,10 @@ import {
     drawDocumentFooter,
     drawDocumentHeader,
     drawDocumentWatermark,
+    drawLetterheadBackground,
     fetchAndPreloadClinicHeader,
     formatCrm,
+    isLetterheadMode,
     type ClinicHeaderForPdf,
     type DocumentIdentity,
     type PreloadedHeaderAssets,
@@ -102,28 +104,39 @@ export const generateCertificatePDF = async (data: CertificateData): Promise<Blo
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const pageWidth = 210;
     const pageHeight = 297;
-    const margin = 20;
-    const contentWidth = pageWidth - margin * 2;
-    const centerX = pageWidth / 2;
     const identity = buildIdentity(data);
+    const letterheadActive = isLetterheadMode(header);
 
-    const headerEndY = drawDocumentHeader(doc, header, assets, {
-        xOffset: 0,
-        pageWidth,
-        marginX: margin,
-        topMargin: 12,
-        identity,
-    });
+    let margin: number;
+    let contentWidth: number;
+    let centerX: number;
+    let yPos: number;
+    let contentBottomY: number;
 
-    drawDocumentWatermark(doc, {
-        xOffset: 0,
-        pageWidth,
-        pageHeight,
-        assets,
-    });
+    if (letterheadActive) {
+        const area = drawLetterheadBackground(doc, header, assets, { xOffset: 0, pageWidth, pageHeight })!;
+        // Use the body bbox as our drawing canvas — the letterhead provides its own header/footer/watermark
+        margin = area.contentX;
+        contentWidth = area.contentWidth;
+        centerX = area.contentX + area.contentWidth / 2;
+        yPos = area.contentY;
+        contentBottomY = area.contentY + area.contentHeight;
+    } else {
+        margin = 20;
+        contentWidth = pageWidth - margin * 2;
+        centerX = pageWidth / 2;
 
-    // Title — generous breathing room between the header and the document title
-    let yPos = headerEndY + 22;
+        const headerEndY = drawDocumentHeader(doc, header, assets, {
+            xOffset: 0,
+            pageWidth,
+            marginX: margin,
+            topMargin: 12,
+            identity,
+        });
+        drawDocumentWatermark(doc, { xOffset: 0, pageWidth, pageHeight, assets });
+        yPos = headerEndY + 22;
+        contentBottomY = pageHeight - 20;
+    }
     doc.setTextColor(20, 20, 20);
     doc.setFontSize(16);
     doc.setFont("times", "bold");
@@ -177,11 +190,15 @@ export const generateCertificatePDF = async (data: CertificateData): Promise<Blo
         yPos += 18;
     }
 
-    // Doctor signature
-    let signatureY = Math.max(yPos + 10, 230);
-    if (signatureY > 260) {
+    // Doctor signature — anchor near the bottom of the body area
+    const signatureAnchor = contentBottomY - 30;
+    let signatureY = Math.max(yPos + 10, signatureAnchor);
+    if (signatureY > contentBottomY - 10) {
         doc.addPage();
-        signatureY = 230;
+        if (letterheadActive) {
+            drawLetterheadBackground(doc, header, assets, { xOffset: 0, pageWidth, pageHeight });
+        }
+        signatureY = signatureAnchor;
     }
 
     doc.setLineWidth(0.4);
@@ -205,13 +222,15 @@ export const generateCertificatePDF = async (data: CertificateData): Promise<Blo
     doc.setFontSize(7);
     doc.text("Assinatura e carimbo", centerX, signatureY + 20, { align: "center" });
 
-    drawDocumentFooter(doc, header, {
-        xOffset: 0,
-        pageWidth,
-        pageHeight,
-        marginX: margin,
-        identity,
-    });
+    if (!letterheadActive) {
+        drawDocumentFooter(doc, header, {
+            xOffset: 0,
+            pageWidth,
+            pageHeight,
+            marginX: margin,
+            identity,
+        });
+    }
 
     return doc.output("blob");
 };
