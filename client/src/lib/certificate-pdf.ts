@@ -7,6 +7,7 @@ import {
     fetchAndPreloadClinicHeader,
     formatCrm,
     isLetterheadMode,
+    isPreprintedMode,
     type ClinicHeaderForPdf,
     type DocumentIdentity,
     type PreloadedHeaderAssets,
@@ -99,6 +100,49 @@ export const generateCertificatePDF = async (data: CertificateData): Promise<Blo
         const result = await fetchAndPreloadClinicHeader();
         header = result.header;
         assets = result.assets;
+    }
+
+    // Preprinted mode: blank PDF sized to the doctor's physical paper; content only inside margins.
+    if (isPreprintedMode(header) && header?.preprinted) {
+        const cfg = header.preprinted;
+        const doc = new jsPDF({ unit: "mm", format: [cfg.paperWidthMm, cfg.paperHeightMm], orientation: cfg.orientation });
+        const contentLeft = cfg.leftMm;
+        const contentRight = cfg.paperWidthMm - cfg.rightMm;
+        const contentTop = cfg.topMm;
+        const contentBottom = cfg.paperHeightMm - cfg.bottomMm;
+        const contentWidth = contentRight - contentLeft;
+        const centerX = (contentLeft + contentRight) / 2;
+
+        let yPos = contentTop;
+        doc.setTextColor(20, 20, 20);
+        doc.setFontSize(13);
+        doc.setFont("times", "bold");
+        const title = data.type === "laudo" ? "LAUDO MÉDICO" : "ATESTADO MÉDICO";
+        doc.text(title, centerX, yPos + 4, { align: "center" });
+        yPos += 10;
+
+        doc.setFontSize(10);
+        doc.setFont("times", "normal");
+        doc.setLineHeightFactor(1.5);
+        const text = generateCertificateText(data);
+        const splitText = doc.splitTextToSize(text, contentWidth);
+        doc.text(splitText, contentLeft, yPos, { align: "justify", maxWidth: contentWidth });
+        yPos += splitText.length * 5 + 6;
+
+        if (data.cid) {
+            doc.setFont("times", "bold");
+            doc.setFontSize(9);
+            doc.text(`CID: ${cleanTextForPDF(data.cid)}`, contentLeft, yPos);
+        }
+
+        // Patient identification line — useful even with preprinted paper for traceability
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(80, 80, 80);
+        const id = `Paciente: ${cleanTextForPDF(data.patientName)}${data.patientDoc ? `  ·  Doc.: ${cleanTextForPDF(data.patientDoc)}` : ""}`;
+        doc.text(id, contentLeft, contentBottom);
+
+        return doc.output("blob");
     }
 
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });

@@ -8,8 +8,20 @@ export interface BodyBbox {
     right: number;
 }
 
+export interface PreprintedConfig {
+    /** Physical paper size in millimeters (final printed sheet). */
+    paperWidthMm: number;
+    paperHeightMm: number;
+    orientation: "landscape" | "portrait";
+    /** Margins reserved for the pre-printed letterhead/footer/sides on the physical paper. */
+    topMm: number;
+    bottomMm: number;
+    leftMm: number;
+    rightMm: number;
+}
+
 export interface ClinicHeaderForPdf {
-    mode: "minimal" | "image" | "composed" | "letterhead";
+    mode: "minimal" | "image" | "composed" | "letterhead" | "preprinted";
     imageUrl?: string | null;
     logoUrl?: string | null;
     clinicName?: string | null;
@@ -20,12 +32,29 @@ export interface ClinicHeaderForPdf {
     cnpj?: string | null;
     /** Body region (0..1) for "letterhead" mode — where document content goes */
     bodyBbox?: BodyBbox | null;
+    /** Margins (mm) for "preprinted" mode — content is positioned inside these margins on a blank PDF. */
+    preprinted?: PreprintedConfig | null;
 }
 
 /** Returns true when the clinic has a full-page letterhead PDF active. */
 export function isLetterheadMode(header: ClinicHeaderForPdf | null | undefined): boolean {
     return !!(header && header.mode === "letterhead" && header.imageUrl && header.bodyBbox);
 }
+
+/** Returns true when the clinic uses pre-printed physical paper (no system header/footer). */
+export function isPreprintedMode(header: ClinicHeaderForPdf | null | undefined): boolean {
+    return !!(header && header.mode === "preprinted" && header.preprinted);
+}
+
+export const DEFAULT_PREPRINTED_CONFIG: PreprintedConfig = {
+    paperWidthMm: 210,
+    paperHeightMm: 148.5,
+    orientation: "landscape",
+    topMm: 35,
+    bottomMm: 18,
+    leftMm: 14,
+    rightMm: 14,
+};
 
 export interface DocumentIdentity {
     /** Doctor full name used when no clinic name is set */
@@ -118,6 +147,7 @@ export async function fetchAndPreloadClinicHeader(): Promise<{
             website: data.headerWebsite,
             cnpj: data.headerCnpj,
             bodyBbox: data.headerBodyBbox ?? null,
+            preprinted: data.preprintedConfig ?? null,
         };
         const assets = await preloadHeaderAssets(header);
         return { header, assets };
