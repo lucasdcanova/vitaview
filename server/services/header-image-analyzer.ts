@@ -39,12 +39,14 @@ function clamp(v: number, min = 0, max = 1): number {
 
 function sanitizeBbox(raw: any): HeaderBoundingBox | null {
     if (!raw || typeof raw !== "object") return null;
-    const top = clamp(parseFloat(raw.top), 0, 0.6);
-    const bottom = clamp(parseFloat(raw.bottom), 0.4, 1);
+    const top = clamp(parseFloat(raw.top), 0, 0.55);
+    const bottom = clamp(parseFloat(raw.bottom), 0.45, 1);
     const left = clamp(parseFloat(raw.left ?? 0), 0, 0.35);
     const right = clamp(parseFloat(raw.right ?? 1), 0.65, 1);
-    if (bottom - top < 0.3) return null; // body too thin
-    if (right - left < 0.5) return null; // body too narrow
+    // The body must comfortably fit title + doctor + patient + ≥2 medications + signature + boxes.
+    // On a portrait page that means at least ~45% of the height.
+    if (bottom - top < 0.45) return null;
+    if (right - left < 0.6) return null;
     return { top, bottom, left, right };
 }
 
@@ -92,8 +94,9 @@ Regras de bbox:
 - Adicione SEMPRE 2-3% de margem de segurança em cada borda (top, bottom, left, right) entre o último elemento pré-impresso e o bbox.
 - left tipicamente 0.08-0.18, right 0.82-0.92.
 - top típico 0.20-0.40 (mais alto se o cabeçalho/labels ocupam mais espaço).
-- bottom típico 0.75-0.92 (mais baixo se há área de assinatura/rodapé).
-- NUNCA retorne uma área menor que 30% da altura ou 50% da largura.
+- bottom típico 0.85-0.95 (use o máximo possível — só reduza se houver rodapé/assinatura pré-impressa).
+- ALTURA MÍNIMA: bottom-top >= 0.50. O conteúdo precisa caber título + cabeçalho do médico + paciente + PELO MENOS 2 medicamentos + rodapé com assinatura e caixas de farmácia (em receitas controladas). Se o timbrado deixa pouco espaço útil, prefira expandir o bottom até onde o letterhead permitir, em vez de retornar um bbox muito curto.
+- LARGURA MÍNIMA: right-left >= 0.6.
 - Confidence:
   - "high" só se você tem certeza absoluta que não há elementos dentro do bbox
   - "medium" se há ambiguidade em alguma borda
@@ -183,9 +186,10 @@ Responda APENAS com JSON:
 }
 
 Regras:
-- Seja CONSERVADOR. Em caso de dúvida, encolha o retângulo.
-- Mantenha o bbox grande o suficiente: bottom-top >= 0.3, right-left >= 0.5.
-- top típico 0.20-0.45, bottom 0.70-0.92.`;
+- O bbox precisa caber título + médico + paciente + ≥2 medicamentos + assinatura + caixas de farmácia.
+- ALTURA MÍNIMA: bottom-top >= 0.50. Em caso de sobreposição, prefira deslocar (mover top pra baixo OU bottom pra cima conforme o lado conflitante) MANTENDO altura >= 0.50.
+- Se for impossível evitar sobreposição com altura >= 0.50, retorne ok=true e o bbox atual (o sistema usará margens de segurança internas).
+- Largura mínima: right-left >= 0.6.`;
 
     try {
         const response = await openai.chat.completions.create({
