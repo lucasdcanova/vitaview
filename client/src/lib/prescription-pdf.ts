@@ -216,6 +216,95 @@ const drawDoctorBlock = (doc: jsPDF, layout: BodyLayout, data: PrescriptionData,
 };
 
 /**
+ * Compact doctor block (2 lines): name+CRM, then specialty/RQE/address (left) + phone (right).
+ */
+const drawDoctorBlockCompact = (doc: jsPDF, layout: BodyLayout, data: PrescriptionData, yPos: number): number => {
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Dr(a). ${data.doctorName}`, layout.leftX, yPos);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(formatCrm(data.doctorCrm, data.doctorCrmState), layout.rightX, yPos, { align: "right" });
+
+    let nextY = yPos + 4;
+
+    const leftBits: string[] = [];
+    if (data.doctorSpecialty) {
+        const sp = formatSpecialty(data.doctorSpecialty, data.doctorRqe);
+        leftBits.push(data.doctorRqe ? `${sp} · RQE ${data.doctorRqe}` : sp);
+    }
+    if (data.doctorAddress) {
+        const addr = data.doctorAddress.length > 40
+            ? data.doctorAddress.slice(0, 37) + "..."
+            : data.doctorAddress;
+        leftBits.push(addr);
+    }
+
+    doc.setFontSize(7.5);
+    doc.setTextColor(95, 95, 95);
+    if (leftBits.length) {
+        doc.text(leftBits.join("  ·  "), layout.leftX, nextY);
+    }
+    if (data.doctorPhone) {
+        doc.text(data.doctorPhone, layout.rightX, nextY, { align: "right" });
+    }
+    doc.setTextColor(0, 0, 0);
+    return nextY + 4;
+};
+
+/**
+ * Compact patient block (2 lines): name+date, then DN/CPF/sex/insurance/address all on one line.
+ */
+const drawPatientBlockCompact = (doc: jsPDF, layout: BodyLayout, data: PrescriptionData, yPos: number): number => {
+    const dateStr = format(data.issueDate, "dd/MM/yyyy", { locale: ptBR });
+
+    doc.setFontSize(9);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "bold");
+    doc.text("Paciente", layout.leftX, yPos);
+    doc.setFont("helvetica", "normal");
+    doc.text(data.patientName, layout.leftX + 18, yPos);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("Data", layout.rightX - 25, yPos);
+    doc.setFont("helvetica", "normal");
+    doc.text(dateStr, layout.rightX, yPos, { align: "right" });
+
+    let nextY = yPos + 4;
+
+    const bits: string[] = [];
+    const bd = formatBirthDate(data.patientBirthDate);
+    if (bd) bits.push(`DN ${bd}`);
+    if (data.patientCpf) bits.push(`CPF ${data.patientCpf}`);
+    if (data.patientGender) bits.push(`Sexo ${data.patientGender}`);
+    if (data.patientAddress) {
+        const addr = data.patientAddress.length > 45
+            ? data.patientAddress.slice(0, 42) + "..."
+            : data.patientAddress;
+        bits.push(addr);
+    }
+    if (data.patientInsurance) bits.push(data.patientInsurance);
+
+    doc.setFontSize(7.5);
+    doc.setTextColor(95, 95, 95);
+    if (bits.length) {
+        const text = bits.join(" · ");
+        const wrapped = doc.splitTextToSize(text, layout.contentWidth);
+        doc.text(wrapped[0], layout.leftX, nextY);
+    }
+    doc.setTextColor(0, 0, 0);
+    nextY += 4;
+
+    nextY += 1.5;
+    doc.setLineWidth(0.2);
+    doc.setDrawColor(220, 220, 220);
+    doc.line(layout.leftX, nextY, layout.rightX, nextY);
+    return nextY + 4;
+};
+
+/**
  * Draws patient identification block (name + date + secondary line).
  */
 const drawPatientBlock = (doc: jsPDF, layout: BodyLayout, data: PrescriptionData, yPos: number): number => {
@@ -640,25 +729,20 @@ const generateLetterheadControlledPrescription = (
     const header = data.clinicHeader;
     const assets = data.clinicHeaderAssets ?? {};
 
-    // Header band: top portion of the letterhead PDF, defined by bbox.top
+    // Header band: show only the branded portion of the letterhead (logo + name + CRM).
+    // The AI bbox.top marks where the BODY begins; pre-printed labels ("PACIENTE:", "DATA:",
+    // dashed lines) sit just above it. Using ~62% of bbox.top as a heuristic gets us the
+    // branded section without dragging in those labels.
     const headerBandHeightMm = header?.bodyBbox
-        ? Math.min(header.bodyBbox.top * VIA_HEIGHT, 60)
-        : 40;
+        ? Math.max(22, Math.min(header.bodyBbox.top * VIA_HEIGHT * 0.62, 55))
+        : 30;
 
     if (assets.image) {
-        // Draw the full letterhead, then mask everything below the header band with white.
-        // This preserves the doctor's branded header without dragging in the bottom artwork.
         doc.addImage(assets.image.dataUrl, "PNG", xOffset, 0, VIA_WIDTH, VIA_HEIGHT);
         doc.setFillColor(255, 255, 255);
         doc.rect(xOffset, headerBandHeightMm, VIA_WIDTH, VIA_HEIGHT - headerBandHeightMm, "F");
-
-        // Thin divider between letterhead band and the document body
-        doc.setDrawColor(40, 40, 40);
-        doc.setLineWidth(0.3);
-        doc.line(layout.leftX, headerBandHeightMm + 2, layout.rightX, headerBandHeightMm + 2);
     }
 
-    // VitaView's standard watermark in the body area (clinic logo if available, else VV mark)
     drawDocumentWatermark(doc, {
         xOffset,
         pageWidth: VIA_WIDTH,
@@ -666,16 +750,16 @@ const generateLetterheadControlledPrescription = (
         assets,
     });
 
-    let yPos = headerBandHeightMm + 8;
+    let yPos = headerBandHeightMm + 3;
     yPos = drawDocumentTitle(doc, layout, config.title, yPos, {
         subtitle: config.subtitle,
         subtitle2: xOffset > 0 ? "2ª via – paciente" : "1ª via – retenção da farmácia",
     });
 
     const controlledData: PrescriptionData = { ...data, isControlledRender: true };
-    yPos = drawDoctorBlock(doc, layout, controlledData, yPos);
-    yPos += 3;
-    yPos = drawPatientBlock(doc, layout, controlledData, yPos);
+    yPos = drawDoctorBlockCompact(doc, layout, controlledData, yPos);
+    yPos += 2;
+    yPos = drawPatientBlockCompact(doc, layout, controlledData, yPos);
     yPos = drawMedicationsBlock(doc, layout, controlledData, yPos);
 
     if (controlledData.cid) {
