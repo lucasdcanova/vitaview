@@ -304,13 +304,13 @@ const drawBasicSignatureFooter = (
     doc.setFontSize(7);
     doc.text("Assinatura e carimbo", sigCenter, signatureY + 13, { align: "center" });
 
-    // City + issue date on the left, baseline aligned with the signature line
-    const dateStr = formatPtBrLongDate(data.issueDate);
-    const localeAndDate = data.doctorCity ? `${data.doctorCity}, ${dateStr}` : dateStr;
+    // City prefix + blank date fields — doctor fills the date manually
+    const cityPrefix = data.doctorCity ? `${data.doctorCity}, ` : "";
+    const blankDate = `${cityPrefix}_____ / _____ / __________`;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(0, 0, 0);
-    doc.text(localeAndDate, layout.leftX, signatureY);
+    doc.text(blankDate, layout.leftX, signatureY);
 
     if (options.viaLabel) {
         doc.setFontSize(7);
