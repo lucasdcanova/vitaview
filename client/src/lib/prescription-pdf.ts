@@ -852,16 +852,14 @@ const drawControlledRegulatorySection = (
     doc.text("Carimbo e assinatura", rightX + 4, startY + 4);
     doc.setTextColor(0, 0, 0);
 
-    // Pill labels above the boxes
+    // Row 2: buyer / pharmacy boxes — draw outlines FIRST, then content, then pill labels last
+    // (pills must sit on top of the box borders, otherwise the top edge clips them)
     const labelY = startY + topH + labelGap;
-    drawPillLabel(doc, leftX + colW / 2, labelY, "Identificação do comprador");
-    drawPillLabel(doc, rightX + colW / 2, labelY, "Identificação do fornecedor");
-
-    // Row 2: buyer / pharmacy boxes — outlined only
     const boxY = labelY + 3.2;
     doc.setDrawColor(BRAND_INK.r, BRAND_INK.g, BRAND_INK.b);
     doc.setLineWidth(0.3);
     doc.rect(leftX, boxY, colW, bottomBoxH, "S");
+    doc.rect(rightX, boxY, colW, bottomBoxH, "S");
 
     let cY = boxY + 7;
     drawInlineFillField(doc, "Nome:", leftX + 3, 12, leftX + colW - 3, cY);
@@ -876,8 +874,7 @@ const drawControlledRegulatorySection = (
     cY += 5.5;
     drawInlineFillField(doc, "Telefone:", leftX + 3, 15, leftX + colW - 3, cY);
 
-    // Fornecedor — outlined box, signature line at bottom
-    doc.rect(rightX, boxY, colW, bottomBoxH, "S");
+    // Fornecedor footer
     const fY = boxY + bottomBoxH - 6;
     doc.setDrawColor(140, 140, 140);
     doc.setLineWidth(0.2);
@@ -888,6 +885,10 @@ const drawControlledRegulatorySection = (
     doc.text("Assinatura do Farmacêutico", rightX + 4, fY + 2.5);
     doc.text("Data ___/___/____", rightX + colW - 27, fY + 2.5);
     doc.setTextColor(0, 0, 0);
+
+    // Pill labels last — sit on top of the box top edges
+    drawPillLabel(doc, leftX + colW / 2, labelY, "Identificação do comprador");
+    drawPillLabel(doc, rightX + colW / 2, labelY, "Identificação do fornecedor");
 };
 
 // ==========================================
