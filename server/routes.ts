@@ -35,6 +35,7 @@ import {
 import { ensurePremium } from "./middleware/ensure-premium";
 import { resolveAnamnesisTemplate } from "./services/anamnesis-template-resolver";
 import { generateHeaderVariations } from "./services/header-generator";
+import { analyzeHeaderRegion } from "./services/header-image-analyzer";
 import { biometricTwoFactorAuth } from "./auth/biometric-2fa";
 import { advancedSecurity } from "./middleware/advanced-security";
 import { ensureAuthenticated } from "./middleware/auth.middleware";
@@ -5748,6 +5749,32 @@ export async function registerRoutes(app: Express): Promise<void> {
     } catch (error) {
       logger.error('[Clinic Header] AI generation failed', { error });
       res.status(500).json({ message: 'Falha ao gerar cabeçalho' });
+    }
+  });
+
+  // POST — analyze a rasterized PDF/page image with GPT-Vision to find the header region
+  app.post('/api/clinics/:id/header/analyze-image', ensureAuthenticated, async (req, res) => {
+    try {
+      const clinicId = parseInt(req.params.id);
+      if (isNaN(clinicId)) return res.status(400).json({ message: 'ID inválido' });
+
+      const guard = await requireClinicAdmin(clinicId, req.user!.id);
+      if (!guard.ok) return res.status(guard.status).json({ message: guard.message });
+
+      const { imageDataUrl } = req.body || {};
+      if (typeof imageDataUrl !== 'string' || !imageDataUrl.startsWith('data:image/')) {
+        return res.status(400).json({ message: 'Imagem inválida' });
+      }
+      // Cap at ~6MB to avoid abuse
+      if (imageDataUrl.length > 6_500_000) {
+        return res.status(413).json({ message: 'Imagem muito grande para análise' });
+      }
+
+      const result = await analyzeHeaderRegion(imageDataUrl, { userId: req.user!.id, clinicId });
+      res.json(result);
+    } catch (error) {
+      logger.error('[Clinic Header] Image analysis failed', { error });
+      res.status(500).json({ message: 'Falha ao analisar imagem' });
     }
   });
 
