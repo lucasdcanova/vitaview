@@ -621,11 +621,10 @@ const drawSignatureFooter = (
     doc.setTextColor(0, 0, 0);
 };
 
-// Brand palette for controlled prescription chrome
-const BRAND_ACCENT_RGB = { r: 175, g: 145, b: 80 };
-const BRAND_ACCENT_LIGHT = { r: 250, g: 246, b: 237 };
+// Brand palette for controlled prescription chrome (black-on-white, ink-saving)
+const BRAND_INK = { r: 33, g: 33, b: 33 };
 
-/** Pill-shaped section header used on controlled prescriptions. */
+/** Compact pill-shaped section header (filled black, white text — small accent area). */
 const drawPillLabel = (
     doc: jsPDF,
     centerX: number,
@@ -633,27 +632,31 @@ const drawPillLabel = (
     label: string,
     options: { fontSize?: number; paddingX?: number; height?: number } = {}
 ) => {
-    const fontSize = options.fontSize ?? 7;
-    const padX = options.paddingX ?? 8;
-    const h = options.height ?? 5.5;
+    const fontSize = options.fontSize ?? 6.5;
+    const padX = options.paddingX ?? 6;
+    const h = options.height ?? 5;
     doc.setFontSize(fontSize);
     doc.setFont("helvetica", "bold");
     const textW = doc.getTextWidth(label);
     const pillW = textW + padX * 2;
     const pillX = centerX - pillW / 2;
 
-    doc.setFillColor(BRAND_ACCENT_RGB.r, BRAND_ACCENT_RGB.g, BRAND_ACCENT_RGB.b);
+    doc.setFillColor(BRAND_INK.r, BRAND_INK.g, BRAND_INK.b);
     if (typeof (doc as any).roundedRect === "function") {
         (doc as any).roundedRect(pillX, y, pillW, h, h / 2, h / 2, "F");
     } else {
         doc.rect(pillX, y, pillW, h, "F");
     }
     doc.setTextColor(255, 255, 255);
-    doc.text(label, centerX, y + h - 1.7, { align: "center" });
+    doc.text(label, centerX, y + h - 1.5, { align: "center" });
     doc.setTextColor(0, 0, 0);
 };
 
-/** Doctor identification box for controlled prescriptions (replaces the institutional header). */
+/**
+ * Doctor identification box for controlled prescriptions.
+ * Layout: logo on the left, name + specialty + contact in the middle column,
+ * CRM and RQE prominently right-aligned (both bold) to give them stamp-like emphasis.
+ */
 const drawEmitenteBox = (
     doc: jsPDF,
     x: number,
@@ -664,11 +667,10 @@ const drawEmitenteBox = (
 ) => {
     const logo = data.clinicHeaderAssets?.logo;
 
-    doc.setDrawColor(BRAND_ACCENT_RGB.r, BRAND_ACCENT_RGB.g, BRAND_ACCENT_RGB.b);
+    doc.setDrawColor(BRAND_INK.r, BRAND_INK.g, BRAND_INK.b);
     doc.setLineWidth(0.4);
     doc.rect(x, y, width, height, "S");
-
-    drawPillLabel(doc, x + width / 2, y - 2.75, "Identificação do emitente");
+    drawPillLabel(doc, x + width / 2, y - 2.5, "Identificação do emitente");
 
     const logoSize = 14;
     const logoX = x + 4;
@@ -679,26 +681,41 @@ const drawEmitenteBox = (
         let h = w / logo.aspect;
         if (h > logoSize) { h = logoSize; w = h * logo.aspect; }
         doc.addImage(logo.dataUrl, "PNG", logoX, logoY + (logoSize - h) / 2, w, h);
-        infoLeftX = logoX + logoSize + 4;
+        infoLeftX = logoX + logoSize + 5;
     }
 
-    let infoY = y + 7;
-    doc.setFontSize(9);
+    const rightEdge = x + width - 4;
+    const crmStr = formatCrm(data.doctorCrm, data.doctorCrmState);
+
+    // Line 1: Name (left, bold) + CRM (right, bold — same prominence)
+    let infoY = y + 8;
+    doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(33, 33, 33);
-    doc.text(`Dr(a). ${data.doctorName}`, infoLeftX, infoY);
-    infoY += 4;
+    doc.setTextColor(BRAND_INK.r, BRAND_INK.g, BRAND_INK.b);
+    const crmW = doc.getTextWidth(crmStr);
+    const nameMaxW = rightEdge - infoLeftX - crmW - 5;
+    const nameWrapped = doc.splitTextToSize(`Dr(a). ${data.doctorName}`, nameMaxW);
+    doc.text(nameWrapped[0], infoLeftX, infoY);
+    doc.text(crmStr, rightEdge, infoY, { align: "right" });
+    infoY += 5;
 
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(95, 95, 95);
-    doc.text(formatCrm(data.doctorCrm, data.doctorCrmState), infoLeftX, infoY);
+    // Line 2: Specialty (left, gray) + RQE (right, bold — second emphasis)
     if (data.doctorSpecialty) {
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(95, 95, 95);
         const sp = formatSpecialty(data.doctorSpecialty, data.doctorRqe);
-        const specialty = data.doctorRqe ? `${sp}  ·  RQE ${data.doctorRqe}` : sp;
-        doc.text(specialty, x + width - 4, infoY, { align: "right" });
+        doc.text(sp, infoLeftX, infoY);
     }
-    infoY += 4;
+    if (data.doctorRqe) {
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(BRAND_INK.r, BRAND_INK.g, BRAND_INK.b);
+        doc.text(`RQE ${data.doctorRqe}`, rightEdge, infoY, { align: "right" });
+    }
+    if (data.doctorSpecialty || data.doctorRqe) infoY += 4.5;
+
+    // Line 3: Phone · Address (tertiary)
     const bits: string[] = [];
     if (data.doctorPhone) bits.push(data.doctorPhone);
     if (data.doctorAddress) {
@@ -707,12 +724,14 @@ const drawEmitenteBox = (
     }
     if (bits.length) {
         doc.setFontSize(7.5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(120, 120, 120);
         doc.text(bits.join("  ·  "), infoLeftX, infoY);
     }
     doc.setTextColor(0, 0, 0);
 };
 
-/** Solid colored panel showing which via this is (1ª retenção, 2ª paciente). */
+/** Outlined panel showing which via this is (1ª retenção, 2ª paciente) — no fill. */
 const drawViaInfoPanel = (
     doc: jsPDF,
     x: number,
@@ -721,22 +740,23 @@ const drawViaInfoPanel = (
     height: number,
     currentVia: 1 | 2
 ) => {
-    doc.setFillColor(BRAND_ACCENT_RGB.r, BRAND_ACCENT_RGB.g, BRAND_ACCENT_RGB.b);
-    doc.rect(x, y, width, height, "F");
+    doc.setDrawColor(BRAND_INK.r, BRAND_INK.g, BRAND_INK.b);
+    doc.setLineWidth(0.4);
+    doc.rect(x, y, width, height, "S");
 
-    doc.setTextColor(255, 255, 255);
+    doc.setTextColor(BRAND_INK.r, BRAND_INK.g, BRAND_INK.b);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
+    doc.setFontSize(11);
     doc.text(`${currentVia}ª Via`, x + width / 2, y + height / 2 - 2.5, { align: "center" });
 
     doc.setFontSize(6.8);
     doc.setFont("helvetica", "normal");
+    doc.setTextColor(80, 80, 80);
     const lines = currentVia === 1
         ? ["Retenção da Farmácia", "ou Drogaria"]
         : ["Orientação ao", "Paciente"];
     doc.text(lines[0], x + width / 2, y + height / 2 + 2.5, { align: "center" });
     doc.text(lines[1], x + width / 2, y + height / 2 + 5.5, { align: "center" });
-
     doc.setTextColor(0, 0, 0);
 };
 
@@ -807,24 +827,25 @@ const drawControlledRegulatorySection = (
 
     const topH = 18;
     const labelGap = 4;
-    const bottomBoxH = 38;
+    const bottomBoxH = 42;
     const totalH = topH + labelGap + bottomBoxH + 4;
-    const startY = options.startY ?? (pageHeight - totalH - 4);
+    // Bottom padding 10mm — leaves printer-safe area; pulls section up so boxes aren't clipped
+    const startY = options.startY ?? (pageHeight - totalH - 10);
 
-    // Row 1: date + signature, tinted backgrounds
-    doc.setFillColor(BRAND_ACCENT_LIGHT.r, BRAND_ACCENT_LIGHT.g, BRAND_ACCENT_LIGHT.b);
-    doc.rect(leftX, startY, colW, topH, "F");
+    // Row 1: date (left) + signature (right) — outlined only, no fill
+    doc.setDrawColor(BRAND_INK.r, BRAND_INK.g, BRAND_INK.b);
+    doc.setLineWidth(0.3);
+    doc.rect(leftX, startY, colW, topH, "S");
     doc.setFontSize(6.5);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(120, 120, 120);
     const cityPrefix = data.doctorCity ? `${data.doctorCity},` : "";
     if (cityPrefix) doc.text(cityPrefix, leftX + 4, startY + 4);
     doc.setFontSize(10);
-    doc.setTextColor(80, 80, 80);
+    doc.setTextColor(60, 60, 60);
     doc.text("____ / ____ / ________", leftX + colW / 2, startY + 13, { align: "center" });
 
-    doc.setFillColor(BRAND_ACCENT_LIGHT.r, BRAND_ACCENT_LIGHT.g, BRAND_ACCENT_LIGHT.b);
-    doc.rect(rightX, startY, colW, topH, "F");
+    doc.rect(rightX, startY, colW, topH, "S");
     doc.setFontSize(6.5);
     doc.setTextColor(120, 120, 120);
     doc.text("Carimbo e assinatura", rightX + 4, startY + 4);
@@ -835,32 +856,29 @@ const drawControlledRegulatorySection = (
     drawPillLabel(doc, leftX + colW / 2, labelY, "Identificação do comprador");
     drawPillLabel(doc, rightX + colW / 2, labelY, "Identificação do fornecedor");
 
-    // Row 2: buyer / pharmacy boxes
-    const boxY = labelY + 3.5;
-    doc.setFillColor(BRAND_ACCENT_LIGHT.r, BRAND_ACCENT_LIGHT.g, BRAND_ACCENT_LIGHT.b);
-    doc.setDrawColor(BRAND_ACCENT_RGB.r, BRAND_ACCENT_RGB.g, BRAND_ACCENT_RGB.b);
+    // Row 2: buyer / pharmacy boxes — outlined only
+    const boxY = labelY + 3.2;
+    doc.setDrawColor(BRAND_INK.r, BRAND_INK.g, BRAND_INK.b);
     doc.setLineWidth(0.3);
-    doc.rect(leftX, boxY, colW, bottomBoxH, "FD");
+    doc.rect(leftX, boxY, colW, bottomBoxH, "S");
 
-    let cY = boxY + 6;
+    let cY = boxY + 7;
     drawInlineFillField(doc, "Nome:", leftX + 3, 12, leftX + colW - 3, cY);
-    cY += 5;
+    cY += 5.5;
     drawInlineFillField(doc, "Ident.:", leftX + 3, 11, leftX + colW * 0.5, cY);
     drawInlineFillField(doc, "Órg. Emissor:", leftX + colW * 0.5 + 2, 22, leftX + colW - 3, cY);
-    cY += 5;
+    cY += 5.5;
     drawInlineFillField(doc, "End.:", leftX + 3, 10, leftX + colW - 3, cY);
-    cY += 5;
+    cY += 5.5;
     drawInlineFillField(doc, "Cidade:", leftX + 3, 13, leftX + colW * 0.7, cY);
     drawInlineFillField(doc, "UF:", leftX + colW * 0.7 + 2, 8, leftX + colW - 3, cY);
-    cY += 5;
+    cY += 5.5;
     drawInlineFillField(doc, "Telefone:", leftX + 3, 15, leftX + colW - 3, cY);
 
-    // Fornecedor — empty box for pharmacist stamp + footer signature line
-    doc.setFillColor(BRAND_ACCENT_LIGHT.r, BRAND_ACCENT_LIGHT.g, BRAND_ACCENT_LIGHT.b);
-    doc.setDrawColor(BRAND_ACCENT_RGB.r, BRAND_ACCENT_RGB.g, BRAND_ACCENT_RGB.b);
-    doc.rect(rightX, boxY, colW, bottomBoxH, "FD");
-    const fY = boxY + bottomBoxH - 5;
-    doc.setDrawColor(120, 120, 120);
+    // Fornecedor — outlined box, signature line at bottom
+    doc.rect(rightX, boxY, colW, bottomBoxH, "S");
+    const fY = boxY + bottomBoxH - 6;
+    doc.setDrawColor(140, 140, 140);
     doc.setLineWidth(0.2);
     doc.line(rightX + 3, fY - 0.5, rightX + colW * 0.6, fY - 0.5);
     doc.setFontSize(6.5);
@@ -939,7 +957,7 @@ const generateControlledPrescription = (
     // Title centered at the top
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11.5);
-    doc.setTextColor(BRAND_ACCENT_RGB.r, BRAND_ACCENT_RGB.g, BRAND_ACCENT_RGB.b);
+    doc.setTextColor(BRAND_INK.r, BRAND_INK.g, BRAND_INK.b);
     doc.text(config.title, layout.centerX, 9, { align: "center" });
     doc.setTextColor(0, 0, 0);
 
