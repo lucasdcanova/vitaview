@@ -60,6 +60,8 @@ interface PrescriptionData {
         isGeneric?: boolean;
         /** Optional explicit route, e.g. "oral", "tópico", "injetável" */
         route?: string;
+        /** True when the medication is for continuous use (chronic, "ad eternum") */
+        continuous?: boolean;
     }[];
     observations?: string;
     /** ICD-10 code (CID-10), optional but commonly requested on controlled prescriptions */
@@ -104,6 +106,21 @@ const formatBirthDate = (raw?: string): string | undefined => {
         if (year && month && day) return `${day}/${month}/${year}`;
     }
     return raw;
+};
+
+// Expand short Brazilian medication abbreviations to full names for legibility.
+// "1 cp" -> "1 comprimido", "2 cps" -> "2 cápsulas", "3 caps" -> "3 cápsulas", "5 gts" -> "5 gotas"
+const expandFormatName = (s: string): string => {
+    if (!s) return s;
+    const pluralize = (n: string, singular: string, plural: string) => {
+        const num = parseFloat(n.replace(",", "."));
+        return Number.isFinite(num) && num <= 1 ? singular : plural;
+    };
+    return s
+        .replace(/(\d+(?:[.,]\d+)?(?:\/\d+)?)\s*cps\b/gi, (_, n) => `${n} ${pluralize(n, "cápsula", "cápsulas")}`)
+        .replace(/(\d+(?:[.,]\d+)?(?:\/\d+)?)\s*caps\b/gi, (_, n) => `${n} ${pluralize(n, "cápsula", "cápsulas")}`)
+        .replace(/(\d+(?:[.,]\d+)?(?:\/\d+)?)\s*cp\b/gi, (_, n) => `${n} ${pluralize(n, "comprimido", "comprimidos")}`)
+        .replace(/(\d+(?:[.,]\d+)?(?:\/\d+)?)\s*gts?\b/gi, (_, n) => `${n} ${pluralize(n, "gota", "gotas")}`);
 };
 
 const resolveRouteOfAdministration = (medFormat?: string): string | null => {
@@ -370,16 +387,6 @@ const drawMedicationsBlock = (
 ): number => {
     let yPos = startY;
 
-    if (data.isContinuousUse) {
-        doc.setFontSize(8);
-        doc.setFont("helvetica", "normal");
-        doc.setDrawColor(40, 40, 40);
-        doc.rect(layout.leftX, yPos - 3, 3, 3, "S");
-        doc.text("X", layout.leftX + 0.7, yPos - 0.5);
-        doc.text("Uso contínuo", layout.leftX + 5, yPos);
-        yPos += 7;
-    }
-
     data.medications.forEach((med, index) => {
         const baseLeft = layout.leftX;
         const textLeft = baseLeft + 7;
@@ -424,24 +431,33 @@ const drawMedicationsBlock = (
         doc.setFontSize(9);
         doc.setTextColor(45, 45, 45);
 
+        const route = med.route || resolveRouteOfAdministration(med.format)
+            || (data.isControlledRender ? "Oral" : null);
+
         const posBits: string[] = [];
-        if (med.dosage) posBits.push(med.dosage);
+        if (med.dosage) posBits.push(expandFormatName(med.dosage));
+        if (route) posBits.push(`via ${route.toLowerCase()}`);
         if (med.frequency) posBits.push(med.frequency);
-        if (data.isContinuousUse) posBits.push("Uso contínuo");
         const posologia = posBits.join("  ·  ");
+
+        const isContinuous = med.continuous === true || (med.continuous === undefined && !!data.isContinuousUse);
 
         if (posologia) {
             const wrapped = doc.splitTextToSize(posologia, layout.contentWidth - 30);
             doc.text(wrapped, textLeft, yPos);
-            yPos += wrapped.length * 3.7;
-        }
 
-        const route = med.route || resolveRouteOfAdministration(med.format)
-            || (data.isControlledRender ? "Oral" : null);
-        if (route) {
+            if (isContinuous) {
+                doc.setFontSize(8);
+                doc.setTextColor(110, 110, 110);
+                doc.text("Uso contínuo", layout.rightX, yPos, { align: "right" });
+            }
+
+            yPos += wrapped.length * 3.7;
+        } else if (isContinuous) {
             doc.setFontSize(8);
             doc.setTextColor(110, 110, 110);
-            doc.text(`Via ${route.toLowerCase()}`, layout.rightX, yPos - 1, { align: "right" });
+            doc.text("Uso contínuo", layout.rightX, yPos, { align: "right" });
+            yPos += 3.7;
         }
 
         if (med.notes) {
