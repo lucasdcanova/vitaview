@@ -74,23 +74,50 @@ function downscaleForUpload(canvas: HTMLCanvasElement, maxWidth = 2000): string 
     return out.toDataURL("image/png");
 }
 
+async function buildPreviewDataUrl(dataUrl: string, maxWidth = 1200): Promise<string> {
+    const img = await loadImage(dataUrl);
+    const targetW = Math.min(maxWidth, img.naturalWidth);
+    const ratio = targetW / img.naturalWidth;
+    const canvas = document.createElement("canvas");
+    canvas.width = targetW;
+    canvas.height = Math.round(img.naturalHeight * ratio);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas 2D context indisponível");
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/jpeg", 0.85);
+}
+
+async function renderBboxOverlay(dataUrl: string, bbox: HeaderBoundingBox, maxWidth = 1200): Promise<string> {
+    const img = await loadImage(dataUrl);
+    const targetW = Math.min(maxWidth, img.naturalWidth);
+    const ratio = targetW / img.naturalWidth;
+    const canvas = document.createElement("canvas");
+    canvas.width = targetW;
+    canvas.height = Math.round(img.naturalHeight * ratio);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas 2D context indisponível");
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    // Draw bbox as a semi-transparent red rectangle with thick border
+    const x = bbox.left * canvas.width;
+    const y = bbox.top * canvas.height;
+    const w = (bbox.right - bbox.left) * canvas.width;
+    const h = (bbox.bottom - bbox.top) * canvas.height;
+    ctx.fillStyle = "rgba(255, 0, 0, 0.18)";
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = "rgba(220, 0, 0, 0.95)";
+    ctx.lineWidth = Math.max(4, Math.round(canvas.width * 0.005));
+    ctx.strokeRect(x, y, w, h);
+
+    return canvas.toDataURL("image/jpeg", 0.85);
+}
+
 async function analyzeBboxViaServer(clinicId: number, dataUrl: string): Promise<{
     bbox: HeaderBoundingBox;
     confidence: "high" | "medium" | "low";
     fallback: boolean;
 }> {
-    // Downscale to send a smaller payload to GPT-Vision
-    const previewCanvas = document.createElement("canvas");
-    const img = await loadImage(dataUrl);
-    const targetW = Math.min(1200, img.naturalWidth);
-    const ratio = targetW / img.naturalWidth;
-    previewCanvas.width = targetW;
-    previewCanvas.height = Math.round(img.naturalHeight * ratio);
-    const ctx = previewCanvas.getContext("2d");
-    if (!ctx) throw new Error("Canvas 2D context indisponível");
-    ctx.drawImage(img, 0, 0, previewCanvas.width, previewCanvas.height);
-    const previewDataUrl = previewCanvas.toDataURL("image/jpeg", 0.85);
-
+    const previewDataUrl = await buildPreviewDataUrl(dataUrl);
     const res = await fetch(`/api/clinics/${clinicId}/header/analyze-image`, {
         method: "POST",
         credentials: "include",
@@ -100,6 +127,24 @@ async function analyzeBboxViaServer(clinicId: number, dataUrl: string): Promise<
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.message || "Falha ao analisar imagem");
+    }
+    return res.json();
+}
+
+async function validateBboxViaServer(
+    clinicId: number,
+    pngDataUrl: string,
+    bbox: HeaderBoundingBox
+): Promise<{ ok: boolean; bbox: HeaderBoundingBox; reason?: string }> {
+    const overlay = await renderBboxOverlay(pngDataUrl, bbox);
+    const res = await fetch(`/api/clinics/${clinicId}/header/validate-bbox`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageDataUrl: overlay, bbox }),
+    });
+    if (!res.ok) {
+        return { ok: true, bbox };
     }
     return res.json();
 }
@@ -132,6 +177,17 @@ export async function processPdfHeader(file: File, clinicId: number): Promise<Pr
         bodyBbox = result.bbox;
         confidence = result.confidence;
         fallback = result.fallback;
+
+        // Second pass: visual validation. Up to 2 refinement iterations.
+        // Each iteration overlays the current bbox on the image and asks GPT
+        // whether the rectangle collides with any pre-printed element.
+        for (let i = 0; i < 2; i++) {
+            const validation = await validateBboxViaServer(clinicId, pngDataUrl, bodyBbox);
+            if (validation.ok) break;
+            bodyBbox = validation.bbox;
+            confidence = "medium";
+            console.info("[pdf-header-processor] bbox refinado pela validação visual", validation.reason);
+        }
     } catch (err) {
         console.warn("[pdf-header-processor] análise falhou, usando bbox padrão", err);
     }

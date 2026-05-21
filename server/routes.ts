@@ -35,7 +35,7 @@ import {
 import { ensurePremium } from "./middleware/ensure-premium";
 import { resolveAnamnesisTemplate } from "./services/anamnesis-template-resolver";
 import { generateHeaderVariations } from "./services/header-generator";
-import { analyzeHeaderRegion } from "./services/header-image-analyzer";
+import { analyzeHeaderRegion, validateBboxOverlap } from "./services/header-image-analyzer";
 import { biometricTwoFactorAuth } from "./auth/biometric-2fa";
 import { advancedSecurity } from "./middleware/advanced-security";
 import { ensureAuthenticated } from "./middleware/auth.middleware";
@@ -5795,6 +5795,34 @@ export async function registerRoutes(app: Express): Promise<void> {
     } catch (error) {
       logger.error('[Clinic Header] Image analysis failed', { error });
       res.status(500).json({ message: 'Falha ao analisar imagem' });
+    }
+  });
+
+  // POST — second-pass: validate bbox overlap against pre-printed letterhead elements
+  app.post('/api/clinics/:id/header/validate-bbox', ensureAuthenticated, async (req, res) => {
+    try {
+      const clinicId = parseInt(req.params.id);
+      if (isNaN(clinicId)) return res.status(400).json({ message: 'ID inválido' });
+
+      const guard = await requireClinicAdmin(clinicId, req.user!.id);
+      if (!guard.ok) return res.status(guard.status).json({ message: guard.message });
+
+      const { imageDataUrl, bbox } = req.body || {};
+      if (typeof imageDataUrl !== 'string' || !imageDataUrl.startsWith('data:image/')) {
+        return res.status(400).json({ message: 'Imagem inválida' });
+      }
+      if (imageDataUrl.length > 6_500_000) {
+        return res.status(413).json({ message: 'Imagem muito grande' });
+      }
+      if (!bbox || typeof bbox !== 'object') {
+        return res.status(400).json({ message: 'Bbox inválido' });
+      }
+
+      const result = await validateBboxOverlap(imageDataUrl, bbox, { userId: req.user!.id, clinicId });
+      res.json(result);
+    } catch (error) {
+      logger.error('[Clinic Header] Bbox validation failed', { error });
+      res.status(500).json({ message: 'Falha ao validar bbox' });
     }
   });
 
