@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BrandLoader } from "@/components/ui/brand-loader";
-import { Upload, Trash2, Image as ImageIcon, Save, Eye, Sparkles } from "lucide-react";
+import { Upload, Trash2, Image as ImageIcon, Save, Eye, Sparkles, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HeaderAiGeneratorDialog } from "@/components/clinic/header-ai-generator-dialog";
 
@@ -40,6 +40,7 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
 
     const [draft, setDraft] = useState<ClinicHeader | null>(null);
     const [aiDialogOpen, setAiDialogOpen] = useState(false);
+    const [isProcessingPdf, setIsProcessingPdf] = useState(false);
     const imageInputRef = useRef<HTMLInputElement | null>(null);
     const logoInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -161,6 +162,32 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
         if (canEdit) updateHeader.mutate({ headerMode: mode });
     };
 
+    const handleImageFileSelected = async (file: File) => {
+        const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+        if (!isPdf) {
+            uploadImage.mutate(file);
+            return;
+        }
+        if (!header) return;
+        setIsProcessingPdf(true);
+        try {
+            const { processPdfHeader, dataUrlToFile } = await import("@/lib/pdf-header-processor");
+            const result = await processPdfHeader(file, header.clinicId);
+            const png = dataUrlToFile(result.pngDataUrl, `header-pdf-${Date.now()}.png`);
+            await uploadImage.mutateAsync(png);
+            const note = result.fallback
+                ? "Não consegui detectar o cabeçalho automaticamente — usei o topo do documento. Ajuste se necessário."
+                : result.confidence === "low"
+                    ? "Cabeçalho extraído, mas a confiança foi baixa. Confira o resultado."
+                    : "Cabeçalho extraído do PDF e ajustado.";
+            toast({ title: "PDF processado", description: note });
+        } catch (e: any) {
+            toast({ title: "Erro", description: e.message || "Falha ao processar PDF.", variant: "destructive" });
+        } finally {
+            setIsProcessingPdf(false);
+        }
+    };
+
     return (
         <Card className="border border-border shadow-sm">
             <CardHeader>
@@ -235,9 +262,16 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                 {draft.headerMode === "image" && (
                     <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-4">
                         <Label className="text-sm font-medium">Imagem do timbrado</Label>
-                        <p className="text-xs text-muted-foreground">
-                            PNG, JPG, WebP ou SVG. Recomendado: largura mínima 1800px, proporção 8:1 ou 6:1 (estilo letterhead).
-                        </p>
+                        <div className="text-xs text-muted-foreground space-y-1.5">
+                            <p>PNG, JPG, WebP ou SVG. Recomendado: largura mínima 1800px, proporção 8:1 ou 6:1 (estilo letterhead).</p>
+                            <p className="flex items-start gap-1.5">
+                                <FileText className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: "#AF9150" }} />
+                                <span>
+                                    <strong>Tem um PDF do seu timbrado?</strong> Pode enviar direto. A IA identifica
+                                    a região do cabeçalho e ajusta automaticamente ao formato da plataforma.
+                                </span>
+                            </p>
+                        </div>
                         {draft.headerImageUrl ? (
                             <div className="space-y-3">
                                 <div className="rounded-lg border border-border bg-white p-3">
@@ -253,10 +287,14 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                                             variant="outline"
                                             size="sm"
                                             onClick={() => imageInputRef.current?.click()}
-                                            disabled={uploadImage.isPending}
+                                            disabled={uploadImage.isPending || isProcessingPdf}
                                         >
-                                            <Upload className="h-4 w-4 mr-2" />
-                                            Substituir
+                                            {isProcessingPdf ? (
+                                                <BrandLoader className="h-4 w-4 mr-2" />
+                                            ) : (
+                                                <Upload className="h-4 w-4 mr-2" />
+                                            )}
+                                            {isProcessingPdf ? "Processando PDF..." : "Substituir"}
                                         </Button>
                                         <Button
                                             variant="ghost"
@@ -275,14 +313,14 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                             <Button
                                 variant="outline"
                                 onClick={() => imageInputRef.current?.click()}
-                                disabled={uploadImage.isPending}
+                                disabled={uploadImage.isPending || isProcessingPdf}
                             >
-                                {uploadImage.isPending ? (
+                                {uploadImage.isPending || isProcessingPdf ? (
                                     <BrandLoader className="h-4 w-4 mr-2" />
                                 ) : (
                                     <Upload className="h-4 w-4 mr-2" />
                                 )}
-                                Enviar imagem
+                                {isProcessingPdf ? "Processando PDF com IA..." : "Enviar imagem ou PDF"}
                             </Button>
                         ) : (
                             <p className="text-sm text-muted-foreground">Nenhuma imagem enviada.</p>
@@ -290,11 +328,11 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                         <input
                             ref={imageInputRef}
                             type="file"
-                            accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                            accept="image/png,image/jpeg,image/webp,image/svg+xml,application/pdf"
                             className="hidden"
                             onChange={(e) => {
                                 const file = e.target.files?.[0];
-                                if (file) uploadImage.mutate(file);
+                                if (file) handleImageFileSelected(file);
                                 e.target.value = "";
                             }}
                         />
