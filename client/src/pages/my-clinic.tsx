@@ -14,10 +14,6 @@ import { Card,
   CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger } from "@/components/ui/tabs";
 import {
     Building,
   Users,
@@ -28,7 +24,6 @@ import {
   Calendar,
   Settings,
   Clock,
-  Shield,
   Edit2,
   Save,
   Star,
@@ -44,6 +39,7 @@ import { BrandLoader } from "@/components/ui/brand-loader";
 import { isIOSAppShell } from '@/lib/app-shell';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { PrescriptionHeaderSettings } from "@/components/clinic/prescription-header-settings";
+import { InviteManagerDialog, type InviteRole } from "@/components/clinic/invite-manager-dialog";
 
 interface Clinic {
     id: number;
@@ -149,7 +145,6 @@ const MyClinic = () => {
     const queryClient = useQueryClient();
     const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
     const [isCreateClinicDialogOpen, setIsCreateClinicDialogOpen] = useState(false);
-    const [inviteEmail, setInviteEmail] = useState('');
     const [inviteCodeInput, setInviteCodeInput] = useState('');
     const [inviteRole, setInviteRole] = useState<'member' | 'secretary'>('member');
     const [clinicName, setClinicName] = useState('');
@@ -197,24 +192,7 @@ const MyClinic = () => {
         onError: (error: Error) => { toast({ title: 'Erro', description: error.message, variant: 'destructive' }); }
     });
 
-    const inviteMemberMutation = useMutation({
-        mutationFn: async (email: string) => {
-            const clinicId = clinicData?.clinic?.id;
-            if (!clinicId) throw new Error('Clínica não encontrada');
-            const res = await apiRequest('POST', `/api/clinics/${clinicId}/invite`, { email, role: inviteRole });
-            if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'Erro ao enviar convite'); }
-            return res.json();
-        },
-        onSuccess: () => {
-            toast({ title: 'Convite enviado!', description: `O ${inviteRole === 'secretary' ? 'secretário(a)' : 'profissional'} receberá um email com o convite.` });
-            setIsInviteDialogOpen(false);
-            setInviteEmail('');
-            refetchClinic();
-        },
-        onError: (error: Error) => { toast({ title: 'Erro', description: error.message, variant: 'destructive' }); }
-    });
-
-    const selectClinicMutation = useMutation({
+const selectClinicMutation = useMutation({
         mutationFn: async (clinicId: number) => {
             const res = await apiRequest('POST', '/api/my-clinic/select', { clinicId });
             if (!res.ok) {
@@ -781,330 +759,217 @@ const MyClinic = () => {
                     </CardContent>
                 </Card>
 
-                {/* Tabs */}
-                <Tabs defaultValue="equipe" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2 bg-muted border border-border rounded-xl h-11">
-                        <TabsTrigger value="equipe" className="flex items-center gap-2 text-xs sm:text-sm rounded-lg text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
-                            <Users className="h-4 w-4" /><span className="hidden sm:inline">Equipe</span>
-                        </TabsTrigger>
-                        <TabsTrigger value="config" className="flex items-center gap-2 text-xs sm:text-sm rounded-lg text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
-                            <Settings className="h-4 w-4" /><span className="hidden sm:inline">Configurações</span>
-                        </TabsTrigger>
-                    </TabsList>
+                {/* Equipe — Profissionais + Equipe de Apoio lado a lado */}
+                {(() => {
+                    const professionals = clinicData.members.filter(m => m.clinicRole === 'admin' || m.clinicRole === 'member');
+                    const secretaries = clinicData.members.filter(m => m.clinicRole === 'secretary');
+                    const profLimit = clinic.maxProfessionals;
+                    const secLimit = clinic.maxSecretaries;
+                    const profPendingCount = clinicData.invitations.filter(
+                        i => (i.status === 'pending' || i.status === 'expired') && i.role !== 'secretary'
+                    ).length;
+                    const secPendingCount = clinicData.invitations.filter(
+                        i => (i.status === 'pending' || i.status === 'expired') && i.role === 'secretary'
+                    ).length;
 
-                    {/* TAB: Equipe */}
-                    <TabsContent value="equipe" className="space-y-6 mt-6">
-                        {(() => {
-                            const professionals = clinicData.members.filter(m => m.clinicRole === 'admin' || m.clinicRole === 'member');
-                            const secretaries = clinicData.members.filter(m => m.clinicRole === 'secretary');
-                            const pendingInvites = clinicData.invitations.filter(
-                                (i) => i.status === 'pending' || i.status === 'expired'
-                            );
-                            const patientCount = clinicData.patientCount ?? 0;
-
-                            const profLimit = clinic.maxProfessionals;
-                            const secLimit = clinic.maxSecretaries;
-
-                            return (
-                                <>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                                        <Card className="border border-border shadow-sm">
-                                            <CardContent className="pt-6">
-                                                <div className="flex items-center justify-between">
-                                                    <div>
-                                                        <p className="text-sm text-muted-foreground">Profissionais</p>
-                                                        <p className="text-2xl font-bold text-foreground">{professionals.length} / {profLimit}</p>
-                                                    </div>
-                                                    <div className="w-11 h-11 bg-muted rounded-xl flex items-center justify-center">
-                                                        <Users className="h-5 w-5 text-foreground" />
-                                                    </div>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                        <Card className="border border-border shadow-sm">
-                                            <CardContent className="pt-6">
-                                                <div className="flex items-center justify-between">
-                                                    <div>
-                                                        <p className="text-sm text-muted-foreground">Secretaria</p>
-                                                        <p className="text-2xl font-bold text-foreground">{secretaries.length} / {secLimit}</p>
-                                                    </div>
-                                                    <div className="w-11 h-11 bg-muted rounded-xl flex items-center justify-center">
-                                                        <Users className="h-5 w-5 text-foreground" />
-                                                    </div>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                        <Card className="border border-border shadow-sm">
-                                            <CardContent className="pt-6">
-                                                <div className="flex items-center justify-between">
-                                                    <div>
-                                                        <p className="text-sm text-muted-foreground">Pacientes</p>
-                                                        <p className="text-2xl font-bold text-foreground">{patientCount}</p>
-                                                    </div>
-                                                    <div className="w-11 h-11 bg-muted rounded-xl flex items-center justify-center">
-                                                        <Users className="h-5 w-5 text-foreground" />
-                                                    </div>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                        <Card className="border border-border shadow-sm">
-                                            <CardContent className="pt-6">
-                                                <div className="flex items-center justify-between">
-                                                    <div>
-                                                        <p className="text-sm text-muted-foreground">Convites Pendentes</p>
-                                                        <p className="text-2xl font-bold text-foreground">{pendingInvites.length}</p>
-                                                    </div>
-                                                    <div className="w-11 h-11 bg-muted rounded-xl flex items-center justify-center">
-                                                        <Mail className="h-5 w-5 text-foreground" />
-                                                    </div>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
+                    return (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* Profissionais de Saúde */}
+                            <Card className="border border-border shadow-sm">
+                                <CardHeader className="flex flex-row items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <CardTitle className="text-foreground flex items-center gap-2">
+                                            Profissionais de Saúde
+                                            <Badge variant="outline" className="border-border text-muted-foreground font-normal">
+                                                {professionals.length} / {profLimit}
+                                            </Badge>
+                                        </CardTitle>
+                                        <CardDescription>Médicos e profissionais vinculados</CardDescription>
                                     </div>
-
-                                    {/* Professionals */}
-                                    <Card className="border border-border shadow-sm">
-                                        <CardHeader className="flex flex-row items-center justify-between">
-                                            <div>
-                                                <CardTitle className="text-foreground">Profissionais de Saúde</CardTitle>
-                                                <CardDescription className="text-muted-foreground">Médicos e profissionais vinculados</CardDescription>
-                                            </div>
-                                            {clinicData.isAdmin && professionals.length < profLimit && (
-                                                <Button onClick={() => { setInviteRole('member'); setIsInviteDialogOpen(true); }} size="sm" className="bg-primary hover:bg-primary/90 rounded-lg">
-                                                    <UserPlus className="h-4 w-4 mr-2" />{compactIOSClinicLabels ? 'Convidar' : 'Convidar Profissional'}
-                                                </Button>
+                                    {clinicData.isAdmin && (
+                                        <Button
+                                            onClick={() => { setInviteRole('member'); setIsInviteDialogOpen(true); }}
+                                            size="sm"
+                                            className="bg-primary hover:bg-primary/90 rounded-lg shrink-0 relative"
+                                        >
+                                            <UserPlus className="h-4 w-4 mr-2" />
+                                            Convidar
+                                            {profPendingCount > 0 && (
+                                                <span className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-1 rounded-full bg-amber-500 text-[10px] font-bold text-white flex items-center justify-center">
+                                                    {profPendingCount}
+                                                </span>
                                             )}
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="space-y-3">
-                                                {professionals.map((member) => (
-                                                    <div key={member.id} className="flex items-center justify-between p-4 bg-muted rounded-xl border border-border hover:border-gray-400 transition-colors">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm">
-                                                                {(member.fullName || member.username).charAt(0).toUpperCase()}
-                                                            </div>
-                                                            <div>
-                                                                <p className="font-medium text-foreground">
-                                                                    {member.fullName || member.username}
-                                                                    {member.clinicRole === 'admin' && <Crown className="h-4 w-4 inline ml-2 text-muted-foreground" />}
-                                                                </p>
-                                                                <p className="text-sm text-muted-foreground">{member.email || 'Sem email'}</p>
-                                                            </div>
-                                                        </div>
-                                                        {clinicData.isAdmin && member.clinicRole !== 'admin' && (
-                                                            <Button variant="ghost" size="sm" onClick={() => removeMemberMutation.mutate(member.id)}
-                                                                disabled={removeMemberMutation.isPending} className="text-destructive hover:text-destructive/90 hover:bg-red-50">
-                                                                <Trash2 className="h-4 w-4" />
-                                                            </Button>
-                                                        )}
+                                        </Button>
+                                    )}
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-2">
+                                        {professionals.map((member) => (
+                                            <div key={member.id} className="flex items-center justify-between p-3 bg-muted rounded-lg border border-border hover:border-gray-400 transition-colors">
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <div className="h-9 w-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm shrink-0">
+                                                        {(member.fullName || member.username).charAt(0).toUpperCase()}
                                                     </div>
-                                                ))}
-                                                {professionals.length === 0 && (
-                                                    <div className="text-center py-6 text-[#9E9E9E]">
-                                                        <p>Nenhum profissional encontrado.</p>
+                                                    <div className="min-w-0">
+                                                        <p className="font-medium text-sm text-foreground truncate">
+                                                            {member.fullName || member.username}
+                                                            {member.clinicRole === 'admin' && <Crown className="h-3.5 w-3.5 inline ml-1.5 text-muted-foreground" />}
+                                                        </p>
+                                                        <p className="text-xs text-muted-foreground truncate">{member.email || 'Sem email'}</p>
                                                     </div>
+                                                </div>
+                                                {clinicData.isAdmin && member.clinicRole !== 'admin' && (
+                                                    <Button variant="ghost" size="sm" onClick={() => removeMemberMutation.mutate(member.id)}
+                                                        disabled={removeMemberMutation.isPending} className="h-8 w-8 p-0 text-destructive hover:text-destructive/90 hover:bg-red-50 shrink-0">
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
                                                 )}
                                             </div>
-                                        </CardContent>
-                                    </Card>
-
-                                    {/* Secretaries */}
-                                    <Card className="border border-border shadow-sm">
-                                        <CardHeader className="flex flex-row items-center justify-between">
-                                            <div>
-                                                <CardTitle className="text-foreground">Secretaria e Apoio</CardTitle>
-                                                <CardDescription className="text-muted-foreground">Equipe de suporte administrativo</CardDescription>
+                                        ))}
+                                        {professionals.length === 0 && (
+                                            <div className="text-center py-6 text-sm text-muted-foreground">
+                                                Nenhum profissional vinculado.
                                             </div>
-                                            {clinicData.isAdmin && secretaries.length < secLimit && (
-                                                <Button onClick={() => { setInviteRole('secretary'); setIsInviteDialogOpen(true); }} size="sm" variant="outline" className="border-primary text-primary hover:bg-muted rounded-lg">
-                                                    <UserPlus className="h-4 w-4 mr-2" />Convidar
-                                                </Button>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Equipe de Apoio */}
+                            <Card className="border border-border shadow-sm">
+                                <CardHeader className="flex flex-row items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <CardTitle className="text-foreground flex items-center gap-2">
+                                            Equipe de Apoio
+                                            <Badge variant="outline" className="border-border text-muted-foreground font-normal">
+                                                {secretaries.length} / {secLimit}
+                                            </Badge>
+                                        </CardTitle>
+                                        <CardDescription>Secretárias e suporte administrativo</CardDescription>
+                                    </div>
+                                    {clinicData.isAdmin && secLimit > 0 && (
+                                        <Button
+                                            onClick={() => { setInviteRole('secretary'); setIsInviteDialogOpen(true); }}
+                                            size="sm"
+                                            variant="outline"
+                                            className="border-primary text-primary hover:bg-muted rounded-lg shrink-0 relative"
+                                        >
+                                            <UserPlus className="h-4 w-4 mr-2" />
+                                            Convidar
+                                            {secPendingCount > 0 && (
+                                                <span className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-1 rounded-full bg-amber-500 text-[10px] font-bold text-white flex items-center justify-center">
+                                                    {secPendingCount}
+                                                </span>
                                             )}
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="space-y-3">
-                                                {secretaries.map((member) => (
-                                                    <div key={member.id} className="flex items-center justify-between p-4 bg-muted rounded-xl border border-border hover:border-gray-400 transition-colors">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="h-10 w-10 rounded-full bg-muted border border-border text-muted-foreground flex items-center justify-center font-bold text-sm">
-                                                                {(member.fullName || member.username).charAt(0).toUpperCase()}
-                                                            </div>
-                                                            <div>
-                                                                <p className="font-medium text-foreground">
-                                                                    {member.fullName || member.username}
-                                                                </p>
-                                                                <p className="text-sm text-muted-foreground">{member.email || 'Sem email'}</p>
-                                                            </div>
-                                                        </div>
-                                                        {clinicData.isAdmin && (
-                                                            <Button variant="ghost" size="sm" onClick={() => removeMemberMutation.mutate(member.id)}
-                                                                disabled={removeMemberMutation.isPending} className="text-destructive hover:text-destructive/90 hover:bg-destructive/10">
-                                                                <Trash2 className="h-4 w-4" />
-                                                            </Button>
-                                                        )}
+                                        </Button>
+                                    )}
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-2">
+                                        {secretaries.map((member) => (
+                                            <div key={member.id} className="flex items-center justify-between p-3 bg-muted rounded-lg border border-border hover:border-gray-400 transition-colors">
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <div className="h-9 w-9 rounded-full bg-muted border border-border text-muted-foreground flex items-center justify-center font-bold text-sm shrink-0">
+                                                        {(member.fullName || member.username).charAt(0).toUpperCase()}
                                                     </div>
-                                                ))}
-                                                {secretaries.length === 0 && (
-                                                    <div className="text-center py-6 text-muted-foreground">
-                                                        <p>{secLimit > 0 ? 'Nenhum cadastro.' : 'Seu plano atual não inclui vagas de secretaria.'}</p>
+                                                    <div className="min-w-0">
+                                                        <p className="font-medium text-sm text-foreground truncate">{member.fullName || member.username}</p>
+                                                        <p className="text-xs text-muted-foreground truncate">{member.email || 'Sem email'}</p>
                                                     </div>
+                                                </div>
+                                                {clinicData.isAdmin && (
+                                                    <Button variant="ghost" size="sm" onClick={() => removeMemberMutation.mutate(member.id)}
+                                                        disabled={removeMemberMutation.isPending} className="h-8 w-8 p-0 text-destructive hover:text-destructive/90 hover:bg-destructive/10 shrink-0">
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
                                                 )}
                                             </div>
-                                        </CardContent>
-                                    </Card>
+                                        ))}
+                                        {secretaries.length === 0 && (
+                                            <div className="text-center py-6 text-sm text-muted-foreground">
+                                                {secLimit > 0 ? 'Nenhuma secretária vinculada.' : 'Seu plano não inclui vagas de apoio.'}
+                                            </div>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    );
+                })()}
 
-                                    {/* Pending invitations */}
-                                    {pendingInvites.length > 0 && (
-                                        <Card className="border border-border shadow-sm">
-                                            <CardHeader><CardTitle className="text-base text-foreground">Convites Pendentes</CardTitle></CardHeader>
-                                            <CardContent>
-                                                <div className="space-y-2">
-                                                    {pendingInvites.map((invite) => {
-                                                        const inviteExpiresAt = new Date(invite.expiresAt);
-                                                        const isInviteExpired =
-                                                            Number.isFinite(inviteExpiresAt.getTime()) &&
-                                                            inviteExpiresAt.getTime() <= Date.now();
-
-                                                        return (
-                                                            <div key={invite.id} className="flex items-center justify-between p-3 bg-muted rounded-xl border border-border">
-                                                                <div className="flex items-center gap-3">
-                                                                    <Mail className="h-5 w-5 text-muted-foreground" />
-                                                                    <div>
-                                                                        <span className="font-medium text-foreground block">{invite.email}</span>
-                                                                        <span className="text-xs text-muted-foreground">{invite.role === 'secretary' ? 'Secretária' : 'Profissional'}</span>
-                                                                        {invite.inviteCode && (
-                                                                            <span className="text-[11px] text-muted-foreground block">Código: {invite.inviteCode}</span>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                                <div className="flex items-center gap-2">
-                                                                    <Badge
-                                                                        variant="outline"
-                                                                        className={isInviteExpired
-                                                                            ? "border-destructive/30 text-destructive"
-                                                                            : "border-border text-xs text-muted-foreground"}
-                                                                    >
-                                                                        {isInviteExpired
-                                                                            ? "Expirado"
-                                                                            : `Expira em ${inviteExpiresAt.toLocaleDateString('pt-BR')}`}
-                                                                    </Badge>
-                                                                    {clinicData.isAdmin && (
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="icon"
-                                                                            className="h-8 w-8 text-destructive hover:text-destructive/90 hover:bg-destructive/10"
-                                                                            onClick={() => cancelInvitationMutation.mutate(invite.id)}
-                                                                            disabled={cancelInvitationMutation.isPending}
-                                                                            title="Cancelar convite"
-                                                                        >
-                                                                            {cancelInvitationMutation.isPending ? <BrandLoader className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
-                                                                        </Button>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    )}
-                                </>
-                            );
-                        })()}
-                    </TabsContent>
-
-                    {/* TAB: Configurações */}
-                    <TabsContent value="config" className="space-y-6 mt-6">
-                        <Card className="border border-border shadow-sm">
-                            <CardHeader>
-                                <CardTitle className="text-foreground">Dados da Clínica</CardTitle>
-                                <CardDescription className="text-muted-foreground">Informações gerais da sua clínica</CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-5">
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-medium text-foreground">Nome da Clínica</Label>
-                                    {isEditingName ? (
-                                        <div className="flex gap-2">
-                                            <Input value={editedClinicName} onChange={(e) => setEditedClinicName(e.target.value)}
-                                                placeholder="Nome da clínica" className="flex-1 border-border focus:border-primary" />
-                                            <Button size="sm" className="bg-primary hover:bg-primary/90"
-                                                onClick={() => updateClinicMutation.mutate({ clinicId: clinic.id, name: editedClinicName })}
-                                                disabled={!editedClinicName.trim() || updateClinicMutation.isPending}>
-                                                {updateClinicMutation.isPending ? <BrandLoader className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                {/* Dados da Clínica */}
+                <Card className="border border-border shadow-sm">
+                    <CardHeader>
+                        <CardTitle className="text-foreground flex items-center gap-2">
+                            <Settings className="h-4 w-4 text-muted-foreground" />
+                            Dados da Clínica
+                        </CardTitle>
+                        <CardDescription>Informações gerais e limites do plano</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-1.5 md:col-span-2">
+                                <Label className="text-xs text-muted-foreground">Nome da Clínica</Label>
+                                {isEditingName ? (
+                                    <div className="flex gap-2">
+                                        <Input value={editedClinicName} onChange={(e) => setEditedClinicName(e.target.value)}
+                                            placeholder="Nome da clínica" className="flex-1 border-border focus:border-primary" />
+                                        <Button size="sm" className="bg-primary hover:bg-primary/90"
+                                            onClick={() => updateClinicMutation.mutate({ clinicId: clinic.id, name: editedClinicName })}
+                                            disabled={!editedClinicName.trim() || updateClinicMutation.isPending}>
+                                            {updateClinicMutation.isPending ? <BrandLoader className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                        </Button>
+                                        <Button size="sm" variant="outline" onClick={() => setIsEditingName(false)} className="border-border">
+                                            <X className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center justify-between p-3 bg-muted rounded-lg border border-border">
+                                        <span className="font-medium text-foreground">{clinic.name}</span>
+                                        {clinicData.isAdmin && (
+                                            <Button size="sm" variant="ghost" onClick={() => { setEditedClinicName(clinic.name); setIsEditingName(true); }}
+                                                className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground">
+                                                <Edit2 className="h-3.5 w-3.5" />
                                             </Button>
-                                            <Button size="sm" variant="outline" onClick={() => setIsEditingName(false)} className="border-border">
-                                                <X className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center justify-between p-3 bg-muted rounded-xl border border-border">
-                                            <span className="font-medium text-foreground">{clinic.name}</span>
-                                            {clinicData.isAdmin && (
-                                                <Button size="sm" variant="ghost" onClick={() => { setEditedClinicName(clinic.name); setIsEditingName(true); }}
-                                                    className="text-muted-foreground hover:text-foreground">
-                                                    <Edit2 className="h-4 w-4" />
-                                                </Button>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-medium text-foreground">Plano Atual</Label>
-                                    <div className="p-3 bg-muted rounded-xl border border-border">
-                                        <span className="font-medium text-foreground">{currentPlan?.name || 'Não identificado'}</span>
+                                        )}
                                     </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-medium text-foreground">Limite de Profissionais</Label>
-                                    <div className="p-3 bg-muted rounded-xl border border-border">
-                                        <span className="font-medium text-foreground">{clinic.maxProfessionals} profissionais</span>
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-medium text-foreground">Limite de Secretárias</Label>
-                                    <div className="p-3 bg-muted rounded-xl border border-border">
-                                        <span className="font-medium text-foreground">{clinic.maxSecretaries} secretárias</span>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
+                                )}
+                            </div>
 
-                        <PrescriptionHeaderSettings />
-
-                        <Card className="border border-border shadow-sm">
-                            <CardHeader>
-                                <CardTitle className="text-foreground">Segurança</CardTitle>
-                                <CardDescription className="text-muted-foreground">Controle de acesso e permissões</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-4 p-4 bg-muted rounded-xl border border-border">
-                                        <div className="w-10 h-10 rounded-xl bg-card border border-border flex items-center justify-center flex-shrink-0">
-                                            <Shield className="h-5 w-5 text-foreground" />
-                                        </div>
-                                        <div>
-                                            <p className="font-medium text-foreground text-sm">Dados Protegidos</p>
-                                            <p className="text-xs text-muted-foreground leading-relaxed">Todos os dados da clínica são criptografados e armazenados com segurança conforme a LGPD.</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-4 p-4 bg-muted rounded-xl border border-border">
-                                        <div className="w-10 h-10 rounded-xl bg-card border border-border flex items-center justify-center flex-shrink-0">
-                                            <Crown className="h-5 w-5 text-foreground" />
-                                        </div>
-                                        <div>
-                                            <p className="font-medium text-foreground text-sm">Administrador</p>
-                                            <p className="text-xs text-muted-foreground leading-relaxed">
-                                                {clinicData.isAdmin
-                                                    ? 'Você é o administrador desta clínica. Apenas você pode convidar ou remover membros.'
-                                                    : 'Apenas o administrador pode gerenciar membros e configurações da clínica.'}
-                                            </p>
-                                        </div>
-                                    </div>
+                            <div className="space-y-1.5">
+                                <Label className="text-xs text-muted-foreground">Plano</Label>
+                                <div className="p-3 bg-muted rounded-lg border border-border">
+                                    <span className="font-medium text-sm text-foreground">{currentPlan?.name || 'Não identificado'}</span>
                                 </div>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                </Tabs>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <Label className="text-xs text-muted-foreground">Pacientes ativos</Label>
+                                <div className="p-3 bg-muted rounded-lg border border-border">
+                                    <span className="font-medium text-sm text-foreground">{clinicData.patientCount ?? 0}</span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <Label className="text-xs text-muted-foreground">Limite de profissionais</Label>
+                                <div className="p-3 bg-muted rounded-lg border border-border">
+                                    <span className="font-medium text-sm text-foreground">{clinic.maxProfessionals}</span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <Label className="text-xs text-muted-foreground">Limite de equipe de apoio</Label>
+                                <div className="p-3 bg-muted rounded-lg border border-border">
+                                    <span className="font-medium text-sm text-foreground">{clinic.maxSecretaries}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Cabeçalho de documentos */}
+                <PrescriptionHeaderSettings />
+
             </>
         );
     };
@@ -1178,31 +1043,17 @@ const MyClinic = () => {
                         </DialogContent>
                     </Dialog>
 
-                    <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle className="text-foreground">Convidar {inviteRole === 'secretary' ? 'Secretária' : 'Profissional'}</DialogTitle>
-                                <DialogDescription className="text-muted-foreground">
-                                    Envie um convite por email para adicionar um novo {inviteRole === 'secretary' ? 'membro de apoio' : 'profissional'} à sua clínica.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="inviteEmail" className="text-foreground">Email do profissional</Label>
-                                    <Input id="inviteEmail" type="email" placeholder="profissional@exemplo.com" value={inviteEmail}
-                                        onChange={(e) => setInviteEmail(e.target.value)} className="border-border focus:border-primary" />
-                                </div>
-                            </div>
-                            <DialogFooter>
-                                <Button variant="outline" onClick={() => setIsInviteDialogOpen(false)} className="border-border text-muted-foreground">Cancelar</Button>
-                                <Button onClick={() => inviteMemberMutation.mutate(inviteEmail)} disabled={!inviteEmail.trim() || inviteMemberMutation.isPending}
-                                    className="bg-primary hover:bg-primary/90">
-                                    {inviteMemberMutation.isPending && <BrandLoader className="h-4 w-4 mr-2 animate-spin" />}
-                                    Enviar Convite
-                                </Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
+                    {clinicData?.clinic && (
+                        <InviteManagerDialog
+                            open={isInviteDialogOpen}
+                            onOpenChange={setIsInviteDialogOpen}
+                            role={inviteRole}
+                            clinicId={clinicData.clinic.id}
+                            invitations={clinicData.invitations}
+                            canInvite={clinicData.isAdmin}
+                            onChange={() => refetchClinic()}
+                        />
+                    )}
                 </div>
             </div>
         </div>
