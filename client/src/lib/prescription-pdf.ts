@@ -31,6 +31,7 @@ interface PrescriptionData {
     doctorRqe?: string;
     doctorAddress?: string;
     doctorPhone?: string;
+    doctorCity?: string;
     // Dados do Paciente
     patientName: string;
     patientCpf?: string;
@@ -232,6 +233,91 @@ const drawDoctorBlock = (doc: jsPDF, layout: BodyLayout, data: PrescriptionData,
         nextY += 3.6;
     }
     return nextY;
+};
+
+/**
+ * Slim patient block for the basic prescription (no header repetition + no issue date).
+ * One line only: Paciente NAME · BIRTHDATE · CPF — no convênio, address, gender, etc.
+ * Issue date is moved to the signature footer.
+ */
+const drawPatientBlockSlim = (doc: jsPDF, layout: BodyLayout, data: PrescriptionData, yPos: number): number => {
+    doc.setFontSize(9);
+    doc.setTextColor(0, 0, 0);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("Paciente", layout.leftX, yPos);
+    const labelW = doc.getTextWidth("Paciente") + 3;
+
+    doc.setFont("helvetica", "normal");
+    const parts: string[] = [data.patientName];
+    const bd = formatBirthDate(data.patientBirthDate);
+    if (bd) parts.push(bd);
+    if (data.patientCpf) parts.push(`CPF ${data.patientCpf}`);
+    const text = parts.join("  ·  ");
+    const wrapped = doc.splitTextToSize(text, layout.contentWidth - labelW);
+    doc.text(wrapped[0], layout.leftX + labelW, yPos);
+
+    let nextY = yPos + 5;
+    doc.setLineWidth(0.2);
+    doc.setDrawColor(220, 220, 220);
+    doc.line(layout.leftX, nextY, layout.rightX, nextY);
+    return nextY + 5;
+};
+
+const PT_BR_MONTHS = [
+    "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+    "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+];
+const formatPtBrLongDate = (d: Date): string =>
+    `${d.getDate()} de ${PT_BR_MONTHS[d.getMonth()]} de ${d.getFullYear()}`;
+
+/**
+ * Footer for the basic prescription: signature anchored to the right, date+city on the left at
+ * the same baseline as the signature line. No validity disclaimer, no institutional bottom band.
+ */
+const drawBasicSignatureFooter = (
+    doc: jsPDF,
+    layout: BodyLayout,
+    data: PrescriptionData,
+    options: { pageHeight?: number; signatureOffset?: number; viaLabel?: string } = {}
+) => {
+    const pageHeight = options.pageHeight ?? 210;
+    const signatureY = pageHeight - (options.signatureOffset ?? 32);
+
+    // Signature block anchored to the right half
+    const sigHalfWidth = Math.min(40, (layout.contentWidth / 2) - 4);
+    const sigCenter = layout.rightX - sigHalfWidth;
+
+    doc.setLineWidth(0.3);
+    doc.setDrawColor(40, 40, 40);
+    doc.line(sigCenter - sigHalfWidth, signatureY, sigCenter + sigHalfWidth, signatureY);
+
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(0, 0, 0);
+    doc.text(data.doctorName, sigCenter, signatureY + 4.5, { align: "center" });
+
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80, 80, 80);
+    doc.text(formatCrm(data.doctorCrm, data.doctorCrmState), sigCenter, signatureY + 9, { align: "center" });
+    doc.setFontSize(7);
+    doc.text("Assinatura e carimbo", sigCenter, signatureY + 13, { align: "center" });
+
+    // City + issue date on the left, baseline aligned with the signature line
+    const dateStr = formatPtBrLongDate(data.issueDate);
+    const localeAndDate = data.doctorCity ? `${data.doctorCity}, ${dateStr}` : dateStr;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(0, 0, 0);
+    doc.text(localeAndDate, layout.leftX, signatureY);
+
+    if (options.viaLabel) {
+        doc.setFontSize(7);
+        doc.setTextColor(110, 110, 110);
+        doc.text(options.viaLabel, layout.rightX, pageHeight - 8, { align: "right" });
+        doc.setTextColor(0, 0, 0);
+    }
 };
 
 /**
@@ -644,23 +730,12 @@ const generateBasicPrescription = (
     let yPos = drawDocumentTitle(doc, layout, config.title, headerEndY, {
         subtitle: config.subtitle,
     });
-    yPos = drawDoctorBlock(doc, layout, data, yPos);
-    yPos += 3;
-    yPos = drawPatientBlock(doc, layout, data, yPos);
+    yPos = drawPatientBlockSlim(doc, layout, data, yPos);
     yPos = drawMedicationsBlock(doc, layout, data, yPos);
 
-    drawSignatureFooter(doc, layout, data, {
-        signatureOffset: 50,
-        footerOffset: 22,
+    drawBasicSignatureFooter(doc, layout, data, {
+        signatureOffset: 32,
         viaLabel: xOffset > 0 ? "2ª via" : "1ª via",
-    });
-
-    drawDocumentFooter(doc, data.clinicHeader ?? null, {
-        xOffset,
-        pageWidth: layout.pageWidth,
-        pageHeight: PAGE_HEIGHT_LANDSCAPE,
-        marginX: layout.margin,
-        identity,
     });
 };
 
