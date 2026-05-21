@@ -148,7 +148,6 @@ const MyClinic = () => {
     const [inviteCodeInput, setInviteCodeInput] = useState('');
     const [inviteRole, setInviteRole] = useState<'member' | 'secretary'>('member');
     const [clinicName, setClinicName] = useState('');
-    const [isEditingName, setIsEditingName] = useState(false);
     const [editedClinicName, setEditedClinicName] = useState('');
     const [editingClinicId, setEditingClinicId] = useState<number | null>(null);
     const [deletingClinicId, setDeletingClinicId] = useState<number | null>(null);
@@ -272,7 +271,6 @@ const selectClinicMutation = useMutation({
         },
         onSuccess: async (data, variables) => {
             const updatedClinicName = data?.clinic?.name ?? variables.name;
-            setIsEditingName(false);
             setEditingClinicId(null);
             setEditedClinicName(updatedClinicName);
             await Promise.all([
@@ -667,6 +665,15 @@ const selectClinicMutation = useMutation({
                                                     </div>
                                                 </div>
                                             )}
+
+                                            {isActiveClinic && (
+                                                <div className="mt-4 pt-4 border-t border-border/60 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                                    <StatTile label="Plano" value={currentPlan?.name || '—'} />
+                                                    <StatTile label="Pacientes" value={String(clinicData.patientCount ?? 0)} />
+                                                    <StatTile label="Profissionais" value={String(clinic.maxProfessionals)} />
+                                                    <StatTile label="Equipe de apoio" value={String(clinic.maxSecretaries)} />
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })}
@@ -753,6 +760,13 @@ const selectClinicMutation = useMutation({
                                         </div>
                                     </div>
                                 )}
+
+                                <div className="mt-4 pt-4 border-t border-border/60 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                    <StatTile label="Plano" value={currentPlan?.name || '—'} />
+                                    <StatTile label="Pacientes" value={String(clinicData.patientCount ?? 0)} />
+                                    <StatTile label="Profissionais" value={String(clinic.maxProfessionals)} />
+                                    <StatTile label="Equipe de apoio" value={String(clinic.maxSecretaries)} />
+                                </div>
                             </div>
                         )}
 
@@ -897,76 +911,6 @@ const selectClinicMutation = useMutation({
                     );
                 })()}
 
-                {/* Dados da Clínica */}
-                <Card className="border border-border shadow-sm">
-                    <CardHeader>
-                        <CardTitle className="text-foreground flex items-center gap-2">
-                            <Settings className="h-4 w-4 text-muted-foreground" />
-                            Dados da Clínica
-                        </CardTitle>
-                        <CardDescription>Informações gerais e limites do plano</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-1.5 md:col-span-2">
-                                <Label className="text-xs text-muted-foreground">Nome da Clínica</Label>
-                                {isEditingName ? (
-                                    <div className="flex gap-2">
-                                        <Input value={editedClinicName} onChange={(e) => setEditedClinicName(e.target.value)}
-                                            placeholder="Nome da clínica" className="flex-1 border-border focus:border-primary" />
-                                        <Button size="sm" className="bg-primary hover:bg-primary/90"
-                                            onClick={() => updateClinicMutation.mutate({ clinicId: clinic.id, name: editedClinicName })}
-                                            disabled={!editedClinicName.trim() || updateClinicMutation.isPending}>
-                                            {updateClinicMutation.isPending ? <BrandLoader className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                                        </Button>
-                                        <Button size="sm" variant="outline" onClick={() => setIsEditingName(false)} className="border-border">
-                                            <X className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center justify-between p-3 bg-muted rounded-lg border border-border">
-                                        <span className="font-medium text-foreground">{clinic.name}</span>
-                                        {clinicData.isAdmin && (
-                                            <Button size="sm" variant="ghost" onClick={() => { setEditedClinicName(clinic.name); setIsEditingName(true); }}
-                                                className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground">
-                                                <Edit2 className="h-3.5 w-3.5" />
-                                            </Button>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <Label className="text-xs text-muted-foreground">Plano</Label>
-                                <div className="p-3 bg-muted rounded-lg border border-border">
-                                    <span className="font-medium text-sm text-foreground">{currentPlan?.name || 'Não identificado'}</span>
-                                </div>
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <Label className="text-xs text-muted-foreground">Pacientes ativos</Label>
-                                <div className="p-3 bg-muted rounded-lg border border-border">
-                                    <span className="font-medium text-sm text-foreground">{clinicData.patientCount ?? 0}</span>
-                                </div>
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <Label className="text-xs text-muted-foreground">Limite de profissionais</Label>
-                                <div className="p-3 bg-muted rounded-lg border border-border">
-                                    <span className="font-medium text-sm text-foreground">{clinic.maxProfessionals}</span>
-                                </div>
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <Label className="text-xs text-muted-foreground">Limite de equipe de apoio</Label>
-                                <div className="p-3 bg-muted rounded-lg border border-border">
-                                    <span className="font-medium text-sm text-foreground">{clinic.maxSecretaries}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
                 {/* Cabeçalho de documentos */}
                 <PrescriptionHeaderSettings />
 
@@ -1059,5 +1003,14 @@ const selectClinicMutation = useMutation({
         </div>
     );
 };
+
+function StatTile({ label, value }: { label: string; value: string }) {
+    return (
+        <div className="rounded-lg border border-border bg-card px-3 py-2">
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">{label}</p>
+            <p className="text-sm font-semibold text-foreground truncate">{value}</p>
+        </div>
+    );
+}
 
 export default MyClinic;
