@@ -622,6 +622,85 @@ const generateControlledPrescription = (
  * frame and content is rendered inside the AI-identified body bbox.
  * Renders one via at a given xOffset/pageWidth/pageHeight slot.
  */
+const drawLetterheadControlledFooter = (
+    doc: jsPDF,
+    layout: BodyLayout,
+    data: PrescriptionData,
+    contentBottomY: number,
+    yAfterContent: number
+) => {
+    // Compact footer geometry: validity 3mm from bottom, then boxes (24mm), then signature (16mm)
+    const VALIDITY_INSET = 3;
+    const GAP_BOXES = 4;
+    const BOXES_HEIGHT = 24;
+    const SIGNATURE_TOTAL = 16;
+    const FOOTER_HEIGHT = VALIDITY_INSET + GAP_BOXES + BOXES_HEIGHT + GAP_BOXES + SIGNATURE_TOTAL;
+    const footerStartY = contentBottomY - FOOTER_HEIGHT;
+
+    // Anchor signature below medications; if overflow, accept a slight push down
+    const signatureY = Math.max(yAfterContent + 6, footerStartY + SIGNATURE_TOTAL);
+    const boxesY = signatureY + GAP_BOXES;
+    const validityY = boxesY + BOXES_HEIGHT + GAP_BOXES + 2;
+
+    // Signature
+    doc.setLineWidth(0.3);
+    doc.setDrawColor(40, 40, 40);
+    doc.line(layout.centerX - 40, signatureY, layout.centerX + 40, signatureY);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(0, 0, 0);
+    doc.text(data.doctorName, layout.centerX, signatureY + 4.5, { align: "center" });
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80, 80, 80);
+    doc.text(formatCrm(data.doctorCrm, data.doctorCrmState), layout.centerX, signatureY + 9, { align: "center" });
+    doc.setFontSize(6.5);
+    doc.text("Assinatura e carimbo", layout.centerX, signatureY + 12.5, { align: "center" });
+    doc.setTextColor(0, 0, 0);
+
+    const gap = 4;
+    const boxWidth = (layout.contentWidth - gap) / 2;
+
+    doc.setDrawColor(180, 180, 180);
+    doc.setLineWidth(0.25);
+    doc.rect(layout.leftX, boxesY, boxWidth, BOXES_HEIGHT, "S");
+    doc.setFontSize(6);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(0, 0, 0);
+    doc.text("IDENTIFICAÇÃO DO COMPRADOR", layout.leftX + 2.5, boxesY + 3.5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(120, 120, 120);
+    doc.text("Nome: _________________________", layout.leftX + 2.5, boxesY + 8);
+    doc.text("RG: ___________  Órgão: ________", layout.leftX + 2.5, boxesY + 12.5);
+    doc.text("Endereço: ______________________", layout.leftX + 2.5, boxesY + 17);
+    doc.text("Telefone: _______________________", layout.leftX + 2.5, boxesY + 21.5);
+
+    const box2X = layout.leftX + boxWidth + gap;
+    doc.setTextColor(0, 0, 0);
+    doc.rect(box2X, boxesY, boxWidth, BOXES_HEIGHT, "S");
+    doc.setFont("helvetica", "bold");
+    doc.text("IDENTIFICAÇÃO DA FARMÁCIA / DROGARIA", box2X + 2.5, boxesY + 3.5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(120, 120, 120);
+    doc.text("Razão social: __________________", box2X + 2.5, boxesY + 8);
+    doc.text("CNPJ: _________________________", box2X + 2.5, boxesY + 12);
+    doc.text("Farmacêutico: __________________", box2X + 2.5, boxesY + 16);
+    doc.text("CRF: __________  Data: __/__/____", box2X + 2.5, boxesY + 20);
+
+    doc.setFontSize(6.5);
+    doc.setTextColor(110, 110, 110);
+    const finalValidityY = Math.min(validityY, contentBottomY - 1);
+    doc.text(
+        data.validityText || "Válido por 30 dias a partir da data de emissão.",
+        layout.leftX,
+        finalValidityY
+    );
+    if (data.prescriptionNumber) {
+        doc.text(`Nº ${data.prescriptionNumber}`, layout.rightX, finalValidityY, { align: "right" });
+    }
+    doc.setTextColor(0, 0, 0);
+};
+
 const generateLetterheadPrescription = (
     doc: jsPDF,
     data: PrescriptionData,
@@ -657,6 +736,7 @@ const generateLetterheadPrescription = (
     };
 
     let yPos = area.contentY + 2;
+    const contentBottomY = area.contentY + area.contentHeight;
 
     // Title
     doc.setTextColor(20, 20, 20);
@@ -690,79 +770,14 @@ const generateLetterheadPrescription = (
         yPos += 6;
     }
 
-    const contentBottomY = area.contentY + area.contentHeight;
-
     if (config.controlled) {
-        // Controlled prescription footer: signature + buyer/pharmacy boxes + validity
-        const validityY = contentBottomY - 3;
-        const boxesHeight = 32;
-        const boxesY = validityY - 6 - boxesHeight;
-        const signatureY = boxesY - 18;
-
-        // Signature
-        doc.setLineWidth(0.3);
-        doc.setDrawColor(40, 40, 40);
-        doc.line(layout.centerX - 40, signatureY, layout.centerX + 40, signatureY);
-        doc.setFontSize(9);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(0, 0, 0);
-        doc.text(data.doctorName, layout.centerX, signatureY + 4.5, { align: "center" });
-        doc.setFontSize(7.5);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(80, 80, 80);
-        doc.text(formatCrm(data.doctorCrm, data.doctorCrmState), layout.centerX, signatureY + 9, { align: "center" });
-        doc.setFontSize(6.5);
-        doc.text("Assinatura e carimbo", layout.centerX, signatureY + 12.5, { align: "center" });
-        doc.setTextColor(0, 0, 0);
-
-        // Buyer + Pharmacy boxes — fit within content width
-        const gap = 4;
-        const boxWidth = (layout.contentWidth - gap) / 2;
-
-        doc.setDrawColor(180, 180, 180);
-        doc.setLineWidth(0.25);
-        doc.rect(layout.leftX, boxesY, boxWidth, boxesHeight, "S");
-        doc.setFontSize(6.5);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(0, 0, 0);
-        doc.text("IDENTIFICAÇÃO DO COMPRADOR", layout.leftX + 2.5, boxesY + 4);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(120, 120, 120);
-        doc.text("Nome: __________________________", layout.leftX + 2.5, boxesY + 10);
-        doc.text("RG: ____________  Órgão: _________", layout.leftX + 2.5, boxesY + 16);
-        doc.text("Endereço: _______________________", layout.leftX + 2.5, boxesY + 22);
-        doc.text("Telefone: _______________________", layout.leftX + 2.5, boxesY + 28);
-
-        const box2X = layout.leftX + boxWidth + gap;
-        doc.setTextColor(0, 0, 0);
-        doc.rect(box2X, boxesY, boxWidth, boxesHeight, "S");
-        doc.setFont("helvetica", "bold");
-        doc.text("IDENTIFICAÇÃO DA FARMÁCIA / DROGARIA", box2X + 2.5, boxesY + 4);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(120, 120, 120);
-        doc.text("Razão social: ___________________", box2X + 2.5, boxesY + 9);
-        doc.text("CNPJ: __________________________", box2X + 2.5, boxesY + 14);
-        doc.text("Endereço: ______________________", box2X + 2.5, boxesY + 19);
-        doc.text("Farmacêutico: __________________", box2X + 2.5, boxesY + 24);
-        doc.text("CRF: ____________  Data: __/__/__", box2X + 2.5, boxesY + 29);
-
-        // Validity + prescription number
-        doc.setFontSize(6.5);
-        doc.setTextColor(110, 110, 110);
-        doc.text(
-            data.validityText || "Válido por 30 dias a partir da data de emissão.",
-            layout.leftX,
-            validityY
-        );
-        if (data.prescriptionNumber) {
-            doc.text(`Nº ${data.prescriptionNumber}`, layout.rightX, validityY, { align: "right" });
-        }
-        doc.setTextColor(0, 0, 0);
+        drawLetterheadControlledFooter(doc, layout, data, contentBottomY, yPos);
         return;
     }
 
-    // Non-controlled: signature anchored near the bottom of the body area
-    const signatureY = Math.min(Math.max(yPos + 10, contentBottomY - 28), contentBottomY - 12);
+    // Non-controlled: signature anchored below medications, near the bottom of the body area
+    const SIG_RESERVE = 22;
+    const signatureY = Math.max(yPos + 8, contentBottomY - SIG_RESERVE);
 
     doc.setLineWidth(0.3);
     doc.setDrawColor(40, 40, 40);
