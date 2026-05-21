@@ -445,7 +445,7 @@ export function usePrescriptionLogic(patient: Profile) {
                     patientInsurance: patient.planType ? `${patient.planType}${patient.insuranceCardNumber ? ` - Comb: ${patient.insuranceCardNumber}` : ""}` : undefined,
                     issueDate: new Date(savedData.issueDate),
                     validUntil: new Date(savedData.validUntil),
-                    medications: savedData.medications as any[],
+                    medications: (savedData.medications as any[]).map((m) => ({ ...m, continuous: true })),
                     observations: savedData.observations || undefined,
                     prescriptionNumber: savedData.id,
                 }, pdfWindow);
