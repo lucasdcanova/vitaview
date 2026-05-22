@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BrandLoader } from "@/components/ui/brand-loader";
-import { Upload, Trash2, Image as ImageIcon, Save, Eye, Sparkles, Droplet, Pencil, MessageCircle } from "lucide-react";
+import { Upload, Trash2, Image as ImageIcon, Save, Eye, Sparkles, Droplet, Pencil, MessageCircle, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { HeaderAiGeneratorDialog } from "@/components/clinic/header-ai-generator-dialog";
 import { HeaderElementsEditorDialog } from "@/components/clinic/header-elements-editor-dialog";
 
@@ -69,6 +70,7 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
     const [elementsDialogOpen, setElementsDialogOpen] = useState(false);
     const [isProcessingPdf, setIsProcessingPdf] = useState(false);
     const [isAnalyzingPreprinted, setIsAnalyzingPreprinted] = useState(false);
+    const [preprintedAdvancedOpen, setPreprintedAdvancedOpen] = useState(false);
     const imageInputRef = useRef<HTMLInputElement | null>(null);
     const bannerInputRef = useRef<HTMLInputElement | null>(null);
     const logoInputRef = useRef<HTMLInputElement | null>(null);
@@ -308,15 +310,24 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                 <CardDescription>
                     Personalize o topo das receitas, atestados e laudos com a identidade da clínica.
                 </CardDescription>
-                <a
-                    href="https://wa.me/555597032546?text=Ol%C3%A1%2C%20preciso%20de%20ajuda%20para%20configurar%20o%20cabe%C3%A7alho%20do%20meu%20receitu%C3%A1rio."
-                    target="_blank"
-                    rel="noreferrer"
-                    className="absolute top-4 right-4 flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition-colors"
-                >
-                    <MessageCircle className="h-3.5 w-3.5" />
-                    Suporte no WhatsApp
-                </a>
+                <TooltipProvider delayDuration={150}>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <a
+                                href="https://wa.me/555597032546?text=Ol%C3%A1%2C%20necessito%20aux%C3%ADlio%20com%20a%20prescri%C3%A7%C3%A3o%20de%20um%20receitu%C3%A1rio%20na%20VitaView%20AI."
+                                target="_blank"
+                                rel="noreferrer"
+                                aria-label="Suporte no WhatsApp"
+                                className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                            >
+                                <MessageCircle className="h-4 w-4" />
+                            </a>
+                        </TooltipTrigger>
+                        <TooltipContent side="left">
+                            Erro no receituário? Entre em contato com o suporte.
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
             </CardHeader>
             <CardContent className="space-y-6">
                 {!canEdit && (
@@ -484,30 +495,107 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                 )}
 
                 {/* Preprinted paper mode */}
-                {draft.headerMode === "preprinted" && (
-                    <div className="space-y-4 rounded-xl border border-border bg-muted/30 p-4">
-                        <div>
-                            <Label className="text-sm font-medium">Foto do seu receituário pré-impresso</Label>
-                            <p className="text-xs text-muted-foreground leading-snug mt-1">
-                                Envie uma foto/scan de uma folha em branco do seu receituário. A IA detecta automaticamente as margens livres onde o conteúdo deve cair na impressão.
+                {draft.headerMode === "preprinted" && (() => {
+                    const cfg = draft.preprintedConfig ?? DEFAULT_PREPRINTED;
+                    const orientationLabel = cfg.orientation === "landscape" ? "Paisagem" : "Retrato";
+                    return (
+                        <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-4">
+                            <p className="text-xs text-muted-foreground leading-snug">
+                                Margens reservadas no papel físico (timbrado em cima, rodapé/assinatura embaixo). Ajuste manualmente ou envie uma foto da folha em branco pra IA detectar.
                             </p>
+
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                <MarginField label="Topo" value={cfg.topMm} onChange={(v) => setPreprintedField("topMm", v)} disabled={!canEdit} max={cfg.paperHeightMm * 0.65} />
+                                <MarginField label="Rodapé" value={cfg.bottomMm} onChange={(v) => setPreprintedField("bottomMm", v)} disabled={!canEdit} max={cfg.paperHeightMm * 0.5} />
+                                <MarginField label="Esquerda" value={cfg.leftMm} onChange={(v) => setPreprintedField("leftMm", v)} disabled={!canEdit} max={cfg.paperWidthMm * 0.4} />
+                                <MarginField label="Direita" value={cfg.rightMm} onChange={(v) => setPreprintedField("rightMm", v)} disabled={!canEdit} max={cfg.paperWidthMm * 0.4} />
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => setPreprintedAdvancedOpen((v) => !v)}
+                                className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${preprintedAdvancedOpen ? "" : "-rotate-90"}`} />
+                                Tamanho do papel ({orientationLabel} · {cfg.paperWidthMm}×{cfg.paperHeightMm} mm)
+                            </button>
+
+                            {preprintedAdvancedOpen && (
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 rounded-lg border border-dashed border-border p-3">
+                                    <div className="space-y-1">
+                                        <Label className="text-[11px] font-medium text-muted-foreground">Largura (mm)</Label>
+                                        <Input
+                                            type="number"
+                                            step={0.5}
+                                            min={50}
+                                            max={500}
+                                            value={cfg.paperWidthMm}
+                                            onChange={(e) => setPreprintedField("paperWidthMm", parseFloat(e.target.value) || 210)}
+                                            disabled={!canEdit}
+                                            className="h-9 text-sm"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-[11px] font-medium text-muted-foreground">Altura (mm)</Label>
+                                        <Input
+                                            type="number"
+                                            step={0.5}
+                                            min={50}
+                                            max={500}
+                                            value={cfg.paperHeightMm}
+                                            onChange={(e) => setPreprintedField("paperHeightMm", parseFloat(e.target.value) || 148.5)}
+                                            disabled={!canEdit}
+                                            className="h-9 text-sm"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-[11px] font-medium text-muted-foreground">Orientação</Label>
+                                        <select
+                                            value={cfg.orientation}
+                                            onChange={(e) => setPreprintedField("orientation", e.target.value)}
+                                            disabled={!canEdit}
+                                            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                        >
+                                            <option value="landscape">Paisagem</option>
+                                            <option value="portrait">Retrato</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
+                                <p className="text-[11px] text-foreground leading-snug">
+                                    <strong>Dica:</strong> imprima uma receita de teste em folha branca e sobreponha à sua folha pré-impressa contra a luz pra conferir o alinhamento.
+                                </p>
+                            </div>
+
                             {canEdit && (
-                                <div className="mt-3">
+                                <div className="flex flex-wrap gap-2 justify-end pt-1">
                                     <Button
                                         variant="outline"
                                         size="sm"
                                         onClick={() => preprintedInputRef.current?.click()}
                                         disabled={isAnalyzingPreprinted || updateHeader.isPending}
+                                        className="h-8 text-xs"
                                     >
                                         {isAnalyzingPreprinted ? (
-                                            <BrandLoader className="h-4 w-4 mr-2" />
+                                            <BrandLoader className="h-3.5 w-3.5 mr-2" />
                                         ) : (
-                                            <Sparkles className="h-4 w-4 mr-2" style={{ color: "#AF9150" }} />
+                                            <Sparkles className="h-3.5 w-3.5 mr-2" style={{ color: "#AF9150" }} />
                                         )}
-                                        {isAnalyzingPreprinted ? "Analisando..." : "Enviar foto e detectar margens"}
+                                        {isAnalyzingPreprinted ? "Analisando..." : "Detectar margens por foto"}
+                                    </Button>
+                                    <Button
+                                        onClick={handleSavePreprinted}
+                                        disabled={updateHeader.isPending}
+                                        className="bg-primary hover:bg-primary/90 h-8 text-xs"
+                                    >
+                                        {updateHeader.isPending ? <BrandLoader className="h-3.5 w-3.5 mr-2" /> : <Save className="h-3.5 w-3.5 mr-2" />}
+                                        Salvar
                                     </Button>
                                 </div>
                             )}
+
                             <input
                                 ref={preprintedInputRef}
                                 type="file"
@@ -520,82 +608,8 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                                 }}
                             />
                         </div>
-
-                        <div className="border-t border-border pt-4">
-                            <Label className="text-sm font-medium">Margens (mm)</Label>
-                            <p className="text-xs text-muted-foreground leading-snug mt-1">
-                                Ajuste manualmente se necessário. As margens marcam o espaço reservado no papel físico (timbrado em cima, assinatura/caixas embaixo).
-                            </p>
-                            {(() => {
-                                const cfg = draft.preprintedConfig ?? DEFAULT_PREPRINTED;
-                                return (
-                                    <>
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
-                                            <MarginField label="Topo" value={cfg.topMm} onChange={(v) => setPreprintedField("topMm", v)} disabled={!canEdit} max={cfg.paperHeightMm * 0.65} />
-                                            <MarginField label="Rodapé" value={cfg.bottomMm} onChange={(v) => setPreprintedField("bottomMm", v)} disabled={!canEdit} max={cfg.paperHeightMm * 0.5} />
-                                            <MarginField label="Esquerda" value={cfg.leftMm} onChange={(v) => setPreprintedField("leftMm", v)} disabled={!canEdit} max={cfg.paperWidthMm * 0.4} />
-                                            <MarginField label="Direita" value={cfg.rightMm} onChange={(v) => setPreprintedField("rightMm", v)} disabled={!canEdit} max={cfg.paperWidthMm * 0.4} />
-                                        </div>
-                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
-                                            <div className="space-y-1.5">
-                                                <Label className="text-xs font-medium text-foreground">Largura do papel (mm)</Label>
-                                                <Input
-                                                    type="number"
-                                                    step={0.5}
-                                                    min={50}
-                                                    max={500}
-                                                    value={cfg.paperWidthMm}
-                                                    onChange={(e) => setPreprintedField("paperWidthMm", parseFloat(e.target.value) || 210)}
-                                                    disabled={!canEdit}
-                                                    className="h-9"
-                                                />
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                <Label className="text-xs font-medium text-foreground">Altura do papel (mm)</Label>
-                                                <Input
-                                                    type="number"
-                                                    step={0.5}
-                                                    min={50}
-                                                    max={500}
-                                                    value={cfg.paperHeightMm}
-                                                    onChange={(e) => setPreprintedField("paperHeightMm", parseFloat(e.target.value) || 148.5)}
-                                                    disabled={!canEdit}
-                                                    className="h-9"
-                                                />
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                <Label className="text-xs font-medium text-foreground">Orientação</Label>
-                                                <select
-                                                    value={cfg.orientation}
-                                                    onChange={(e) => setPreprintedField("orientation", e.target.value)}
-                                                    disabled={!canEdit}
-                                                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                                                >
-                                                    <option value="landscape">Paisagem</option>
-                                                    <option value="portrait">Retrato</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                        {canEdit && (
-                                            <div className="flex justify-end mt-4">
-                                                <Button onClick={handleSavePreprinted} disabled={updateHeader.isPending} className="bg-primary hover:bg-primary/90">
-                                                    {updateHeader.isPending ? <BrandLoader className="h-4 w-4 mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                                                    Salvar margens
-                                                </Button>
-                                            </div>
-                                        )}
-                                    </>
-                                );
-                            })()}
-                        </div>
-
-                        <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
-                            <p className="text-xs text-foreground leading-snug">
-                                <strong>Dica:</strong> imprima uma receita de teste em uma folha branca normal e sobreponha à sua folha pré-impressa contra a luz para conferir o alinhamento. Ajuste as margens em pequenos incrementos.
-                            </p>
-                        </div>
-                    </div>
-                )}
+                    );
+                })()}
 
                 {(draft.headerMode === "minimal" || draft.headerMode === "composed") && (
                     <div className="rounded-xl border border-dashed border-border p-4 space-y-4">
@@ -856,8 +870,7 @@ function MarginField({
     max: number;
 }) {
     return (
-        <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-foreground">{label} (mm)</Label>
+        <div className="relative">
             <Input
                 type="number"
                 step={0.5}
@@ -866,8 +879,11 @@ function MarginField({
                 value={Number.isFinite(value) ? value : 0}
                 onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
                 disabled={disabled}
-                className="h-9"
+                className="h-9 pr-12 text-sm"
             />
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-medium text-muted-foreground pointer-events-none">
+                {label}
+            </span>
         </div>
     );
 }
