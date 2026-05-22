@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BrandLoader } from "@/components/ui/brand-loader";
-import { Upload, Trash2, Image as ImageIcon, Save, Eye, Sparkles, Droplet, Pencil } from "lucide-react";
+import { Upload, Trash2, Image as ImageIcon, Save, Eye, Sparkles, Droplet, Pencil, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { HeaderAiGeneratorDialog } from "@/components/clinic/header-ai-generator-dialog";
@@ -303,11 +303,20 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
 
     return (
         <Card className="border border-border shadow-sm">
-            <CardHeader>
+            <CardHeader className="relative">
                 <CardTitle className="text-foreground">Cabeçalho do receituário</CardTitle>
                 <CardDescription>
                     Personalize o topo das receitas, atestados e laudos com a identidade da clínica.
                 </CardDescription>
+                <a
+                    href="https://wa.me/555597032546?text=Ol%C3%A1%2C%20preciso%20de%20ajuda%20para%20configurar%20o%20cabe%C3%A7alho%20do%20meu%20receitu%C3%A1rio."
+                    target="_blank"
+                    rel="noreferrer"
+                    className="absolute top-4 right-4 flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition-colors"
+                >
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    Suporte no WhatsApp
+                </a>
             </CardHeader>
             <CardContent className="space-y-6">
                 {!canEdit && (
