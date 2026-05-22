@@ -18,6 +18,7 @@ import { BrandLoader } from "@/components/ui/brand-loader";
 import { Save, Loader2, BadgeCheck, MapPin } from "lucide-react";
 
 const SPECIALTIES = [
+    "Clínico geral",
     "Acupuntura", "Alergia e Imunologia", "Anestesiologia", "Angiologia",
     "Cardiologia", "Cirurgia Cardiovascular", "Cirurgia da Mão", "Cirurgia de Cabeça e Pescoço",
     "Cirurgia do Aparelho Digestivo", "Cirurgia Geral", "Cirurgia Pediátrica", "Cirurgia Plástica",
