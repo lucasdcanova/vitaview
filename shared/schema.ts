@@ -518,6 +518,10 @@ export const clinics = pgTable("clinics", {
   headerEmail: text("header_email"),
   headerWebsite: text("header_website"),
   headerCnpj: text("header_cnpj"),
+  /** When true and a logo is uploaded, the logo is used as the document watermark
+   *  in place of the discrete VitaView mark. Defaults to false so existing
+   *  clinics keep the VitaView watermark unless they opt in. */
+  headerWatermarkUseLogo: boolean("header_watermark_use_logo").default(false),
   // For "letterhead" mode: body region where content should be placed
   // JSON shape: { top: 0..1, bottom: 0..1, left: 0..1, right: 0..1 }
   headerBodyBbox: text("header_body_bbox"),

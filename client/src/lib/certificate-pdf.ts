@@ -182,7 +182,7 @@ export const generateCertificatePDF = async (data: CertificateData): Promise<Blo
             topMargin: 12,
             identity,
         });
-        drawDocumentWatermark(doc, { xOffset: 0, pageWidth, pageHeight, assets });
+        drawDocumentWatermark(doc, { xOffset: 0, pageWidth, pageHeight, assets, useLogo: !!header?.watermarkUseLogo });
         yPos = headerEndY + 22;
         contentBottomY = pageHeight - 20;
     }

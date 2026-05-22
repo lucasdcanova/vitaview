@@ -30,6 +30,8 @@ export interface ClinicHeaderForPdf {
     email?: string | null;
     website?: string | null;
     cnpj?: string | null;
+    /** When true and a logo is uploaded, the logo is used as the document watermark. */
+    watermarkUseLogo?: boolean;
     /** Body region (0..1) for "letterhead" mode — where document content goes */
     bodyBbox?: BodyBbox | null;
     /** Margins (mm) for "preprinted" mode — content is positioned inside these margins on a blank PDF. */
@@ -170,6 +172,7 @@ export async function fetchAndPreloadClinicHeader(): Promise<{
             email: data.headerEmail,
             website: data.headerWebsite,
             cnpj: data.headerCnpj,
+            watermarkUseLogo: !!data.headerWatermarkUseLogo,
             bodyBbox: data.headerBodyBbox ?? null,
             preprinted: data.preprintedConfig ?? null,
         };
@@ -524,9 +527,13 @@ export function drawDocumentWatermark(
         pageWidth: number;
         pageHeight: number;
         assets?: PreloadedHeaderAssets;
+        /** When true and a clinic logo is present, the logo replaces the VitaView mark. */
+        useLogo?: boolean;
     }
 ): void {
-    const mark = options.assets?.logo ?? options.assets?.vitaViewMark;
+    const mark = options.useLogo && options.assets?.logo
+        ? options.assets.logo
+        : options.assets?.vitaViewMark;
     if (!mark) return;
 
     const docAny = doc as any;

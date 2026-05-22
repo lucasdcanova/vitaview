@@ -1362,6 +1362,7 @@ export class MemStorage implements IStorage {
       headerEmail: null,
       headerWebsite: null,
       headerCnpj: null,
+      headerWatermarkUseLogo: false,
       headerBodyBbox: null,
       preprintedConfig: null,
     };

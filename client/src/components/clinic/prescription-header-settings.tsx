@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BrandLoader } from "@/components/ui/brand-loader";
-import { Upload, Trash2, Image as ImageIcon, Save, Eye, Sparkles } from "lucide-react";
+import { Upload, Trash2, Image as ImageIcon, Save, Eye, Sparkles, Droplet } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Checkbox } from "@/components/ui/checkbox";
 import { HeaderAiGeneratorDialog } from "@/components/clinic/header-ai-generator-dialog";
 
 export type PreprintedConfig = {
@@ -35,6 +36,7 @@ export type ClinicHeader = {
     headerEmail: string | null;
     headerWebsite: string | null;
     headerCnpj: string | null;
+    headerWatermarkUseLogo: boolean;
     headerBodyBbox: { top: number; bottom: number; left: number; right: number } | null;
     preprintedConfig: PreprintedConfig | null;
 };
@@ -178,6 +180,7 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
             headerEmail: draft.headerEmail,
             headerWebsite: draft.headerWebsite,
             headerCnpj: draft.headerCnpj,
+            headerWatermarkUseLogo: draft.headerWatermarkUseLogo,
         });
     };
 
@@ -572,13 +575,14 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
 
                 {(draft.headerMode === "minimal" || draft.headerMode === "composed") && (
                     <div className="rounded-xl border border-dashed border-border p-4 space-y-4">
-                        <p className="text-sm text-muted-foreground">
-                            O nome do médico aparece ao lado do monograma — você pode substituí-lo por um nome de clínica/marca pessoal e por uma logo própria. CNPJ, e-mail e site ficam em <strong>Dados do consultório</strong>.
+                        <p className="text-xs text-muted-foreground leading-snug">
+                            Cabeçalho discreto com monograma. CNPJ, e-mail e site ficam em <strong>Dados do consultório</strong>.
                         </p>
 
-                        <div className="space-y-3">
-                            <Label className="text-sm font-medium">Logo (opcional)</Label>
-                            <div className="flex items-center gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-[88px_1fr] gap-4 items-start">
+                            {/* Logo preview + actions */}
+                            <div className="space-y-1.5">
+                                <Label className="text-xs font-medium text-foreground">Logo</Label>
                                 <div className="h-20 w-20 rounded-lg border border-border bg-white flex items-center justify-center overflow-hidden">
                                     {draft.headerLogoUrl ? (
                                         <img src={draft.headerLogoUrl} alt="Logo" className="max-h-full max-w-full object-contain" />
@@ -587,48 +591,74 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                                     )}
                                 </div>
                                 {canEdit && (
-                                    <div className="flex flex-col gap-1.5">
-                                        <Button variant="outline" size="sm" onClick={() => logoInputRef.current?.click()} disabled={uploadLogo.isPending}>
-                                            <Upload className="h-4 w-4 mr-2" />
-                                            {draft.headerLogoUrl ? "Substituir" : "Enviar logo"}
+                                    <div className="flex flex-col gap-1 pt-1">
+                                        <Button variant="outline" size="sm" onClick={() => logoInputRef.current?.click()} disabled={uploadLogo.isPending} className="h-7 px-2 text-xs">
+                                            <Upload className="h-3 w-3 mr-1" />
+                                            {draft.headerLogoUrl ? "Trocar" : "Enviar"}
                                         </Button>
                                         {draft.headerLogoUrl && (
-                                            <Button variant="ghost" size="sm" onClick={() => deleteLogo.mutate()} className="text-destructive">
-                                                <Trash2 className="h-3.5 w-3.5 mr-2" />
+                                            <Button variant="ghost" size="sm" onClick={() => deleteLogo.mutate()} className="h-6 px-2 text-xs text-destructive">
+                                                <Trash2 className="h-3 w-3 mr-1" />
                                                 Remover
                                             </Button>
                                         )}
                                     </div>
                                 )}
+                                <input
+                                    ref={logoInputRef}
+                                    type="file"
+                                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) uploadLogo.mutate(file);
+                                        e.target.value = "";
+                                    }}
+                                />
                             </div>
-                            <input
-                                ref={logoInputRef}
-                                type="file"
-                                accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                                className="hidden"
-                                onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) uploadLogo.mutate(file);
-                                    e.target.value = "";
-                                }}
-                            />
+
+                            {/* Right column: name, watermark toggle, save */}
+                            <div className="space-y-3">
+                                <Field
+                                    label="Nome exibido no cabeçalho"
+                                    value={draft.headerClinicName}
+                                    onChange={(v) => setField("headerClinicName", v)}
+                                    disabled={!canEdit}
+                                />
+
+                                <label className={cn(
+                                    "flex items-start gap-2.5 rounded-md border border-border bg-background px-3 py-2.5 text-xs cursor-pointer transition-colors",
+                                    !draft.headerLogoUrl && "opacity-60 cursor-not-allowed",
+                                )}>
+                                    <Checkbox
+                                        checked={!!draft.headerWatermarkUseLogo}
+                                        onCheckedChange={(v) => setField("headerWatermarkUseLogo", !!v)}
+                                        disabled={!canEdit || !draft.headerLogoUrl}
+                                        className="mt-0.5"
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-medium text-foreground flex items-center gap-1.5">
+                                            <Droplet className="h-3.5 w-3.5" />
+                                            Usar minha logo como marca d'água
+                                        </p>
+                                        <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">
+                                            {draft.headerLogoUrl
+                                                ? "Substitui a marca d'água discreta do VitaView pela sua logo."
+                                                : "Envie uma logo acima para habilitar."}
+                                        </p>
+                                    </div>
+                                </label>
+
+                                {canEdit && (
+                                    <div className="flex justify-end pt-1">
+                                        <Button onClick={handleSaveTexts} disabled={updateHeader.isPending} className="bg-primary hover:bg-primary/90 h-8 text-sm">
+                                            {updateHeader.isPending ? <BrandLoader className="h-3.5 w-3.5 mr-2" /> : <Save className="h-3.5 w-3.5 mr-2" />}
+                                            Salvar
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-
-                        <Field
-                            label="Nome exibido no cabeçalho (opcional)"
-                            value={draft.headerClinicName}
-                            onChange={(v) => setField("headerClinicName", v)}
-                            disabled={!canEdit}
-                        />
-
-                        {canEdit && (
-                            <div className="flex justify-end">
-                                <Button onClick={handleSaveTexts} disabled={updateHeader.isPending} className="bg-primary hover:bg-primary/90">
-                                    {updateHeader.isPending ? <BrandLoader className="h-4 w-4 mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                                    Salvar dados do cabeçalho
-                                </Button>
-                            </div>
-                        )}
                     </div>
                 )}
 

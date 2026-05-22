@@ -983,6 +983,7 @@ const generateBasicPrescription = (
         pageWidth: layout.pageWidth,
         pageHeight: PAGE_HEIGHT_LANDSCAPE,
         assets: data.clinicHeaderAssets ?? {},
+        useLogo: !!data.clinicHeader?.watermarkUseLogo,
     });
 
     let yPos = drawDocumentTitle(doc, layout, config.title, headerEndY, {
@@ -1016,6 +1017,7 @@ const generateControlledPrescription = (
         pageWidth: VIA_W,
         pageHeight: VIA_H,
         assets: data.clinicHeaderAssets ?? {},
+        useLogo: !!data.clinicHeader?.watermarkUseLogo,
     });
 
     // Title centered at the top
@@ -1100,6 +1102,7 @@ const generateLetterheadControlledPrescription = (
         pageWidth: VIA_WIDTH,
         pageHeight: VIA_HEIGHT,
         assets,
+        useLogo: !!header?.watermarkUseLogo,
     });
 
     let yPos = headerBandHeightMm + 3;
