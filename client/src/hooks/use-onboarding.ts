@@ -16,14 +16,30 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
         id: 'minha-clinica',
         target: '[data-tour="nav-minha-clinica"]',
         title: '1. Minha Clínica',
-        description: 'Comece configurando aqui os dados da sua clínica: nome, endereço, telefone e o cabeçalho dos receituários, atestados e laudos. É o que dá identidade aos seus documentos.',
+        description: 'Este é o centro da sua clínica. Aqui ficam os dados do consultório, o cabeçalho dos documentos e os profissionais que têm acesso.',
         placement: 'right',
+        route: '/minha-clinica'
+    },
+    {
+        id: 'clinic-office',
+        target: '[data-tour="clinic-office-card"]',
+        title: '2. Dados do consultório',
+        description: 'Comece por aqui: preencha o endereço, CEP, telefone e os dados de contato. Essas informações aparecem nos receituários, atestados e laudos.',
+        placement: 'top',
+        route: '/minha-clinica'
+    },
+    {
+        id: 'clinic-header',
+        target: '[data-tour="clinic-header-card"]',
+        title: '3. Cabeçalho do receituário',
+        description: 'Em seguida configure o cabeçalho que aparecerá no topo de cada documento. Você pode usar o modo Padrão, enviar um timbrado em PDF ou imprimir em papel pré-impresso.',
+        placement: 'top',
         route: '/minha-clinica'
     },
     {
         id: 'agenda',
         target: '[data-tour="nav-agenda"]',
-        title: '2. Agenda',
+        title: '4. Agenda',
         description: 'Organize seus atendimentos. Aqui você visualiza e gerencia todas as suas consultas agendadas do dia e da semana.',
         placement: 'right',
         route: '/agenda'
@@ -31,7 +47,7 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
     {
         id: 'pacientes',
         target: '[data-tour="nav-pacientes"]',
-        title: '3. Pacientes',
+        title: '5. Pacientes',
         description: 'Gerencie sua base de pacientes. Ao acessar um paciente, você poderá registrar toda a anamnese, histórico clínico e evoluções de forma detalhada e segura.',
         placement: 'right',
         route: '/pacientes'
@@ -39,7 +55,7 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
     {
         id: 'vita-assist',
         target: '[data-tour="nav-vita-assist"]',
-        title: '4. Vita Assist',
+        title: '6. Vita Assist',
         description: 'Seu assistente de IA para medicina. Tire dúvidas clínicas, consulte protocolos e obtenha suporte inteligente para suas decisões médicas.',
         placement: 'right',
         route: '/vita-assist'
@@ -47,7 +63,7 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
     {
         id: 'subscription',
         target: '[data-tour="nav-assinatura"]',
-        title: '5. Minha Assinatura',
+        title: '7. Minha Assinatura',
         description: 'Gerencie seu plano, faturas e métodos de pagamento. Acompanhe o status da sua assinatura e faça upgrades conforme sua necessidade.',
         placement: 'right',
         route: '/subscription'
@@ -55,7 +71,7 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
     {
         id: 'reports',
         target: '[data-tour="nav-relatorios"]',
-        title: '6. Relatórios',
+        title: '8. Relatórios',
         description: 'Acompanhe métricas detalhadas da sua clínica ou consultório. Visualize dados financeiros, volume de atendimentos e estatísticas de saúde dos seus pacientes.',
         placement: 'right',
         route: '/reports'
@@ -63,7 +79,7 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
     {
         id: 'settings',
         target: '[data-tour="nav-configuracoes"]',
-        title: '7. Configurações',
+        title: '9. Configurações',
         description: 'Personalize sua experiência. Aqui você completa seu perfil profissional, adiciona CRM/RQE e ajusta suas preferências de atendimento.',
         placement: 'right',
         route: '/profile'
