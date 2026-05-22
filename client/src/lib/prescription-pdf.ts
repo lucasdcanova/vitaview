@@ -847,13 +847,7 @@ const drawControlledRegulatorySection = (
     doc.setFont("helvetica", "normal");
     doc.setTextColor(60, 60, 60);
     doc.text("____ / ____ / ________", leftX + colW / 2, startY + 8, { align: "center" });
-    // Full clinic address on the bottom line (replaces the bare city)
-    if (data.doctorAddress) {
-        doc.setFontSize(6.5);
-        doc.setTextColor(95, 95, 95);
-        const wrapped = doc.splitTextToSize(data.doctorAddress, colW - 6);
-        doc.text(wrapped[0], leftX + colW / 2, startY + topH - 3, { align: "center" });
-    } else if (data.doctorCity) {
+    if (data.doctorCity) {
         doc.setFontSize(6.5);
         doc.setTextColor(95, 95, 95);
         doc.text(data.doctorCity, leftX + colW / 2, startY + topH - 3, { align: "center" });
