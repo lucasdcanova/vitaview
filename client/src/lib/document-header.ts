@@ -20,6 +20,22 @@ export interface PreprintedConfig {
     rightMm: number;
 }
 
+/** Names of prescription elements that can be suppressed when the clinic's
+ *  letterhead already provides them. Keep in sync with HeaderElementsEditorDialog. */
+export type SuppressableField =
+    | "doctorName"
+    | "doctorCrm"
+    | "doctorSpecialty"
+    | "doctorRqe"
+    | "doctorAddress"
+    | "doctorPhone"
+    | "doctorEmail"
+    | "doctorWebsite"
+    | "doctorCnpj"
+    | "footerBand";
+
+export type SuppressFieldsMap = Partial<Record<SuppressableField, boolean>>;
+
 export interface ClinicHeaderForPdf {
     mode: "minimal" | "image" | "composed" | "letterhead" | "preprinted";
     imageUrl?: string | null;
@@ -32,10 +48,18 @@ export interface ClinicHeaderForPdf {
     cnpj?: string | null;
     /** When true and a logo is uploaded, the logo is used as the document watermark. */
     watermarkUseLogo?: boolean;
+    /** Per-field suppression map — when value is true, the renderer skips that field. */
+    suppressFields?: SuppressFieldsMap;
     /** Body region (0..1) for "letterhead" mode — where document content goes */
     bodyBbox?: BodyBbox | null;
     /** Margins (mm) for "preprinted" mode — content is positioned inside these margins on a blank PDF. */
     preprinted?: PreprintedConfig | null;
+}
+
+/** Returns true when the clinic has uploaded a banner image (used as the wide
+ *  top strip in minimal mode, replacing the monogram + name composition). */
+export function hasMinimalBanner(header: ClinicHeaderForPdf | null | undefined): boolean {
+    return !!(header && header.mode === "minimal" && header.imageUrl);
 }
 
 /** Returns true when the clinic has a full-page letterhead PDF active. */
@@ -173,6 +197,9 @@ export async function fetchAndPreloadClinicHeader(): Promise<{
             website: data.headerWebsite,
             cnpj: data.headerCnpj,
             watermarkUseLogo: !!data.headerWatermarkUseLogo,
+            suppressFields: (data.headerSuppressFields && typeof data.headerSuppressFields === "object")
+                ? (data.headerSuppressFields as SuppressFieldsMap)
+                : {},
             bodyBbox: data.headerBodyBbox ?? null,
             preprinted: data.preprintedConfig ?? null,
         };
@@ -251,43 +278,44 @@ function resolveHeaderText(
 ): HeaderRenderInput {
     const usingComposed = header?.mode === "composed";
     const customName = header?.clinicName?.trim() || "";
+    const suppress = header?.suppressFields ?? {};
 
-    // Title — prefer the custom clinic name (composed OR minimal mode); fall back to doctor's name
-    const title = customName || identity?.doctorName || "VitaView.AI";
+    // Title — prefer the custom clinic name; fall back to doctor's name (unless suppressed)
+    const titleFromDoctor = suppress.doctorName ? "" : (identity?.doctorName || "");
+    const title = customName || titleFromDoctor || "VitaView.AI";
 
-    const crmLabel = formatCrm(identity?.doctorCrm, identity?.doctorCrmState);
+    const crmLabel = suppress.doctorCrm ? "" : formatCrm(identity?.doctorCrm, identity?.doctorCrmState);
 
-    const specialtyLabel = formatSpecialty(identity?.doctorSpecialty, identity?.doctorRqe, { prefixWhenNoRqe: false });
+    const specialtyLabel = suppress.doctorSpecialty
+        ? ""
+        : formatSpecialty(identity?.doctorSpecialty, identity?.doctorRqe, { prefixWhenNoRqe: false });
 
     const subtitleParts: string[] = [];
     if (customName) {
         // Custom name is the title: subtitle shows doctor identity + credentials
-        if (identity?.doctorName && identity.doctorName !== title) {
-            const docBits = [identity.doctorName];
-            if (crmLabel) docBits.push(crmLabel);
-            if (specialtyLabel) docBits.push(specialtyLabel);
-            subtitleParts.push(docBits.join("  ·  "));
-        } else if (crmLabel) {
-            subtitleParts.push(crmLabel);
-        }
+        const docBits: string[] = [];
+        if (identity?.doctorName && identity.doctorName !== title && !suppress.doctorName) docBits.push(identity.doctorName);
+        if (crmLabel) docBits.push(crmLabel);
+        if (specialtyLabel) docBits.push(specialtyLabel);
+        if (docBits.length) subtitleParts.push(docBits.join("  ·  "));
     } else {
         // No custom name: subtitle shows credentials of the doctor
         const bits: string[] = [];
         if (crmLabel) bits.push(crmLabel);
         if (specialtyLabel) bits.push(specialtyLabel);
-        if (identity?.doctorRqe) bits.push(`RQE ${identity.doctorRqe}`);
-        subtitleParts.push(bits.join("  ·  "));
+        if (identity?.doctorRqe && !suppress.doctorRqe) bits.push(`RQE ${identity.doctorRqe}`);
+        if (bits.length) subtitleParts.push(bits.join("  ·  "));
     }
 
-    // Optional secondary line — composed clinic contact info
+    // Optional secondary line — composed clinic contact info (legacy)
     let subtitleLine2: string | undefined;
     if (usingComposed) {
         const contact: string[] = [];
-        if (header?.address) contact.push(header.address);
+        if (header?.address && !suppress.doctorAddress) contact.push(header.address);
         const inline: string[] = [];
-        if (header?.phone) inline.push(formatBrazilianPhone(header.phone));
-        if (header?.email) inline.push(header.email);
-        if (header?.website) inline.push(header.website);
+        if (header?.phone && !suppress.doctorPhone) inline.push(formatBrazilianPhone(header.phone));
+        if (header?.email && !suppress.doctorEmail) inline.push(header.email);
+        if (header?.website && !suppress.doctorWebsite) inline.push(header.website);
         if (inline.length) contact.push(inline.join("  ·  "));
         if (contact.length) subtitleLine2 = contact.join("  ·  ");
     }
@@ -349,8 +377,10 @@ export function drawDocumentHeader(
     const rightX = xOffset + pageWidth - marginX;
     const mode = header?.mode ?? "minimal";
 
-    // ===== IMAGE MODE (user-uploaded full letterhead) =====
-    if (mode === "image" && assets.image) {
+    // ===== BANNER MODE — minimal/composed/image when a wide image is uploaded =====
+    // The image acts as a top-of-page header band. Below it, only the suppression-aware
+    // content rules apply (the user's letterhead may already include name/CRM/etc.).
+    if (assets.image && (mode === "image" || mode === "minimal" || mode === "composed")) {
         const contentWidth = pageWidth - marginX * 2;
         const maxHeight = 30;
         let drawWidth = contentWidth;
@@ -368,7 +398,7 @@ export function drawDocumentHeader(
         return sepY + 4;
     }
 
-    // ===== VITA DEFAULT TEMPLATE (used for both composed and minimal) =====
+    // ===== VITA DEFAULT TEMPLATE (used for minimal without banner) =====
     const { title, subtitleLine1, subtitleLine2 } = resolveHeaderText(header, options.identity);
 
     const monogramSize = 13;
@@ -453,23 +483,29 @@ export function drawDocumentFooter(
     const usingComposed = header?.mode === "composed";
     const identity = options.identity;
     const customName = header?.clinicName?.trim() || "";
+    const suppress = header?.suppressFields ?? {};
+
+    // Whole-band suppression: the clinic's letterhead already has a footer.
+    if (suppress.footerBand) return;
 
     const primaryParts: string[] = [];
     if (customName) primaryParts.push(customName);
-    if (identity?.doctorName && identity.doctorName !== customName) {
+    if (identity?.doctorName && identity.doctorName !== customName && !suppress.doctorName) {
         primaryParts.push(identity.doctorName);
     }
-    const footerCrm = formatCrm(identity?.doctorCrm, identity?.doctorCrmState);
-    if (footerCrm) primaryParts.push(footerCrm);
+    if (!suppress.doctorCrm) {
+        const footerCrm = formatCrm(identity?.doctorCrm, identity?.doctorCrmState);
+        if (footerCrm) primaryParts.push(footerCrm);
+    }
 
     const secondaryParts: string[] = [];
-    const address = identity?.doctorAddress || (usingComposed ? header?.address : null);
+    const address = !suppress.doctorAddress ? (identity?.doctorAddress || (usingComposed ? header?.address : null)) : null;
     if (address) secondaryParts.push(address);
     const contact: string[] = [];
-    const phone = identity?.doctorPhone || (usingComposed ? header?.phone : null);
-    const email = identity?.doctorEmail || (usingComposed ? header?.email : null);
-    const website = identity?.doctorWebsite || (usingComposed ? header?.website : null);
-    const cnpj = identity?.doctorCnpj || (usingComposed ? header?.cnpj : null);
+    const phone = !suppress.doctorPhone ? (identity?.doctorPhone || (usingComposed ? header?.phone : null)) : null;
+    const email = !suppress.doctorEmail ? (identity?.doctorEmail || (usingComposed ? header?.email : null)) : null;
+    const website = !suppress.doctorWebsite ? (identity?.doctorWebsite || (usingComposed ? header?.website : null)) : null;
+    const cnpj = !suppress.doctorCnpj ? (identity?.doctorCnpj || (usingComposed ? header?.cnpj : null)) : null;
     if (phone) contact.push(formatBrazilianPhone(phone));
     if (email) contact.push(email);
     if (website) contact.push(website);

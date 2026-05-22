@@ -5595,6 +5595,7 @@ export async function registerRoutes(app: Express): Promise<void> {
     headerWebsite: string | null;
     headerCnpj: string | null;
     headerWatermarkUseLogo: boolean;
+    headerSuppressFields: Record<string, boolean>;
     headerBodyBbox: { top: number; bottom: number; left: number; right: number } | null;
     preprintedConfig: PreprintedConfigShape | null;
   };
@@ -5669,6 +5670,20 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
     }
 
+    let suppressFields: Record<string, boolean> = {};
+    if (clinic.headerSuppressFields && typeof clinic.headerSuppressFields === 'string') {
+      try {
+        const parsed = JSON.parse(clinic.headerSuppressFields);
+        if (parsed && typeof parsed === 'object') {
+          for (const [k, v] of Object.entries(parsed)) {
+            if (v === true) suppressFields[k] = true;
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
     return {
       clinicId: clinic.id,
       role,
@@ -5684,6 +5699,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       headerWebsite: clinic.headerWebsite ?? null,
       headerCnpj: clinic.headerCnpj ?? null,
       headerWatermarkUseLogo: !!clinic.headerWatermarkUseLogo,
+      headerSuppressFields: suppressFields,
       headerBodyBbox: bodyBbox,
       preprintedConfig,
     };
@@ -5787,6 +5803,20 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
       if ('headerWatermarkUseLogo' in (req.body || {})) {
         update.headerWatermarkUseLogo = !!req.body.headerWatermarkUseLogo;
+      }
+      if ('headerSuppressFields' in (req.body || {})) {
+        const raw = req.body.headerSuppressFields;
+        if (raw === null) {
+          update.headerSuppressFields = null;
+        } else if (raw && typeof raw === 'object') {
+          const cleaned: Record<string, boolean> = {};
+          for (const [k, v] of Object.entries(raw)) {
+            if (v === true) cleaned[k] = true;
+          }
+          update.headerSuppressFields = Object.keys(cleaned).length ? JSON.stringify(cleaned) : null;
+        } else {
+          return res.status(400).json({ message: 'headerSuppressFields inválido' });
+        }
       }
       if ('preprintedConfig' in (req.body || {})) {
         if (req.body.preprintedConfig === null) {

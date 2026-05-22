@@ -522,6 +522,10 @@ export const clinics = pgTable("clinics", {
    *  in place of the discrete VitaView mark. Defaults to false so existing
    *  clinics keep the VitaView watermark unless they opt in. */
   headerWatermarkUseLogo: boolean("header_watermark_use_logo").default(false),
+  /** Per-field suppression for prescription elements the user's letterhead already provides.
+   *  JSON shape: { doctorName?: true, doctorCrm?: true, doctorAddress?: true, ... }
+   *  Each true means "my letterhead already has this — don't draw it". */
+  headerSuppressFields: text("header_suppress_fields"),
   // For "letterhead" mode: body region where content should be placed
   // JSON shape: { top: 0..1, bottom: 0..1, left: 0..1, right: 0..1 }
   headerBodyBbox: text("header_body_bbox"),
