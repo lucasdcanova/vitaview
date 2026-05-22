@@ -308,15 +308,17 @@ const drawBasicSignatureFooter = (
     doc.setFontSize(7);
     doc.text("Assinatura e carimbo", sigCenter, signatureY + 13, { align: "center" });
 
-    // Blank date fields — doctor fills the date manually. Clinic city sits on the line below.
+    // Blank date fields — doctor fills the date manually. Clinic city sits centered below.
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(0, 0, 0);
-    doc.text("_____ / _____ / __________", layout.leftX, signatureY);
+    const dateText = "_____ / _____ / __________";
+    doc.text(dateText, layout.leftX, signatureY);
     if (data.doctorCity) {
+        const dateWidth = doc.getTextWidth(dateText);
         doc.setFontSize(8);
         doc.setTextColor(95, 95, 95);
-        doc.text(data.doctorCity, layout.leftX, signatureY + 4);
+        doc.text(data.doctorCity, layout.leftX + dateWidth / 2, signatureY + 6.5, { align: "center" });
         doc.setTextColor(0, 0, 0);
     }
 
