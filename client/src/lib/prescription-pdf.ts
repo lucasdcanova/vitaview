@@ -305,13 +305,17 @@ const drawBasicSignatureFooter = (
     doc.setFontSize(7);
     doc.text("Assinatura e carimbo", sigCenter, signatureY + 13, { align: "center" });
 
-    // City prefix + blank date fields — doctor fills the date manually
-    const cityPrefix = data.doctorCity ? `${data.doctorCity}, ` : "";
-    const blankDate = `${cityPrefix}_____ / _____ / __________`;
+    // Blank date fields — doctor fills the date manually. Clinic city sits on the line below.
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(0, 0, 0);
-    doc.text(blankDate, layout.leftX, signatureY);
+    doc.text("_____ / _____ / __________", layout.leftX, signatureY);
+    if (data.doctorCity) {
+        doc.setFontSize(8);
+        doc.setTextColor(95, 95, 95);
+        doc.text(data.doctorCity, layout.leftX, signatureY + 4);
+        doc.setTextColor(0, 0, 0);
+    }
 
     if (options.viaLabel) {
         doc.setFontSize(7);
@@ -837,14 +841,21 @@ const drawControlledRegulatorySection = (
     doc.setDrawColor(BRAND_INK.r, BRAND_INK.g, BRAND_INK.b);
     doc.setLineWidth(0.3);
     doc.rect(leftX, startY, colW, topH, "S");
-    doc.setFontSize(6.5);
+    doc.setFontSize(9.5);
     doc.setFont("helvetica", "normal");
-    doc.setTextColor(120, 120, 120);
-    const cityPrefix = data.doctorCity ? `${data.doctorCity},` : "";
-    if (cityPrefix) doc.text(cityPrefix, leftX + 4, startY + 4);
-    doc.setFontSize(10);
     doc.setTextColor(60, 60, 60);
-    doc.text("____ / ____ / ________", leftX + colW / 2, startY + 13, { align: "center" });
+    doc.text("____ / ____ / ________", leftX + colW / 2, startY + 8, { align: "center" });
+    // Full clinic address on the bottom line (replaces the bare city)
+    if (data.doctorAddress) {
+        doc.setFontSize(6.5);
+        doc.setTextColor(95, 95, 95);
+        const wrapped = doc.splitTextToSize(data.doctorAddress, colW - 6);
+        doc.text(wrapped[0], leftX + colW / 2, startY + topH - 3, { align: "center" });
+    } else if (data.doctorCity) {
+        doc.setFontSize(6.5);
+        doc.setTextColor(95, 95, 95);
+        doc.text(data.doctorCity, leftX + colW / 2, startY + topH - 3, { align: "center" });
+    }
 
     doc.rect(rightX, startY, colW, topH, "S");
     doc.setFontSize(6.5);
@@ -1341,6 +1352,23 @@ export const generatePrescriptionPDF = async (
         return;
     }
 
+    // Controlled prescriptions cap at 3 medications per receipt (Anvisa rule).
+    // Split the controlled groups into chunks of 3; each chunk renders as its own receipt.
+    const MAX_CONTROLLED_PER_RECEIPT = 3;
+    const CONTROLLED_TYPES = new Set(["especial", "C", "C1"]);
+    type ReceiptUnit = { type: keyof typeof groups; medications: typeof data.medications };
+    const receipts: ReceiptUnit[] = [];
+    typesWithMeds.forEach((type) => {
+        const meds = groups[type];
+        if (CONTROLLED_TYPES.has(type as string)) {
+            for (let i = 0; i < meds.length; i += MAX_CONTROLLED_PER_RECEIPT) {
+                receipts.push({ type, medications: meds.slice(i, i + MAX_CONTROLLED_PER_RECEIPT) });
+            }
+        } else {
+            receipts.push({ type, medications: meds });
+        }
+    });
+
     // Pre-printed mode: doctor prints into a physical paper that already has the
     // letterhead, signature line, regulatory boxes. We generate a blank PDF and
     // only place the content within the configured margins.
@@ -1353,10 +1381,10 @@ export const generatePrescriptionPDF = async (
         });
         let isFirstPage = true;
 
-        typesWithMeds.forEach((type) => {
-            const groupData = enrich({ ...data, medications: groups[type] });
+        receipts.forEach((receipt) => {
+            const groupData = enrich({ ...data, medications: receipt.medications });
             const config = (() => {
-                switch (type) {
+                switch (receipt.type) {
                     case "padrao": return { title: "RECEITUÁRIO", subtitle: undefined, controlled: false };
                     case "A": return { title: "RECEITUÁRIO", subtitle: "Cópia paciente — Notificação A (opioides)", controlled: false };
                     case "B1": return { title: "RECEITUÁRIO", subtitle: "Cópia paciente — Notificação B1 (psicotrópicos)", controlled: false };
@@ -1400,13 +1428,13 @@ export const generatePrescriptionPDF = async (
         const VIA_WIDTH = 148.5;
         const VIA_HEIGHT = 210;
 
-        typesWithMeds.forEach((type) => {
+        receipts.forEach((receipt) => {
             if (!isFirstPage) doc.addPage();
             isFirstPage = false;
 
-            const groupData = enrich({ ...data, medications: groups[type] });
+            const groupData = enrich({ ...data, medications: receipt.medications });
             const config = (() => {
-                switch (type) {
+                switch (receipt.type) {
                     case "padrao": return { title: "RECEITUÁRIO", subtitle: undefined, controlled: false };
                     case "A": return { title: "RECEITUÁRIO", subtitle: "Cópia paciente — Notificação A (opioides)", controlled: false };
                     case "B1": return { title: "RECEITUÁRIO", subtitle: "Cópia paciente — Notificação B1 (psicotrópicos)", controlled: false };
@@ -1438,7 +1466,7 @@ export const generatePrescriptionPDF = async (
                     };
                     generateLetterheadControlledPrescription(doc, {
                         ...groupData,
-                        validityText: validityByType[type] || "Válido por 30 dias a partir da data de emissão.",
+                        validityText: validityByType[receipt.type] || "Válido por 30 dias a partir da data de emissão.",
                     }, xOffset, {
                         title: config.title,
                         subtitle: config.subtitle ?? "",
@@ -1470,11 +1498,11 @@ export const generatePrescriptionPDF = async (
     const doc = new jsPDF({ format: "a4", orientation: "landscape" });
     let isFirstPage = true;
 
-    typesWithMeds.forEach((type) => {
+    receipts.forEach((receipt) => {
         if (!isFirstPage) doc.addPage();
         isFirstPage = false;
 
-        const groupData = enrich({ ...data, medications: groups[type] });
+        const groupData = enrich({ ...data, medications: receipt.medications });
         const offsets = [0, 148.5];
 
         // Thin cut line between vias
@@ -1483,7 +1511,7 @@ export const generatePrescriptionPDF = async (
         doc.line(148.5, 8, 148.5, 202);
 
         offsets.forEach((xOffset) => {
-            switch (type) {
+            switch (receipt.type) {
                 case "padrao": {
                     generateBasicPrescription(
                         doc,
