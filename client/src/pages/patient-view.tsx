@@ -39,6 +39,7 @@ import {
   AlertTriangle,
   MoreVertical,
   HeartCrack,
+  AlertCircle,
 } from "lucide-react";
 import { FeatureGate } from '@/components/ui/feature-gate';
 import { format, differenceInYears } from "date-fns";
@@ -68,6 +69,7 @@ import { DiagnosisDialog, diagnosisSchema, type DiagnosisFormData } from "@/comp
 import { SurgeryDialog, surgerySchema, type SurgeryFormData } from "@/components/dialogs/surgery-dialog";
 import { RegisterDeathDialog } from "@/components/dialogs/register-death-dialog";
 import { AppointmentExamHistoryDialog } from "@/components/exams/appointment-exam-history-dialog";
+import { DoctorDataDialog } from "@/components/dialogs/doctor-data-dialog";
 import { ExamUploadLauncher } from "@/components/exams/exam-upload-launcher";
 import { AppointmentExamWorkspace } from "@/components/exams/appointment-exam-workspace";
 
@@ -126,6 +128,24 @@ export default function PatientView() {
     const [isSurgeryDialogOpen, setIsSurgeryDialogOpen] = useState(false);
     const [isDeathDialogOpen, setIsDeathDialogOpen] = useState(false);
     const [isExamHistoryDialogOpen, setIsExamHistoryDialogOpen] = useState(false);
+    const [isDoctorDataDialogOpen, setIsDoctorDataDialogOpen] = useState(false);
+
+    // Doctor profile completeness — drives the warning glyph + auto-open on first access
+    const doctorDataIncomplete = (() => {
+        const u = user as any;
+        if (!u) return false;
+        return !u.crm || !u.crmState || !u.city || !(u.street || u.address);
+    })();
+
+    useEffect(() => {
+        if (!user) return;
+        if (!doctorDataIncomplete) return;
+        const key = `doctor-data-prompt-${(user as any).id}`;
+        if (typeof window === "undefined") return;
+        if (localStorage.getItem(key)) return;
+        setIsDoctorDataDialogOpen(true);
+        localStorage.setItem(key, "1");
+    }, [user, doctorDataIncomplete]);
 
     // Diagnosis Form & Mutation
     const diagnosisForm = useForm<DiagnosisFormData>({
@@ -391,11 +411,29 @@ export default function PatientView() {
                                     </div>
                                     <div className="flex items-center gap-4">
                                         {user && (
-                                            <div className="hidden md:flex min-w-[200px] bg-card px-4 py-2 rounded-lg border border-border shadow-sm flex-col items-end flex-shrink-0">
-                                                <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-0.5">Médico Prescritor</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsDoctorDataDialogOpen(true)}
+                                                title={doctorDataIncomplete ? "Complete os dados do médico prescritor" : "Editar dados do médico prescritor"}
+                                                className={`hidden md:flex min-w-[200px] px-4 py-2 rounded-lg border shadow-sm flex-col items-end flex-shrink-0 transition-colors text-right hover:bg-muted/50 ${
+                                                    doctorDataIncomplete
+                                                        ? "bg-amber-50 border-amber-300 hover:bg-amber-100"
+                                                        : "bg-card border-border"
+                                                }`}
+                                            >
+                                                <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-0.5 flex items-center gap-1">
+                                                    {doctorDataIncomplete && <AlertCircle className="h-3 w-3 text-amber-600" />}
+                                                    Médico Prescritor
+                                                </span>
                                                 <p className="font-semibold text-foreground text-sm">{user?.fullName || user?.username || "Profissional"}</p>
-                                                {user?.crm && <span className="text-xs text-muted-foreground font-medium bg-muted px-1.5 py-0.5 rounded border border-border">CRM: {user.crm}</span>}
-                                            </div>
+                                                {user?.crm ? (
+                                                    <span className="text-xs text-muted-foreground font-medium bg-muted px-1.5 py-0.5 rounded border border-border">
+                                                        CRM: {user.crm}{(user as any)?.crmState ? `/${(user as any).crmState}` : ""}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs text-amber-700 font-medium">Cadastrar dados</span>
+                                                )}
+                                            </button>
                                         )}
                                     </div>
                                 </div>
@@ -776,6 +814,11 @@ export default function PatientView() {
                                     onOpenExam={openExamReportFromAppointment}
                                 />
                             )}
+
+                            <DoctorDataDialog
+                                open={isDoctorDataDialogOpen}
+                                onOpenChange={setIsDoctorDataDialogOpen}
+                            />
 
                         </Tabs>
                 </div>
