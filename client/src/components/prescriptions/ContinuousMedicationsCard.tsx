@@ -122,8 +122,8 @@ export function ContinuousMedicationsCard({
         const map: Record<string, { label: string; className: string }> = {
             padrao: { label: 'Básica', className: 'bg-gray-100 text-gray-700 border-gray-300' },
             C: { label: 'Básica', className: 'bg-gray-100 text-gray-700 border-gray-300' },
-            especial: { label: 'Especial', className: 'bg-orange-100 text-orange-800 border-orange-300' },
-            C1: { label: 'Especial', className: 'bg-orange-100 text-orange-800 border-orange-300' },
+            especial: { label: 'Especial', className: 'bg-gray-900 text-white border-gray-900' },
+            C1: { label: 'Especial', className: 'bg-gray-900 text-white border-gray-900' },
             B1: { label: 'Azul B1', className: 'bg-blue-100 text-blue-800 border-blue-300' },
             B2: { label: 'Azul B2', className: 'bg-sky-100 text-sky-800 border-sky-300' },
             A: { label: 'Amarela', className: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
@@ -168,7 +168,7 @@ export function ContinuousMedicationsCard({
                         <Button
                             variant="outline"
                             size="sm"
-                            className="gap-1.5 text-gray-700 border-gray-200 hover:bg-gray-50 hover:text-gray-900 max-w-[160px] whitespace-normal text-center leading-tight h-auto py-1.5 text-xs shrink-0"
+                            className="gap-1.5 text-gray-700 border-gray-200 hover:bg-gray-50 hover:text-gray-900 max-w-[200px] whitespace-normal text-center leading-tight h-auto py-1.5 text-xs shrink-0"
                             onClick={handleCheckInteractions}
                             disabled={isCheckingInteractions || medications.length < 2}
                         >
@@ -177,7 +177,7 @@ export function ContinuousMedicationsCard({
                             ) : (
                                 <Sparkles className="h-4 w-4 text-yellow-500 shrink-0" />
                             )}
-                            Checar Interação<br />com IA
+                            <span className="block">Checar Interação<br />com IA</span>
                         </Button>
                     </FeatureGate>
                 </div>
@@ -201,7 +201,7 @@ export function ContinuousMedicationsCard({
                             </label>
                         </div>
                         {medications.map((med) => (
-                            <div key={med.id} className="p-3 flex items-start gap-3 hover:bg-gray-50 transition-colors group">
+                            <div key={med.id} className="p-3 flex items-start gap-3 hover:bg-gray-50 transition-colors group relative">
                                 <Checkbox
                                     checked={selectedMedications.has(med.id)}
                                     onCheckedChange={() => onToggleSelection(med.id)}
@@ -226,7 +226,7 @@ export function ContinuousMedicationsCard({
                                         </div>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-1 self-center opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="flex items-center gap-1 self-center lg:absolute lg:right-2 lg:top-1/2 lg:-translate-y-1/2 lg:bg-gray-50 lg:rounded-md lg:shadow-sm lg:opacity-0 lg:group-hover:opacity-100 lg:transition-opacity">
                                     <Button
                                         variant="ghost"
                                         size="sm"
