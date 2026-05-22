@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BrandLoader } from "@/components/ui/brand-loader";
-import { Upload, Trash2, Image as ImageIcon, Save, Eye, Sparkles, Droplet } from "lucide-react";
+import { Upload, Trash2, Image as ImageIcon, Save, Eye, Sparkles, Droplet, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { HeaderAiGeneratorDialog } from "@/components/clinic/header-ai-generator-dialog";
+import { HeaderElementsEditorDialog } from "@/components/clinic/header-elements-editor-dialog";
 
 export type PreprintedConfig = {
     paperWidthMm: number;
@@ -37,6 +38,7 @@ export type ClinicHeader = {
     headerWebsite: string | null;
     headerCnpj: string | null;
     headerWatermarkUseLogo: boolean;
+    headerSuppressFields: Record<string, boolean>;
     headerBodyBbox: { top: number; bottom: number; left: number; right: number } | null;
     preprintedConfig: PreprintedConfig | null;
 };
@@ -64,9 +66,11 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
 
     const [draft, setDraft] = useState<ClinicHeader | null>(null);
     const [aiDialogOpen, setAiDialogOpen] = useState(false);
+    const [elementsDialogOpen, setElementsDialogOpen] = useState(false);
     const [isProcessingPdf, setIsProcessingPdf] = useState(false);
     const [isAnalyzingPreprinted, setIsAnalyzingPreprinted] = useState(false);
     const imageInputRef = useRef<HTMLInputElement | null>(null);
+    const bannerInputRef = useRef<HTMLInputElement | null>(null);
     const logoInputRef = useRef<HTMLInputElement | null>(null);
     const preprintedInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -315,11 +319,18 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                 {/* Mode selector */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <ModeCard
-                        title="Imagem ou timbrado"
-                        description="Envie banner em PNG/JPG ou um PDF do seu receituário completo."
-                        active={draft.headerMode === "image" || draft.headerMode === "letterhead"}
+                        title="Minimalista"
+                        description="Use seu logo e/ou um cabeçalho próprio (PNG/JPG). O sistema cuida do resto."
+                        active={draft.headerMode === "minimal" || draft.headerMode === "image" || draft.headerMode === "composed"}
                         disabled={!canEdit}
-                        onClick={() => handleSelectMode("image")}
+                        onClick={() => handleSelectMode("minimal")}
+                    />
+                    <ModeCard
+                        title="Timbrado em PDF"
+                        description="Você tem o PDF inteiro do seu receituário. O sistema injeta paciente e medicamentos no meio."
+                        active={draft.headerMode === "letterhead"}
+                        disabled={!canEdit}
+                        onClick={() => handleSelectMode("letterhead")}
                     />
                     <ModeCard
                         title="Papel pré-impresso"
@@ -327,13 +338,6 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                         active={draft.headerMode === "preprinted"}
                         disabled={!canEdit}
                         onClick={() => handleSelectMode("preprinted")}
-                    />
-                    <ModeCard
-                        title="Minimalista"
-                        description="Cabeçalho discreto com monograma. Você pode subir uma logo própria e um nome de clínica."
-                        active={draft.headerMode === "minimal" || draft.headerMode === "composed"}
-                        disabled={!canEdit}
-                        onClick={() => handleSelectMode("minimal")}
                     />
                 </div>
 
@@ -367,14 +371,25 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                     onOpenChange={setAiDialogOpen}
                 />
 
-                {/* Image / Letterhead mode */}
-                {(draft.headerMode === "image" || draft.headerMode === "letterhead") && (
+                <HeaderElementsEditorDialog
+                    clinicId={draft.clinicId}
+                    open={elementsDialogOpen}
+                    onOpenChange={setElementsDialogOpen}
+                    initialSuppress={draft.headerSuppressFields ?? {}}
+                    onSaved={(updated) => {
+                        setDraft((prev) => prev ? { ...prev, headerSuppressFields: updated } : prev);
+                        queryClient.invalidateQueries({ queryKey: ["/api/clinics/header/active"] });
+                    }}
+                />
+
+                {/* Letterhead (full-page PDF) mode */}
+                {draft.headerMode === "letterhead" && (
                     <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-4">
                         <div className="flex items-start justify-between gap-3">
                             <div className="space-y-1 min-w-0">
-                                <Label className="text-sm font-medium">Imagem do timbrado</Label>
+                                <Label className="text-sm font-medium">PDF do receituário</Label>
                                 <p className="text-xs text-muted-foreground leading-snug">
-                                    PNG, JPG, WebP, SVG ou PDF. Recomendado: largura mínima 1800px. Em PDF, a IA usa o design inteiro como moldura.
+                                    Envie o PDF do seu receituário com o design completo. A IA identifica onde o conteúdo deve cair e gera as receitas usando o seu PDF como moldura.
                                 </p>
                             </div>
                             {canEdit && !draft.headerImageUrl && (
@@ -448,7 +463,7 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                         <input
                             ref={imageInputRef}
                             type="file"
-                            accept="image/png,image/jpeg,image/webp,image/svg+xml,application/pdf"
+                            accept="application/pdf"
                             className="hidden"
                             onChange={(e) => {
                                 const file = e.target.files?.[0];
@@ -576,11 +591,12 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                 {(draft.headerMode === "minimal" || draft.headerMode === "composed") && (
                     <div className="rounded-xl border border-dashed border-border p-4 space-y-4">
                         <p className="text-xs text-muted-foreground leading-snug">
-                            Cabeçalho discreto com monograma. CNPJ, e-mail e site ficam em <strong>Dados do consultório</strong>.
+                            Cabeçalho discreto com monograma — ou substitua por sua logo + um cabeçalho próprio. CNPJ, e-mail e site ficam em <strong>Dados do consultório</strong>.
                         </p>
 
-                        <div className="grid grid-cols-1 md:grid-cols-[88px_1fr] gap-4 items-start">
-                            {/* Logo preview + actions */}
+                        {/* Logo + Cabeçalho slots side by side */}
+                        <div className="grid grid-cols-1 md:grid-cols-[88px_1fr] gap-3 items-start">
+                            {/* Logo slot */}
                             <div className="space-y-1.5">
                                 <Label className="text-xs font-medium text-foreground">Logo</Label>
                                 <div className="h-20 w-20 rounded-lg border border-border bg-white flex items-center justify-center overflow-hidden">
@@ -617,47 +633,93 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                                 />
                             </div>
 
-                            {/* Right column: name, watermark toggle, save */}
-                            <div className="space-y-3">
-                                <Field
-                                    label="Nome exibido no cabeçalho"
-                                    value={draft.headerClinicName}
-                                    onChange={(v) => setField("headerClinicName", v)}
-                                    disabled={!canEdit}
-                                />
-
-                                <label className={cn(
-                                    "flex items-start gap-2.5 rounded-md border border-border bg-background px-3 py-2.5 text-xs cursor-pointer transition-colors",
-                                    !draft.headerLogoUrl && "opacity-60 cursor-not-allowed",
-                                )}>
-                                    <Checkbox
-                                        checked={!!draft.headerWatermarkUseLogo}
-                                        onCheckedChange={(v) => setField("headerWatermarkUseLogo", !!v)}
-                                        disabled={!canEdit || !draft.headerLogoUrl}
-                                        className="mt-0.5"
-                                    />
-                                    <div className="flex-1 min-w-0">
-                                        <p className="font-medium text-foreground flex items-center gap-1.5">
-                                            <Droplet className="h-3.5 w-3.5" />
-                                            Usar minha logo como marca d'água
+                            {/* Banner slot — wide, top strip of the prescription */}
+                            <div className="space-y-1.5">
+                                <Label className="text-xs font-medium text-foreground">Cabeçalho (opcional)</Label>
+                                <div className="h-20 w-full rounded-lg border border-border bg-white flex items-center justify-center overflow-hidden">
+                                    {draft.headerImageUrl ? (
+                                        <img src={draft.headerImageUrl} alt="Cabeçalho" className="max-h-full max-w-full object-contain" />
+                                    ) : (
+                                        <p className="text-[11px] text-muted-foreground px-3 text-center leading-tight">
+                                            Banner amplo no topo da receita (PNG/JPG).<br />
+                                            Use no lugar do monograma + nome do sistema.
                                         </p>
-                                        <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">
-                                            {draft.headerLogoUrl
-                                                ? "Substitui a marca d'água discreta do VitaView pela sua logo."
-                                                : "Envie uma logo acima para habilitar."}
-                                        </p>
-                                    </div>
-                                </label>
-
+                                    )}
+                                </div>
                                 {canEdit && (
-                                    <div className="flex justify-end pt-1">
-                                        <Button onClick={handleSaveTexts} disabled={updateHeader.isPending} className="bg-primary hover:bg-primary/90 h-8 text-sm">
-                                            {updateHeader.isPending ? <BrandLoader className="h-3.5 w-3.5 mr-2" /> : <Save className="h-3.5 w-3.5 mr-2" />}
-                                            Salvar
+                                    <div className="flex gap-1 pt-1">
+                                        <Button variant="outline" size="sm" onClick={() => bannerInputRef.current?.click()} disabled={uploadImage.isPending} className="h-7 px-2 text-xs">
+                                            <Upload className="h-3 w-3 mr-1" />
+                                            {draft.headerImageUrl ? "Trocar" : "Enviar"}
                                         </Button>
+                                        {draft.headerImageUrl && (
+                                            <Button variant="ghost" size="sm" onClick={() => deleteImage.mutate()} disabled={deleteImage.isPending} className="h-7 px-2 text-xs text-destructive">
+                                                <Trash2 className="h-3 w-3 mr-1" />
+                                                Remover
+                                            </Button>
+                                        )}
+                                        {draft.headerImageUrl && (
+                                            <Button variant="outline" size="sm" onClick={() => setElementsDialogOpen(true)} className="h-7 px-2 text-xs ml-auto">
+                                                <Pencil className="h-3 w-3 mr-1" />
+                                                Editar elementos
+                                            </Button>
+                                        )}
                                     </div>
                                 )}
+                                <input
+                                    ref={bannerInputRef}
+                                    type="file"
+                                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) uploadImage.mutate(file);
+                                        e.target.value = "";
+                                    }}
+                                />
                             </div>
+                        </div>
+
+                        {/* Name + watermark toggle + save */}
+                        <div className="space-y-3">
+                            <Field
+                                label="Nome exibido no cabeçalho"
+                                value={draft.headerClinicName}
+                                onChange={(v) => setField("headerClinicName", v)}
+                                disabled={!canEdit}
+                            />
+
+                            <label className={cn(
+                                "flex items-start gap-2.5 rounded-md border border-border bg-background px-3 py-2.5 text-xs cursor-pointer transition-colors",
+                                !draft.headerLogoUrl && "opacity-60 cursor-not-allowed",
+                            )}>
+                                <Checkbox
+                                    checked={!!draft.headerWatermarkUseLogo}
+                                    onCheckedChange={(v) => setField("headerWatermarkUseLogo", !!v)}
+                                    disabled={!canEdit || !draft.headerLogoUrl}
+                                    className="mt-0.5"
+                                />
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-medium text-foreground flex items-center gap-1.5">
+                                        <Droplet className="h-3.5 w-3.5" />
+                                        Usar minha logo como marca d'água
+                                    </p>
+                                    <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">
+                                        {draft.headerLogoUrl
+                                            ? "Substitui a marca d'água discreta do VitaView pela sua logo."
+                                            : "Envie uma logo acima para habilitar."}
+                                    </p>
+                                </div>
+                            </label>
+
+                            {canEdit && (
+                                <div className="flex justify-end pt-1">
+                                    <Button onClick={handleSaveTexts} disabled={updateHeader.isPending} className="bg-primary hover:bg-primary/90 h-8 text-sm">
+                                        {updateHeader.isPending ? <BrandLoader className="h-3.5 w-3.5 mr-2" /> : <Save className="h-3.5 w-3.5 mr-2" />}
+                                        Salvar
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
