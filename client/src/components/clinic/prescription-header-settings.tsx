@@ -643,7 +643,7 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                 {draft.headerMode === "minimal" && (
                     <div className="rounded-xl border border-dashed border-border p-4 space-y-3">
                         <p className="text-sm text-muted-foreground">
-                            Cabeçalho neutro com a assinatura discreta "VitaView.AI" no rodapé. Por padrão, o nome do médico aparece ao lado do monograma — você pode substituí-lo por um nome de clínica/marca pessoal abaixo.
+                            O nome do médico aparece ao lado do monograma — você pode substituí-lo por um nome de clínica/marca pessoal abaixo.
                         </p>
                         <Field
                             label="Nome exibido no cabeçalho (opcional)"
