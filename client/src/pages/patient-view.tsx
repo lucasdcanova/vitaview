@@ -130,11 +130,12 @@ export default function PatientView() {
     const [isExamHistoryDialogOpen, setIsExamHistoryDialogOpen] = useState(false);
     const [isDoctorDataDialogOpen, setIsDoctorDataDialogOpen] = useState(false);
 
-    // Doctor profile completeness — drives the warning glyph + auto-open on first access
+    // Doctor professional credentials — what the box dialog edits.
+    // Office address lives in Minha Clínica and is enforced via the prescription gate.
     const doctorDataIncomplete = (() => {
         const u = user as any;
         if (!u) return false;
-        return !u.crm || !u.crmState || !u.city || !(u.street || u.address);
+        return !u.crm || !u.crmState;
     })();
 
     useEffect(() => {
