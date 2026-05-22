@@ -319,7 +319,7 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                 {/* Mode selector */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <ModeCard
-                        title="Minimalista"
+                        title="Padrão"
                         description="Use seu logo e/ou um cabeçalho próprio (PNG/JPG). O sistema cuida do resto."
                         active={draft.headerMode === "minimal" || draft.headerMode === "image" || draft.headerMode === "composed"}
                         disabled={!canEdit}
@@ -341,7 +341,7 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                     />
                 </div>
 
-                {/* AI generator entry point — only relevant for Minimalista (creates a banner image) */}
+                {/* AI generator entry point — only relevant for Padrão mode (creates a banner image) */}
                 {canEdit && (draft.headerMode === "minimal" || draft.headerMode === "composed" || draft.headerMode === "image") && (
                     <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-primary/30 bg-primary/5 p-4">
                         <div className="space-y-1">
