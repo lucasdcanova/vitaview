@@ -341,8 +341,8 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                     />
                 </div>
 
-                {/* AI generator entry point */}
-                {canEdit && (
+                {/* AI generator entry point — only relevant for Minimalista (creates a banner image) */}
+                {canEdit && (draft.headerMode === "minimal" || draft.headerMode === "composed" || draft.headerMode === "image") && (
                     <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-primary/30 bg-primary/5 p-4">
                         <div className="space-y-1">
                             <p className="text-sm font-medium text-foreground flex items-center gap-2">
