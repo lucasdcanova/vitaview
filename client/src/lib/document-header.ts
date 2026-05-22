@@ -243,17 +243,18 @@ function resolveHeaderText(
     identity: DocumentIdentity | undefined
 ): HeaderRenderInput {
     const usingComposed = header?.mode === "composed";
+    const customName = header?.clinicName?.trim() || "";
 
-    // Title — prefer clinic name; fall back to doctor's name
-    const title = (usingComposed && header?.clinicName) || identity?.doctorName || "VitaView.AI";
+    // Title — prefer the custom clinic name (composed OR minimal mode); fall back to doctor's name
+    const title = customName || identity?.doctorName || "VitaView.AI";
 
     const crmLabel = formatCrm(identity?.doctorCrm, identity?.doctorCrmState);
 
     const specialtyLabel = formatSpecialty(identity?.doctorSpecialty, identity?.doctorRqe, { prefixWhenNoRqe: false });
 
     const subtitleParts: string[] = [];
-    if (usingComposed) {
-        // Clinic mode: subtitle shows doctor identity (since clinic name is the title)
+    if (customName) {
+        // Custom name is the title: subtitle shows doctor identity + credentials
         if (identity?.doctorName && identity.doctorName !== title) {
             const docBits = [identity.doctorName];
             if (crmLabel) docBits.push(crmLabel);
@@ -263,7 +264,7 @@ function resolveHeaderText(
             subtitleParts.push(crmLabel);
         }
     } else {
-        // Minimal mode: subtitle shows credentials of the doctor
+        // No custom name: subtitle shows credentials of the doctor
         const bits: string[] = [];
         if (crmLabel) bits.push(crmLabel);
         if (specialtyLabel) bits.push(specialtyLabel);
@@ -444,10 +445,11 @@ export function drawDocumentFooter(
 
     const usingComposed = header?.mode === "composed";
     const identity = options.identity;
+    const customName = header?.clinicName?.trim() || "";
 
     const primaryParts: string[] = [];
-    if (usingComposed && header?.clinicName) primaryParts.push(header.clinicName);
-    if (identity?.doctorName && (!usingComposed || identity.doctorName !== header?.clinicName)) {
+    if (customName) primaryParts.push(customName);
+    if (identity?.doctorName && identity.doctorName !== customName) {
         primaryParts.push(identity.doctorName);
     }
     const footerCrm = formatCrm(identity?.doctorCrm, identity?.doctorCrmState);
