@@ -3008,6 +3008,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       const allowedFields = [
         'fullName', 'email', 'phoneNumber', 'crm', 'crmState', 'specialty', 'rqe',
         'address', 'cep', 'street', 'number', 'complement', 'neighborhood', 'city', 'state',
+        'cnpj', 'website',
         'birthDate', 'gender', 'preferences', 'password'
       ];
 

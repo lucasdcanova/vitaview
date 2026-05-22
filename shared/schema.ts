@@ -20,6 +20,8 @@ export const users = pgTable("users", {
   neighborhood: text("neighborhood"),
   city: text("city"),
   state: text("state"),
+  cnpj: text("cnpj"), // Optional clinic CNPJ — rendered on prescriptions when present
+  website: text("website"), // Optional clinic website — rendered on prescriptions when present
   crm: text("crm"), // CRM or professional registration number
   crmState: text("crm_state"), // UF (state) of the CRM, e.g. "SP", "RJ" — required for legal prescriptions
   specialty: text("specialty"), // Medical specialty

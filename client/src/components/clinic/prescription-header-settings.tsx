@@ -310,7 +310,7 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                 )}
 
                 {/* Mode selector */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <ModeCard
                         title="Imagem ou timbrado"
                         description="Envie banner em PNG/JPG ou um PDF do seu receituário completo."
@@ -326,16 +326,9 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                         onClick={() => handleSelectMode("preprinted")}
                     />
                     <ModeCard
-                        title="Logo + dados"
-                        description="Logo da clínica com nome, endereço e contato."
-                        active={draft.headerMode === "composed"}
-                        disabled={!canEdit}
-                        onClick={() => handleSelectMode("composed")}
-                    />
-                    <ModeCard
                         title="Minimalista"
-                        description="Sem cabeçalho — apenas marca discreta do VitaView."
-                        active={draft.headerMode === "minimal"}
+                        description="Cabeçalho discreto com monograma. Você pode subir uma logo própria e um nome de clínica."
+                        active={draft.headerMode === "minimal" || draft.headerMode === "composed"}
                         disabled={!canEdit}
                         onClick={() => handleSelectMode("minimal")}
                     />
@@ -577,11 +570,14 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                     </div>
                 )}
 
-                {/* Composed mode */}
-                {draft.headerMode === "composed" && (
-                    <div className="space-y-4 rounded-xl border border-border bg-muted/30 p-4">
+                {(draft.headerMode === "minimal" || draft.headerMode === "composed") && (
+                    <div className="rounded-xl border border-dashed border-border p-4 space-y-4">
+                        <p className="text-sm text-muted-foreground">
+                            O nome do médico aparece ao lado do monograma — você pode substituí-lo por um nome de clínica/marca pessoal e por uma logo própria. CNPJ, e-mail e site ficam em <strong>Dados do consultório</strong>.
+                        </p>
+
                         <div className="space-y-3">
-                            <Label className="text-sm font-medium">Logo da clínica</Label>
+                            <Label className="text-sm font-medium">Logo (opcional)</Label>
                             <div className="flex items-center gap-4">
                                 <div className="h-20 w-20 rounded-lg border border-border bg-white flex items-center justify-center overflow-hidden">
                                     {draft.headerLogoUrl ? (
@@ -618,44 +614,18 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                             />
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <Field label="Nome da clínica" value={draft.headerClinicName} onChange={(v) => setField("headerClinicName", v)} disabled={!canEdit} />
-                            <Field label="CNPJ" value={draft.headerCnpj} onChange={(v) => setField("headerCnpj", v)} disabled={!canEdit} />
-                        </div>
-                        <Field label="Endereço completo" value={draft.headerAddress} onChange={(v) => setField("headerAddress", v)} disabled={!canEdit} />
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <Field label="Telefone" value={draft.headerPhone} onChange={(v) => setField("headerPhone", v)} disabled={!canEdit} />
-                            <Field label="E-mail" value={draft.headerEmail} onChange={(v) => setField("headerEmail", v)} disabled={!canEdit} />
-                            <Field label="Site" value={draft.headerWebsite} onChange={(v) => setField("headerWebsite", v)} disabled={!canEdit} />
-                        </div>
-
-                        {canEdit && (
-                            <div className="flex justify-end">
-                                <Button onClick={handleSaveTexts} disabled={updateHeader.isPending} className="bg-primary hover:bg-primary/90">
-                                    {updateHeader.isPending ? <BrandLoader className="h-4 w-4 mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                                    Salvar dados
-                                </Button>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {draft.headerMode === "minimal" && (
-                    <div className="rounded-xl border border-dashed border-border p-4 space-y-3">
-                        <p className="text-sm text-muted-foreground">
-                            O nome do médico aparece ao lado do monograma — você pode substituí-lo por um nome de clínica/marca pessoal abaixo.
-                        </p>
                         <Field
                             label="Nome exibido no cabeçalho (opcional)"
                             value={draft.headerClinicName}
                             onChange={(v) => setField("headerClinicName", v)}
                             disabled={!canEdit}
                         />
+
                         {canEdit && (
                             <div className="flex justify-end">
                                 <Button onClick={handleSaveTexts} disabled={updateHeader.isPending} className="bg-primary hover:bg-primary/90">
                                     {updateHeader.isPending ? <BrandLoader className="h-4 w-4 mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                                    Salvar nome
+                                    Salvar dados do cabeçalho
                                 </Button>
                             </div>
                         )}

@@ -66,6 +66,10 @@ export interface DocumentIdentity {
     doctorRqe?: string | null;
     doctorAddress?: string | null;
     doctorPhone?: string | null;
+    /** Optional office contact fields, shown on the footer when present. */
+    doctorEmail?: string | null;
+    doctorWebsite?: string | null;
+    doctorCnpj?: string | null;
 }
 
 /**
@@ -456,17 +460,18 @@ export function drawDocumentFooter(
     if (footerCrm) primaryParts.push(footerCrm);
 
     const secondaryParts: string[] = [];
-    if (usingComposed) {
-        if (header?.address) secondaryParts.push(header.address);
-        const contact: string[] = [];
-        if (header?.phone) contact.push(formatBrazilianPhone(header.phone));
-        if (header?.email) contact.push(header.email);
-        if (header?.website) contact.push(header.website);
-        if (contact.length) secondaryParts.push(contact.join("  ·  "));
-    } else {
-        if (identity?.doctorAddress) secondaryParts.push(identity.doctorAddress);
-        if (identity?.doctorPhone) secondaryParts.push(formatBrazilianPhone(identity.doctorPhone));
-    }
+    const address = identity?.doctorAddress || (usingComposed ? header?.address : null);
+    if (address) secondaryParts.push(address);
+    const contact: string[] = [];
+    const phone = identity?.doctorPhone || (usingComposed ? header?.phone : null);
+    const email = identity?.doctorEmail || (usingComposed ? header?.email : null);
+    const website = identity?.doctorWebsite || (usingComposed ? header?.website : null);
+    const cnpj = identity?.doctorCnpj || (usingComposed ? header?.cnpj : null);
+    if (phone) contact.push(formatBrazilianPhone(phone));
+    if (email) contact.push(email);
+    if (website) contact.push(website);
+    if (cnpj) contact.push(`CNPJ ${cnpj}`);
+    if (contact.length) secondaryParts.push(contact.join("  ·  "));
 
     const primaryLine = primaryParts.join("  ·  ");
     const secondaryLine = secondaryParts.join("  ·  ");
