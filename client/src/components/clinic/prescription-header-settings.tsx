@@ -641,9 +641,25 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                 )}
 
                 {draft.headerMode === "minimal" && (
-                    <p className="text-sm text-muted-foreground rounded-xl border border-dashed border-border p-4">
-                        Será usado um cabeçalho neutro com a assinatura discreta "VitaView.AI" no rodapé.
-                    </p>
+                    <div className="rounded-xl border border-dashed border-border p-4 space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                            Cabeçalho neutro com a assinatura discreta "VitaView.AI" no rodapé. Por padrão, o nome do médico aparece ao lado do monograma — você pode substituí-lo por um nome de clínica/marca pessoal abaixo.
+                        </p>
+                        <Field
+                            label="Nome exibido no cabeçalho (opcional)"
+                            value={draft.headerClinicName}
+                            onChange={(v) => setField("headerClinicName", v)}
+                            disabled={!canEdit}
+                        />
+                        {canEdit && (
+                            <div className="flex justify-end">
+                                <Button onClick={handleSaveTexts} disabled={updateHeader.isPending} className="bg-primary hover:bg-primary/90">
+                                    {updateHeader.isPending ? <BrandLoader className="h-4 w-4 mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                                    Salvar nome
+                                </Button>
+                            </div>
+                        )}
+                    </div>
                 )}
 
                 {onPreview && (
