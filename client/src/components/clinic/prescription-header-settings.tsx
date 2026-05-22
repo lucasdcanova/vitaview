@@ -599,27 +599,42 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                             {/* Logo slot */}
                             <div className="space-y-1.5">
                                 <Label className="text-xs font-medium text-foreground">Logo</Label>
-                                <div className="h-20 w-20 rounded-lg border border-border bg-white flex items-center justify-center overflow-hidden">
-                                    {draft.headerLogoUrl ? (
-                                        <img src={draft.headerLogoUrl} alt="Logo" className="max-h-full max-w-full object-contain" />
-                                    ) : (
-                                        <ImageIcon className="h-7 w-7 text-muted-foreground" />
+                                <div className="relative h-20 w-20">
+                                    <button
+                                        type="button"
+                                        onClick={() => canEdit && logoInputRef.current?.click()}
+                                        disabled={!canEdit || uploadLogo.isPending}
+                                        className="h-full w-full rounded-lg border border-border bg-white flex items-center justify-center overflow-hidden hover:border-primary/60 transition-colors group relative"
+                                    >
+                                        {draft.headerLogoUrl ? (
+                                            <>
+                                                <img src={draft.headerLogoUrl} alt="Logo" className="max-h-full max-w-full object-contain" />
+                                                {canEdit && (
+                                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-0.5 text-white">
+                                                        <Upload className="h-3.5 w-3.5" />
+                                                        <span className="text-[10px] font-medium">Trocar</span>
+                                                    </div>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                                                <Upload className="h-4 w-4" />
+                                                <span className="text-[10px] font-medium">Enviar</span>
+                                            </div>
+                                        )}
+                                    </button>
+                                    {canEdit && draft.headerLogoUrl && (
+                                        <button
+                                            type="button"
+                                            onClick={() => deleteLogo.mutate()}
+                                            disabled={deleteLogo.isPending}
+                                            className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-destructive text-white flex items-center justify-center shadow-sm hover:bg-destructive/90"
+                                            aria-label="Remover logo"
+                                        >
+                                            <Trash2 className="h-2.5 w-2.5" />
+                                        </button>
                                     )}
                                 </div>
-                                {canEdit && (
-                                    <div className="flex flex-col gap-1 pt-1">
-                                        <Button variant="outline" size="sm" onClick={() => logoInputRef.current?.click()} disabled={uploadLogo.isPending} className="h-7 px-2 text-xs">
-                                            <Upload className="h-3 w-3 mr-1" />
-                                            {draft.headerLogoUrl ? "Trocar" : "Enviar"}
-                                        </Button>
-                                        {draft.headerLogoUrl && (
-                                            <Button variant="ghost" size="sm" onClick={() => deleteLogo.mutate()} className="h-6 px-2 text-xs text-destructive">
-                                                <Trash2 className="h-3 w-3 mr-1" />
-                                                Remover
-                                            </Button>
-                                        )}
-                                    </div>
-                                )}
                                 <input
                                     ref={logoInputRef}
                                     type="file"
@@ -635,37 +650,57 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
 
                             {/* Banner slot — wide, top strip of the prescription */}
                             <div className="space-y-1.5">
-                                <Label className="text-xs font-medium text-foreground">Cabeçalho (opcional)</Label>
-                                <div className="h-20 w-full rounded-lg border border-border bg-white flex items-center justify-center overflow-hidden">
-                                    {draft.headerImageUrl ? (
-                                        <img src={draft.headerImageUrl} alt="Cabeçalho" className="max-h-full max-w-full object-contain" />
-                                    ) : (
-                                        <p className="text-[11px] text-muted-foreground px-3 text-center leading-tight">
-                                            Banner amplo no topo da receita (PNG/JPG).<br />
-                                            Use no lugar do monograma + nome do sistema.
-                                        </p>
+                                <div className="flex items-center justify-between gap-2 min-h-[20px]">
+                                    <Label className="text-xs font-medium text-foreground">Cabeçalho (opcional)</Label>
+                                    {canEdit && draft.headerImageUrl && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setElementsDialogOpen(true)}
+                                            className="text-[11px] font-medium text-primary hover:underline flex items-center gap-1"
+                                        >
+                                            <Pencil className="h-3 w-3" />
+                                            Editar elementos
+                                        </button>
                                     )}
                                 </div>
-                                {canEdit && (
-                                    <div className="flex gap-1 pt-1">
-                                        <Button variant="outline" size="sm" onClick={() => bannerInputRef.current?.click()} disabled={uploadImage.isPending} className="h-7 px-2 text-xs">
-                                            <Upload className="h-3 w-3 mr-1" />
-                                            {draft.headerImageUrl ? "Trocar" : "Enviar"}
-                                        </Button>
-                                        {draft.headerImageUrl && (
-                                            <Button variant="ghost" size="sm" onClick={() => deleteImage.mutate()} disabled={deleteImage.isPending} className="h-7 px-2 text-xs text-destructive">
-                                                <Trash2 className="h-3 w-3 mr-1" />
-                                                Remover
-                                            </Button>
+                                <div className="relative h-20 w-full">
+                                    <button
+                                        type="button"
+                                        onClick={() => canEdit && bannerInputRef.current?.click()}
+                                        disabled={!canEdit || uploadImage.isPending}
+                                        className="h-full w-full rounded-lg border border-border bg-white flex items-center justify-center overflow-hidden hover:border-primary/60 transition-colors group"
+                                    >
+                                        {draft.headerImageUrl ? (
+                                            <>
+                                                <img src={draft.headerImageUrl} alt="Cabeçalho" className="max-h-full max-w-full object-contain" />
+                                                {canEdit && (
+                                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-0.5 text-white">
+                                                        <Upload className="h-3.5 w-3.5" />
+                                                        <span className="text-[10px] font-medium">Trocar</span>
+                                                    </div>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <div className="flex flex-col items-center gap-1 text-muted-foreground px-3 text-center">
+                                                <Upload className="h-4 w-4" />
+                                                <span className="text-[10px] font-medium leading-tight">
+                                                    Enviar cabeçalho (PNG/JPG)
+                                                </span>
+                                            </div>
                                         )}
-                                        {draft.headerImageUrl && (
-                                            <Button variant="outline" size="sm" onClick={() => setElementsDialogOpen(true)} className="h-7 px-2 text-xs ml-auto">
-                                                <Pencil className="h-3 w-3 mr-1" />
-                                                Editar elementos
-                                            </Button>
-                                        )}
-                                    </div>
-                                )}
+                                    </button>
+                                    {canEdit && draft.headerImageUrl && (
+                                        <button
+                                            type="button"
+                                            onClick={() => deleteImage.mutate()}
+                                            disabled={deleteImage.isPending}
+                                            className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-destructive text-white flex items-center justify-center shadow-sm hover:bg-destructive/90"
+                                            aria-label="Remover cabeçalho"
+                                        >
+                                            <Trash2 className="h-2.5 w-2.5" />
+                                        </button>
+                                    )}
+                                </div>
                                 <input
                                     ref={bannerInputRef}
                                     type="file"
