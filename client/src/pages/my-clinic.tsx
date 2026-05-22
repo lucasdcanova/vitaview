@@ -913,10 +913,14 @@ const selectClinicMutation = useMutation({
                 })()}
 
                 {/* Dados do consultório (cidade, endereço, telefone — aparecem nas receitas) */}
-                <ClinicOfficeInfoCard />
+                <div data-tour="clinic-office-card">
+                    <ClinicOfficeInfoCard />
+                </div>
 
                 {/* Cabeçalho de documentos */}
-                <PrescriptionHeaderSettings />
+                <div data-tour="clinic-header-card">
+                    <PrescriptionHeaderSettings />
+                </div>
 
             </>
         );
