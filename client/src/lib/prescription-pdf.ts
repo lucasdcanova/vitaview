@@ -480,31 +480,35 @@ const drawInvalidNoticeBanner = (
     yPos: number,
     text: string
 ): number => {
-    const paddingX = 3;
-    const paddingY = 2.5;
-    const fontSize = 8;
-    doc.setFontSize(fontSize);
-    doc.setFont("helvetica", "bold");
+    const paddingX = 5;
+    const paddingY = 4;
+    const titleFontSize = 8;
+    const bodyFontSize = 7.5;
+    const lineH = 3.6;
+    const titleBodyGap = 2.2;
     const titleText = "Documento sem validade legal";
-    const titleH = 3.5;
+
+    doc.setFontSize(bodyFontSize);
     doc.setFont("helvetica", "normal");
     const wrapped = doc.splitTextToSize(text, layout.contentWidth - paddingX * 2);
-    const bodyH = wrapped.length * 3.4;
-    const boxH = paddingY * 2 + titleH + 1.2 + bodyH;
+    const bodyH = wrapped.length * lineH;
+    const boxH = paddingY * 2 + lineH + titleBodyGap + bodyH;
 
     doc.setDrawColor(60, 60, 60);
     doc.setLineWidth(0.4);
     doc.roundedRect(layout.leftX, yPos, layout.contentWidth, boxH, 1.2, 1.2, "S");
 
+    doc.setFontSize(titleFontSize);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(20, 20, 20);
-    doc.text(titleText, layout.leftX + paddingX, yPos + paddingY + titleH);
+    doc.text(titleText, layout.leftX + paddingX, yPos + paddingY + lineH - 0.5);
 
+    doc.setFontSize(bodyFontSize);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(60, 60, 60);
-    doc.text(wrapped, layout.leftX + paddingX, yPos + paddingY + titleH + 1.2 + 3);
+    doc.text(wrapped, layout.leftX + paddingX, yPos + paddingY + lineH + titleBodyGap + lineH - 0.8);
     doc.setTextColor(0, 0, 0);
-    return yPos + boxH + 3;
+    return yPos + boxH + 3.5;
 };
 
 /**
@@ -1418,9 +1422,9 @@ export const generatePrescriptionPDF = async (
     // issued by the regulatory body (Notificação A — amarela; B1/B2 — azul).
     // What we generate is a reference copy; the legal prescription is the official paper.
     const invalidNoticeFor = (t: string): string | undefined => {
-        if (t === "A") return "A prescrição de opioides exige Notificação de Receita A (talão amarelo) numerada e fornecida pela autoridade sanitária. Este documento serve apenas como referência e não substitui a receita oficial.";
-        if (t === "B1") return "A prescrição de psicotrópicos exige Notificação de Receita B1 (talão azul) numerada e fornecida pela autoridade sanitária. Este documento serve apenas como referência e não substitui a receita oficial.";
-        if (t === "B2") return "A prescrição de anorexígenos exige Notificação de Receita B2 (talão azul) numerada e fornecida pela autoridade sanitária. Este documento serve apenas como referência e não substitui a receita oficial.";
+        if (t === "A") return "Apenas referência. A receita legal é a Notificação A (talão amarelo) numerada da autoridade sanitária.";
+        if (t === "B1") return "Apenas referência. A receita legal é a Notificação B1 (talão azul) numerada da autoridade sanitária.";
+        if (t === "B2") return "Apenas referência. A receita legal é a Notificação B2 (talão azul) numerada da autoridade sanitária.";
         return undefined;
     };
 
