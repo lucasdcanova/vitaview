@@ -5594,6 +5594,7 @@ export async function registerRoutes(app: Express): Promise<void> {
     headerEmail: string | null;
     headerWebsite: string | null;
     headerCnpj: string | null;
+    headerWatermarkUseLogo: boolean;
     headerBodyBbox: { top: number; bottom: number; left: number; right: number } | null;
     preprintedConfig: PreprintedConfigShape | null;
   };
@@ -5682,6 +5683,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       headerEmail: clinic.headerEmail ?? null,
       headerWebsite: clinic.headerWebsite ?? null,
       headerCnpj: clinic.headerCnpj ?? null,
+      headerWatermarkUseLogo: !!clinic.headerWatermarkUseLogo,
       headerBodyBbox: bodyBbox,
       preprintedConfig,
     };
@@ -5782,6 +5784,9 @@ export async function registerRoutes(app: Express): Promise<void> {
         if (field in (req.body || {})) {
           update[field] = sanitizeHeaderTextValue(req.body[field]);
         }
+      }
+      if ('headerWatermarkUseLogo' in (req.body || {})) {
+        update.headerWatermarkUseLogo = !!req.body.headerWatermarkUseLogo;
       }
       if ('preprintedConfig' in (req.body || {})) {
         if (req.body.preprintedConfig === null) {
