@@ -510,7 +510,7 @@ const drawInvalidNoticeBanner = (
     doc.setTextColor(60, 60, 60);
     doc.text(wrapped, layout.leftX + paddingX, yPos + paddingY + lineH + titleBodyGap + lineH - 0.8);
     doc.setTextColor(0, 0, 0);
-    return yPos + boxH + 3.5;
+    return yPos + boxH + 7;
 };
 
 /**
@@ -1424,9 +1424,9 @@ export const generatePrescriptionPDF = async (
     // issued by the regulatory body (Notificação A — amarela; B1/B2 — azul).
     // What we generate is a reference copy; the legal prescription is the official paper.
     const invalidNoticeFor = (t: string): string | undefined => {
-        if (t === "A") return "Apenas referência. A receita legal é a Notificação A (talão amarelo) numerada da autoridade sanitária.";
-        if (t === "B1") return "Apenas referência. A receita legal é a Notificação B1 (talão azul) numerada da autoridade sanitária.";
-        if (t === "B2") return "Apenas referência. A receita legal é a Notificação B2 (talão azul) numerada da autoridade sanitária.";
+        if (t === "A") return "Apenas referência. A receita oficial é a Notificação A (talão amarelo) numerada.";
+        if (t === "B1") return "Apenas referência. A receita oficial é a Notificação B1 (talão azul) numerada.";
+        if (t === "B2") return "Apenas referência. A receita oficial é a Notificação B2 (talão azul) numerada.";
         return undefined;
     };
 
