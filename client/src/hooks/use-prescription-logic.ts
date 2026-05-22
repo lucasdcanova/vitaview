@@ -102,6 +102,30 @@ export function usePrescriptionLogic(patient: Profile) {
     const [editingPrescriptionId, setEditingPrescriptionId] = useState<number | null>(null);
     const [prescriptionObservations, setPrescriptionObservations] = useState("");
     const [prescriptionCid, setPrescriptionCid] = useState("");
+    const [clinicInfoDialog, setClinicInfoDialog] = useState<{ open: boolean; missing: string[] }>({
+        open: false,
+        missing: [],
+    });
+
+    // Gate: ensure the doctor profile has the data needed to render a legible
+    // prescription (name, CRM/UF, city, and address when a controlled med is involved).
+    const validateClinicInfo = (hasControlled: boolean): string[] => {
+        const missing: string[] = [];
+        const u: any = user;
+        if (!u?.fullName) missing.push("Nome completo do médico");
+        if (!u?.crm) missing.push("CRM");
+        if (!u?.crmState) missing.push("UF do CRM");
+        if (!u?.city) missing.push("Cidade do consultório");
+        const addrOk = u?.address || u?.street;
+        if (!addrOk) {
+            missing.push(
+                hasControlled
+                    ? "Endereço completo (obrigatório para controle especial)"
+                    : "Endereço do consultório"
+            );
+        }
+        return missing;
+    };
 
     // --- Prescription State ---
     const [acuteItems, setAcuteItems] = useState<AcutePrescriptionItem[]>(() => {
@@ -245,20 +269,9 @@ export function usePrescriptionLogic(patient: Profile) {
 
         const CONTROLLED_TYPES = new Set(['especial', 'C', 'C1']);
         const hasControlled = acuteItems.some(item => CONTROLLED_TYPES.has(item.prescriptionType));
-        if (hasControlled && !(user as any).address) {
-            toast({
-                title: "Endereço profissional obrigatório",
-                description: "Receita de controle especial exige endereço do consultório. Atualize seu perfil.",
-                variant: "destructive",
-            });
-            return;
-        }
-        if (hasControlled && !(user as any).crmState) {
-            toast({
-                title: "UF do CRM obrigatória",
-                description: "Receita de controle especial exige UF do CRM. Atualize seu perfil.",
-                variant: "destructive",
-            });
+        const missing = validateClinicInfo(hasControlled);
+        if (missing.length > 0) {
+            setClinicInfoDialog({ open: true, missing });
             return;
         }
 
@@ -389,6 +402,18 @@ export function usePrescriptionLogic(patient: Profile) {
             return;
         }
 
+        const CONTROLLED_TYPES = new Set(['especial', 'C', 'C1']);
+        const hasControlled = selectedMeds.some((m: any) => {
+            const type = m.prescriptionType || m.prescription_type
+                || classifyPrescriptionType(m.name || "");
+            return CONTROLLED_TYPES.has(type);
+        });
+        const missing = validateClinicInfo(hasControlled);
+        if (missing.length > 0) {
+            setClinicInfoDialog({ open: true, missing });
+            return;
+        }
+
         const pdfWindow = window.open('', '_blank');
         if (pdfWindow) {
             pdfWindow.document.write('<html><head><title>Gerando Receita...</title></head><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;"><div><h2>Gerando Receita...</h2><p>Por favor, aguarde.</p></div></body></html>');
@@ -484,6 +509,7 @@ export function usePrescriptionLogic(patient: Profile) {
         prescriptionObservations, setPrescriptionObservations,
         prescriptionCid, setPrescriptionCid,
         acuteItems, setAcuteItems,
+        clinicInfoDialog, setClinicInfoDialog,
 
         // Actions
         addMedicationToReceituario,
