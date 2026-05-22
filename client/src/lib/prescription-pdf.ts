@@ -76,6 +76,9 @@ interface PrescriptionData {
     clinicHeader?: ClinicHeaderForPdf | null;
     clinicHeaderAssets?: PreloadedHeaderAssets;
     validityText?: string;
+    /** Prominent warning rendered above the medications, used for A (amarela) and B (azul)
+     *  prescriptions to make clear that the document does not replace the official numbered form. */
+    invalidNotice?: string;
 }
 
 const buildIdentity = (data: PrescriptionData): DocumentIdentity => ({
@@ -465,6 +468,43 @@ const drawPatientBlock = (doc: jsPDF, layout: BodyLayout, data: PrescriptionData
     doc.setDrawColor(220, 220, 220);
     doc.line(layout.leftX, nextY, layout.rightX, nextY);
     return nextY + 5;
+};
+
+/**
+ * Bordered warning box used on A (amarela) and B (azul) prescriptions to make
+ * clear that the document does not replace the official numbered form. Returns updated Y.
+ */
+const drawInvalidNoticeBanner = (
+    doc: jsPDF,
+    layout: BodyLayout,
+    yPos: number,
+    text: string
+): number => {
+    const paddingX = 3;
+    const paddingY = 2.5;
+    const fontSize = 8;
+    doc.setFontSize(fontSize);
+    doc.setFont("helvetica", "bold");
+    const titleText = "Documento sem validade legal";
+    const titleH = 3.5;
+    doc.setFont("helvetica", "normal");
+    const wrapped = doc.splitTextToSize(text, layout.contentWidth - paddingX * 2);
+    const bodyH = wrapped.length * 3.4;
+    const boxH = paddingY * 2 + titleH + 1.2 + bodyH;
+
+    doc.setDrawColor(60, 60, 60);
+    doc.setLineWidth(0.4);
+    doc.roundedRect(layout.leftX, yPos, layout.contentWidth, boxH, 1.2, 1.2, "S");
+
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(20, 20, 20);
+    doc.text(titleText, layout.leftX + paddingX, yPos + paddingY + titleH);
+
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(60, 60, 60);
+    doc.text(wrapped, layout.leftX + paddingX, yPos + paddingY + titleH + 1.2 + 3);
+    doc.setTextColor(0, 0, 0);
+    return yPos + boxH + 3;
 };
 
 /**
@@ -937,6 +977,9 @@ const generateBasicPrescription = (
         subtitle: config.subtitle,
     });
     yPos = drawPatientBlockSlim(doc, layout, data, yPos);
+    if (data.invalidNotice) {
+        yPos = drawInvalidNoticeBanner(doc, layout, yPos, data.invalidNotice);
+    }
     yPos = drawMedicationsBlock(doc, layout, data, yPos);
 
     drawBasicSignatureFooter(doc, layout, data, {
@@ -1197,6 +1240,9 @@ const generatePreprintedPrescription = (
     yPos = drawDoctorBlockCompact(doc, layout, contentData, yPos);
     yPos += 1.5;
     yPos = drawPatientBlockCompact(doc, layout, contentData, yPos);
+    if (contentData.invalidNotice) {
+        yPos = drawInvalidNoticeBanner(doc, layout, yPos, contentData.invalidNotice);
+    }
     yPos = drawMedicationsBlock(doc, layout, contentData, yPos);
 
     if (config.controlled && contentData.cid) {
@@ -1266,6 +1312,9 @@ const generateLetterheadPrescription = (
     yPos = drawDoctorBlock(doc, layout, contentData, yPos);
     yPos += 2;
     yPos = drawPatientBlock(doc, layout, contentData, yPos);
+    if (contentData.invalidNotice) {
+        yPos = drawInvalidNoticeBanner(doc, layout, yPos, contentData.invalidNotice);
+    }
     yPos = drawMedicationsBlock(doc, layout, contentData, yPos);
 
     if (config.controlled && contentData.cid) {
@@ -1365,6 +1414,16 @@ export const generatePrescriptionPDF = async (
         }
     });
 
+    // Notice text for prescription types that require an official numbered form
+    // issued by the regulatory body (Notificação A — amarela; B1/B2 — azul).
+    // What we generate is a reference copy; the legal prescription is the official paper.
+    const invalidNoticeFor = (t: string): string | undefined => {
+        if (t === "A") return "A prescrição de opioides exige Notificação de Receita A (talão amarelo) numerada e fornecida pela autoridade sanitária. Este documento serve apenas como referência e não substitui a receita oficial.";
+        if (t === "B1") return "A prescrição de psicotrópicos exige Notificação de Receita B1 (talão azul) numerada e fornecida pela autoridade sanitária. Este documento serve apenas como referência e não substitui a receita oficial.";
+        if (t === "B2") return "A prescrição de anorexígenos exige Notificação de Receita B2 (talão azul) numerada e fornecida pela autoridade sanitária. Este documento serve apenas como referência e não substitui a receita oficial.";
+        return undefined;
+    };
+
     // Pre-printed mode: doctor prints into a physical paper that already has the
     // letterhead, signature line, regulatory boxes. We generate a blank PDF and
     // only place the content within the configured margins.
@@ -1378,7 +1437,8 @@ export const generatePrescriptionPDF = async (
         let isFirstPage = true;
 
         receipts.forEach((receipt) => {
-            const groupData = enrich({ ...data, medications: receipt.medications });
+            const notice = invalidNoticeFor(receipt.type as string);
+            const groupData = enrich({ ...data, medications: receipt.medications, invalidNotice: notice });
             const config = (() => {
                 switch (receipt.type) {
                     case "padrao": return { title: "RECEITUÁRIO", subtitle: undefined, controlled: false };
@@ -1428,7 +1488,8 @@ export const generatePrescriptionPDF = async (
             if (!isFirstPage) doc.addPage();
             isFirstPage = false;
 
-            const groupData = enrich({ ...data, medications: receipt.medications });
+            const notice = invalidNoticeFor(receipt.type as string);
+            const groupData = enrich({ ...data, medications: receipt.medications, invalidNotice: notice });
             const config = (() => {
                 switch (receipt.type) {
                     case "padrao": return { title: "RECEITUÁRIO", subtitle: undefined, controlled: false };
@@ -1498,7 +1559,8 @@ export const generatePrescriptionPDF = async (
         if (!isFirstPage) doc.addPage();
         isFirstPage = false;
 
-        const groupData = enrich({ ...data, medications: receipt.medications });
+        const notice = invalidNoticeFor(receipt.type as string);
+        const groupData = enrich({ ...data, medications: receipt.medications, invalidNotice: notice });
         const offsets = [0, 148.5];
 
         // Thin cut line between vias
