@@ -72,18 +72,22 @@ export function ClinicOfficeInfoCard() {
         });
     }, [user]);
 
-    // Auto-fill street/neighborhood/city/UF when CEP reaches 8 digits via ViaCEP
+    // Auto-fill street/neighborhood/city/UF when CEP reaches 8 digits via ViaCEP.
+    // Loading state always resets in finally — even if the user edits the field
+    // mid-flight or the request times out, so the spinner can't get stuck.
     useEffect(() => {
         const digits = form.cep.replace(/\D/g, "");
         if (digits.length !== 8) return;
         if (digits === cepLookup.lastDigits) return;
 
-        let cancelled = false;
         setCepLookup({ loading: true, lastDigits: digits });
-        fetch(`https://viacep.com.br/ws/${digits}/json/`)
+
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), 8000);
+
+        fetch(`https://viacep.com.br/ws/${digits}/json/`, { signal: controller.signal })
             .then((r) => r.json())
             .then((data) => {
-                if (cancelled) return;
                 if (data?.erro) {
                     toast({ title: "CEP não encontrado", variant: "destructive" });
                     return;
@@ -96,17 +100,17 @@ export function ClinicOfficeInfoCard() {
                     state: (data.uf || prev.state).toUpperCase(),
                 }));
             })
-            .catch(() => {
-                if (!cancelled) toast({ title: "Falha ao consultar CEP", variant: "destructive" });
+            .catch((err) => {
+                if (err?.name !== "AbortError") {
+                    toast({ title: "Falha ao consultar CEP", variant: "destructive" });
+                }
             })
             .finally(() => {
-                if (!cancelled) setCepLookup((s) => ({ ...s, loading: false }));
+                window.clearTimeout(timeoutId);
+                setCepLookup((s) => ({ ...s, loading: false }));
             });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [form.cep, cepLookup.lastDigits, toast]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [form.cep]);
 
     const mutation = useMutation({
         mutationFn: updateUserProfile,
