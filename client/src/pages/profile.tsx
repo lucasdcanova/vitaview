@@ -92,6 +92,7 @@ const supportWhatsAppUrl =
   "https://wa.me/555597032546?text=Ol%C3%A1%2C%20preciso%20de%20ajuda%20com%20a%20VitaView%20AI.";
 
 const MEDICAL_SPECIALTIES = [
+  "Clínico geral",
   "Alergia e Imunologia",
   "Anestesiologia",
   "Angiologia",

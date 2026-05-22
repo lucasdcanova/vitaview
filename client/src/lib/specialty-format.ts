@@ -58,6 +58,10 @@ export function formatSpecialty(
     const trimmed = specialty.trim();
     const hasRqe = !!(rqe && rqe.trim());
 
+    // "Clínico geral" is the default for doctors without residency — it is not a
+    // CFM-recognized specialty nor an "área de atuação", so render plainly.
+    if (/^cl[ií]nico\s+geral$/i.test(trimmed)) return "Clínico geral";
+
     if (!hasRqe) {
         if (options.prefixWhenNoRqe === false) return trimmed;
         return `Área de atuação: ${trimmed}`;
