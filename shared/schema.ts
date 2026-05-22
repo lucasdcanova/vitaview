@@ -12,7 +12,14 @@ export const users = pgTable("users", {
   birthDate: text("birth_date"),
   gender: text("gender"),
   phoneNumber: text("phone_number"),
-  address: text("address"),
+  address: text("address"), // legacy single-line address — kept for back-compat
+  cep: text("cep"),
+  street: text("street"),
+  number: text("number"),
+  complement: text("complement"),
+  neighborhood: text("neighborhood"),
+  city: text("city"),
+  state: text("state"),
   crm: text("crm"), // CRM or professional registration number
   crmState: text("crm_state"), // UF (state) of the CRM, e.g. "SP", "RJ" — required for legal prescriptions
   specialty: text("specialty"), // Medical specialty
