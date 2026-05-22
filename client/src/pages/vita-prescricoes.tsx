@@ -6,6 +6,7 @@ import { AlertTriangle } from "lucide-react";
 
 import { MedicationDialog } from "@/components/dialogs";
 import { HeaderConfigReminderDialog } from "@/components/clinic/header-config-reminder-dialog";
+import { ClinicInfoIncompleteDialog } from "@/components/dialogs/clinic-info-incomplete-dialog";
 import type { Profile } from "@shared/schema";
 
 // Sub-components
@@ -127,6 +128,12 @@ export default function VitaPrescriptions({ patient, medications: propMedication
                 open={headerReminder.open}
                 onOpenChange={headerReminder.setOpen}
                 onDismissForever={headerReminder.dismissForever}
+            />
+
+            <ClinicInfoIncompleteDialog
+                open={logic.clinicInfoDialog.open}
+                onOpenChange={(open) => logic.setClinicInfoDialog((prev) => ({ ...prev, open }))}
+                missing={logic.clinicInfoDialog.missing}
             />
         </div>
     );
