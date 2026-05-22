@@ -305,29 +305,33 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
 
     return (
         <Card className="border border-border shadow-sm">
-            <CardHeader className="relative">
-                <CardTitle className="text-foreground">Cabeçalho do receituário</CardTitle>
-                <CardDescription>
-                    Personalize o topo das receitas, atestados e laudos com a identidade da clínica.
-                </CardDescription>
-                <TooltipProvider delayDuration={150}>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <a
-                                href="https://wa.me/555597032546?text=Ol%C3%A1%2C%20necessito%20aux%C3%ADlio%20com%20a%20prescri%C3%A7%C3%A3o%20de%20um%20receitu%C3%A1rio%20na%20VitaView%20AI."
-                                target="_blank"
-                                rel="noreferrer"
-                                aria-label="Suporte no WhatsApp"
-                                className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
-                            >
-                                <MessageCircle className="h-4 w-4" />
-                            </a>
-                        </TooltipTrigger>
-                        <TooltipContent side="left">
-                            Erro no receituário? Entre em contato com o suporte.
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
+            <CardHeader>
+                <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1.5 min-w-0">
+                        <CardTitle className="text-foreground">Cabeçalho do receituário</CardTitle>
+                        <CardDescription>
+                            Personalize o topo das receitas, atestados e laudos com a identidade da clínica.
+                        </CardDescription>
+                    </div>
+                    <TooltipProvider delayDuration={150}>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <a
+                                    href="https://wa.me/555597032546?text=Ol%C3%A1%2C%20necessito%20aux%C3%ADlio%20com%20a%20prescri%C3%A7%C3%A3o%20de%20um%20receitu%C3%A1rio%20na%20VitaView%20AI."
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    aria-label="Suporte no WhatsApp"
+                                    className="flex h-8 w-8 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors shrink-0"
+                                >
+                                    <MessageCircle className="h-4 w-4" />
+                                </a>
+                            </TooltipTrigger>
+                            <TooltipContent side="left">
+                                Erro no receituário? Entre em contato com o suporte.
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                </div>
             </CardHeader>
             <CardContent className="space-y-6">
                 {!canEdit && (
@@ -501,7 +505,7 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                     return (
                         <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-4">
                             <p className="text-xs text-muted-foreground leading-snug">
-                                Margens reservadas no papel físico (timbrado em cima, rodapé/assinatura embaixo). Ajuste manualmente ou envie uma foto da folha em branco pra IA detectar.
+                                Margens reservadas no papel físico — ajuste à mão ou detecte por foto.
                             </p>
 
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
