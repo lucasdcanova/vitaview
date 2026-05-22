@@ -720,18 +720,20 @@ const drawEmitenteBox = (
     }
     if (data.doctorSpecialty || data.doctorRqe) infoY += 4.5;
 
-    // Line 3: Phone · Address (tertiary)
-    const bits: string[] = [];
-    if (data.doctorPhone) bits.push(formatBrazilianPhone(data.doctorPhone));
-    if (data.doctorAddress) {
-        const addr = data.doctorAddress.length > 60 ? data.doctorAddress.slice(0, 57) + "..." : data.doctorAddress;
-        bits.push(addr);
+    // Line 3: Phone (tertiary)
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(120, 120, 120);
+    if (data.doctorPhone) {
+        doc.text(formatBrazilianPhone(data.doctorPhone), infoLeftX, infoY);
+        infoY += 4;
     }
-    if (bits.length) {
-        doc.setFontSize(7.5);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(120, 120, 120);
-        doc.text(bits.join("  ·  "), infoLeftX, infoY);
+
+    // Line 4: Address on its own line, full width
+    if (data.doctorAddress) {
+        const maxAddrW = rightEdge - infoLeftX;
+        const wrapped = doc.splitTextToSize(data.doctorAddress, maxAddrW);
+        doc.text(wrapped[0], infoLeftX, infoY);
     }
     doc.setTextColor(0, 0, 0);
 };
