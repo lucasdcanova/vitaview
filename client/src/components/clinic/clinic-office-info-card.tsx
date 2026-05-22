@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { BrandLoader } from "@/components/ui/brand-loader";
-import { Save, MapPin } from "lucide-react";
+import { Save, MapPin, Loader2 } from "lucide-react";
 
 type OfficeForm = {
     cep: string;
@@ -32,11 +32,21 @@ const EMPTY_FORM: OfficeForm = {
     phoneNumber: "",
 };
 
+const formatCep = (raw: string): string => {
+    const digits = raw.replace(/\D/g, "").slice(0, 8);
+    if (digits.length > 5) return `${digits.slice(0, 5)}-${digits.slice(5)}`;
+    return digits;
+};
+
 export function ClinicOfficeInfoCard() {
     const { user } = useAuth();
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const [form, setForm] = useState<OfficeForm>(EMPTY_FORM);
+    const [cepLookup, setCepLookup] = useState<{ loading: boolean; lastDigits: string }>({
+        loading: false,
+        lastDigits: "",
+    });
 
     useEffect(() => {
         if (!user) return;
@@ -52,6 +62,42 @@ export function ClinicOfficeInfoCard() {
             phoneNumber: u.phoneNumber ?? "",
         });
     }, [user]);
+
+    // Auto-fill street/neighborhood/city/UF when CEP reaches 8 digits via ViaCEP
+    useEffect(() => {
+        const digits = form.cep.replace(/\D/g, "");
+        if (digits.length !== 8) return;
+        if (digits === cepLookup.lastDigits) return;
+
+        let cancelled = false;
+        setCepLookup({ loading: true, lastDigits: digits });
+        fetch(`https://viacep.com.br/ws/${digits}/json/`)
+            .then((r) => r.json())
+            .then((data) => {
+                if (cancelled) return;
+                if (data?.erro) {
+                    toast({ title: "CEP não encontrado", variant: "destructive" });
+                    return;
+                }
+                setForm((prev) => ({
+                    ...prev,
+                    street: data.logradouro || prev.street,
+                    neighborhood: data.bairro || prev.neighborhood,
+                    city: data.localidade || prev.city,
+                    state: (data.uf || prev.state).toUpperCase(),
+                }));
+            })
+            .catch(() => {
+                if (!cancelled) toast({ title: "Falha ao consultar CEP", variant: "destructive" });
+            })
+            .finally(() => {
+                if (!cancelled) setCepLookup((s) => ({ ...s, loading: false }));
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [form.cep, cepLookup.lastDigits, toast]);
 
     const mutation = useMutation({
         mutationFn: updateUserProfile,
@@ -85,7 +131,22 @@ export function ClinicOfficeInfoCard() {
             </CardHeader>
             <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <Field label="CEP" value={form.cep} onChange={(v) => setField("cep", v)} className="md:col-span-1" />
+                    <div className="space-y-1.5 md:col-span-1">
+                        <Label className="text-xs font-medium text-foreground">CEP</Label>
+                        <div className="relative">
+                            <Input
+                                value={form.cep}
+                                onChange={(e) => setField("cep", formatCep(e.target.value))}
+                                placeholder="00000-000"
+                                className="h-9 pr-8"
+                                inputMode="numeric"
+                                maxLength={9}
+                            />
+                            {cepLookup.loading && (
+                                <Loader2 className="h-3.5 w-3.5 text-muted-foreground animate-spin absolute right-2 top-1/2 -translate-y-1/2" />
+                            )}
+                        </div>
+                    </div>
                     <Field label="Rua / Logradouro" value={form.street} onChange={(v) => setField("street", v)} className="md:col-span-3" />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
