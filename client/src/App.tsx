@@ -15,6 +15,7 @@ import { CommandPalette } from "@/components/command-palette/command-palette";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { AuthenticatedScripts } from "@/components/authenticated-scripts";
 import { OnboardingTour } from "@/components/onboarding/onboarding-tour";
+import { ClinicSetupWelcomeDialog } from "@/components/onboarding/clinic-setup-welcome-dialog";
 import { lazyWithRetry } from "@/lib/lazy-with-retry";
 import { isIOSAppShell, isNativeIOSAppOnMac, isRestrictedAppShell } from "@/lib/app-shell";
 import { BrandLoader } from "@/components/ui/brand-loader";
@@ -318,6 +319,7 @@ function AuthenticatedRoutes() {
                   <AuthenticatedWarmup />
                   <AuthenticatedRouteContent />
                   <CommandPalette />
+                  <ClinicSetupWelcomeDialog />
                   <OnboardingTour />
                 </TooltipProvider>
               </ThemeProvider>

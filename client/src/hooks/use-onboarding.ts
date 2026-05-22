@@ -13,17 +13,25 @@ export interface OnboardingStep {
 
 const ONBOARDING_STEPS: OnboardingStep[] = [
     {
+        id: 'minha-clinica',
+        target: '[data-tour="nav-minha-clinica"]',
+        title: '1. Minha Clínica',
+        description: 'Comece configurando aqui os dados da sua clínica: nome, endereço, telefone e o cabeçalho dos receituários, atestados e laudos. É o que dá identidade aos seus documentos.',
+        placement: 'right',
+        route: '/minha-clinica'
+    },
+    {
         id: 'agenda',
         target: '[data-tour="nav-agenda"]',
-        title: '1. Agenda',
-        description: 'Comece organizando seus atendimentos. Aqui você visualiza e gerencia todas as suas consultas agendadas do dia e da semana.',
+        title: '2. Agenda',
+        description: 'Organize seus atendimentos. Aqui você visualiza e gerencia todas as suas consultas agendadas do dia e da semana.',
         placement: 'right',
         route: '/agenda'
     },
     {
         id: 'pacientes',
         target: '[data-tour="nav-pacientes"]',
-        title: '2. Pacientes',
+        title: '3. Pacientes',
         description: 'Gerencie sua base de pacientes. Ao acessar um paciente, você poderá registrar toda a anamnese, histórico clínico e evoluções de forma detalhada e segura.',
         placement: 'right',
         route: '/pacientes'
@@ -31,7 +39,7 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
     {
         id: 'vita-assist',
         target: '[data-tour="nav-vita-assist"]',
-        title: '3. Vita Assist',
+        title: '4. Vita Assist',
         description: 'Seu assistente de IA para medicina. Tire dúvidas clínicas, consulte protocolos e obtenha suporte inteligente para suas decisões médicas.',
         placement: 'right',
         route: '/vita-assist'
@@ -39,7 +47,7 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
     {
         id: 'subscription',
         target: '[data-tour="nav-assinatura"]',
-        title: '4. Minha Assinatura',
+        title: '5. Minha Assinatura',
         description: 'Gerencie seu plano, faturas e métodos de pagamento. Acompanhe o status da sua assinatura e faça upgrades conforme sua necessidade.',
         placement: 'right',
         route: '/subscription'
@@ -47,7 +55,7 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
     {
         id: 'reports',
         target: '[data-tour="nav-relatorios"]',
-        title: '5. Relatórios',
+        title: '6. Relatórios',
         description: 'Acompanhe métricas detalhadas da sua clínica ou consultório. Visualize dados financeiros, volume de atendimentos e estatísticas de saúde dos seus pacientes.',
         placement: 'right',
         route: '/reports'
@@ -55,8 +63,8 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
     {
         id: 'settings',
         target: '[data-tour="nav-configuracoes"]',
-        title: '6. Configurações',
-        description: 'Personalize sua experiência. IMPORTANTE: Acesse esta área agora para completar seu perfil profissional, adicionar seu CRM e configurar suas preferências de atendimento.',
+        title: '7. Configurações',
+        description: 'Personalize sua experiência. Aqui você completa seu perfil profissional, adiciona CRM/RQE e ajusta suas preferências de atendimento.',
         placement: 'right',
         route: '/profile'
     },
@@ -86,9 +94,10 @@ export function useOnboarding() {
         }
     }, [user]);
 
-    // Start the tour
-    const startTour = useCallback(() => {
-        setCurrentStep(0);
+    // Start the tour, optionally at a specific step
+    const startTour = useCallback((startAt: number = 0) => {
+        const clamped = Math.max(0, Math.min(startAt, ONBOARDING_STEPS.length - 1));
+        setCurrentStep(clamped);
         setIsActive(true);
     }, []);
 
@@ -134,18 +143,9 @@ export function useOnboarding() {
         completeTour();
     }, [completeTour]);
 
-    // Auto-start tour for new users (only once)
-    useEffect(() => {
-        // Do not auto-start if already completed (checked via state which includes DB and local)
-        // Also wait for user to be loaded to avoid false starts
-        if (!isCompleted && user) {
-            // Small delay to let the page render first
-            const timer = setTimeout(() => {
-                setIsActive(true);
-            }, 1500);
-            return () => clearTimeout(timer);
-        }
-    }, [isCompleted, user]);
+    // Tour start is now triggered explicitly by the clinic setup welcome dialog,
+    // not auto-started on login. This avoids overlapping with the dialog and lets
+    // existing users who already configured their clinic stay focused on their work.
 
     return {
         steps: ONBOARDING_STEPS,
