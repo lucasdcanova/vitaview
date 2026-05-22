@@ -333,7 +333,7 @@ export class HTTPSConfigManager {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com data:",
       "img-src 'self' data: https: blob:",
-      "connect-src 'self' https://api.stripe.com https://replit.com wss://replit.com https://fonts.googleapis.com https://fonts.gstatic.com https://www.googletagmanager.com https://www.google-analytics.com https://region1.google-analytics.com https://analytics.google.com https://api.openai.com https://generativelanguage.googleapis.com",
+      "connect-src 'self' https://api.stripe.com https://replit.com wss://replit.com https://fonts.googleapis.com https://fonts.gstatic.com https://www.googletagmanager.com https://www.google-analytics.com https://region1.google-analytics.com https://analytics.google.com https://api.openai.com https://generativelanguage.googleapis.com https://viacep.com.br",
       "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://replit.com",
       "object-src 'none'",
       "base-uri 'self'",

@@ -92,7 +92,8 @@ const TRUSTED_DOMAINS = {
   ],
   apis: [
     'https://api.openai.com',
-    'https://generativelanguage.googleapis.com'
+    'https://generativelanguage.googleapis.com',
+    'https://viacep.com.br'
   ],
   storage: getConfiguredStorageOrigins(),
 };
