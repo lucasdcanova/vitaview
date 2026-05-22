@@ -33,6 +33,9 @@ interface PrescriptionData {
     doctorAddress?: string;
     doctorPhone?: string;
     doctorCity?: string;
+    doctorEmail?: string;
+    doctorWebsite?: string;
+    doctorCnpj?: string;
     // Dados do Paciente
     patientName: string;
     patientCpf?: string;
@@ -89,6 +92,9 @@ const buildIdentity = (data: PrescriptionData): DocumentIdentity => ({
     doctorRqe: data.doctorRqe,
     doctorAddress: data.doctorAddress,
     doctorPhone: data.doctorPhone,
+    doctorEmail: data.doctorEmail,
+    doctorWebsite: data.doctorWebsite,
+    doctorCnpj: data.doctorCnpj,
 });
 
 // Lista de medicamentos controlados

@@ -502,6 +502,8 @@ export class MemStorage implements IStorage {
       neighborhood: null,
       city: null,
       state: null,
+      cnpj: null,
+      website: null,
       activeProfileId: null,
       stripeCustomerId: null,
       stripeSubscriptionId: null,
