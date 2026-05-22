@@ -39,6 +39,7 @@ import { BrandLoader } from "@/components/ui/brand-loader";
 import { isIOSAppShell } from '@/lib/app-shell';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { PrescriptionHeaderSettings } from "@/components/clinic/prescription-header-settings";
+import { ClinicOfficeInfoCard } from "@/components/clinic/clinic-office-info-card";
 import { InviteManagerDialog, type InviteRole } from "@/components/clinic/invite-manager-dialog";
 
 interface Clinic {
@@ -910,6 +911,9 @@ const selectClinicMutation = useMutation({
                         </div>
                     );
                 })()}
+
+                {/* Dados do consultório (cidade, endereço, telefone — aparecem nas receitas) */}
+                <ClinicOfficeInfoCard />
 
                 {/* Cabeçalho de documentos */}
                 <PrescriptionHeaderSettings />

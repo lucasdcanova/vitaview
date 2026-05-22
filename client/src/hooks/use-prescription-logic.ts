@@ -107,6 +107,24 @@ export function usePrescriptionLogic(patient: Profile) {
         missing: [],
     });
 
+    // Build a human-readable office address from the user's structured fields,
+    // falling back to the legacy single-field address when not yet split.
+    const buildDoctorAddress = (): string | undefined => {
+        const u: any = user;
+        if (!u) return undefined;
+        if (u.street) {
+            const parts: string[] = [u.street];
+            if (u.number) parts[parts.length - 1] = `${parts[parts.length - 1]}, ${u.number}`;
+            if (u.complement) parts.push(u.complement);
+            if (u.neighborhood) parts.push(u.neighborhood);
+            const cityState = [u.city, u.state].filter(Boolean).join(" - ");
+            if (cityState) parts.push(cityState);
+            if (u.cep) parts.push(`CEP ${u.cep}`);
+            return parts.join(", ");
+        }
+        return u.address || undefined;
+    };
+
     // Gate: ensure the doctor profile has the data needed to render a legible
     // prescription (name, CRM/UF, city, and address when a controlled med is involved).
     const validateClinicInfo = (hasControlled: boolean): string[] => {
@@ -327,7 +345,7 @@ export function usePrescriptionLogic(patient: Profile) {
                     doctorCrmState: doctorCrmState,
                     doctorSpecialty: savedData.doctorSpecialty || undefined,
                     doctorRqe: (user as any)?.rqe || undefined,
-                    doctorAddress: (user as any)?.address || undefined,
+                    doctorAddress: buildDoctorAddress(),
                     doctorPhone: (user as any)?.phoneNumber || undefined,
                     doctorCity: (user as any)?.city || undefined,
                     patientName: patient.name,
@@ -456,7 +474,7 @@ export function usePrescriptionLogic(patient: Profile) {
                     doctorCrmState: doctorCrmState,
                     doctorSpecialty: savedData.doctorSpecialty || undefined,
                     doctorRqe: (user as any)?.rqe || undefined,
-                    doctorAddress: (user as any)?.address || undefined,
+                    doctorAddress: buildDoctorAddress(),
                     doctorPhone: (user as any)?.phoneNumber || undefined,
                     doctorCity: (user as any)?.city || undefined,
                     patientName: patient.name,
