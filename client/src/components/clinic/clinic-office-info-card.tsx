@@ -38,6 +38,15 @@ const formatCep = (raw: string): string => {
     return digits;
 };
 
+const formatPhone = (raw: string): string => {
+    const digits = raw.replace(/\D/g, "").slice(0, 11);
+    if (digits.length === 0) return "";
+    if (digits.length <= 2) return `(${digits}`;
+    if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+    if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+};
+
 export function ClinicOfficeInfoCard() {
     const { user } = useAuth();
     const { toast } = useToast();
@@ -52,14 +61,14 @@ export function ClinicOfficeInfoCard() {
         if (!user) return;
         const u = user as any;
         setForm({
-            cep: u.cep ?? "",
+            cep: formatCep(u.cep ?? ""),
             street: u.street ?? "",
             number: u.number ?? "",
             complement: u.complement ?? "",
             neighborhood: u.neighborhood ?? "",
             city: u.city ?? "",
             state: u.state ?? "",
-            phoneNumber: u.phoneNumber ?? "",
+            phoneNumber: formatPhone(u.phoneNumber ?? ""),
         });
     }, [user]);
 
@@ -157,7 +166,7 @@ export function ClinicOfficeInfoCard() {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                     <Field label="Cidade" value={form.city} onChange={(v) => setField("city", v)} required className="md:col-span-2" />
                     <Field label="UF" value={form.state} onChange={(v) => setField("state", v.toUpperCase().slice(0, 2))} required />
-                    <Field label="Telefone do consultório" value={form.phoneNumber} onChange={(v) => setField("phoneNumber", v)} />
+                    <Field label="Telefone do consultório" value={form.phoneNumber} onChange={(v) => setField("phoneNumber", formatPhone(v))} placeholder="(00) 00000-0000" />
                 </div>
                 <div className="flex justify-end">
                     <Button onClick={handleSave} disabled={mutation.isPending} className="bg-primary hover:bg-primary/90">
@@ -176,12 +185,14 @@ function Field({
     onChange,
     required,
     className,
+    placeholder,
 }: {
     label: string;
     value: string;
     onChange: (v: string) => void;
     required?: boolean;
     className?: string;
+    placeholder?: string;
 }) {
     return (
         <div className={`space-y-1.5 ${className ?? ""}`}>
@@ -191,6 +202,7 @@ function Field({
             <Input
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
+                placeholder={placeholder}
                 className="h-9"
             />
         </div>
