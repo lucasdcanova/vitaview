@@ -320,21 +320,21 @@ export function PrescriptionHeaderSettings({ onPreview }: Props) {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <ModeCard
                         title="Padrão"
-                        description="Use seu logo e/ou um cabeçalho próprio (PNG/JPG). O sistema cuida do resto."
+                        description="Use sua logo e/ou um cabeçalho próprio. O sistema cuida do resto."
                         active={draft.headerMode === "minimal" || draft.headerMode === "image" || draft.headerMode === "composed"}
                         disabled={!canEdit}
                         onClick={() => handleSelectMode("minimal")}
                     />
                     <ModeCard
                         title="Timbrado em PDF"
-                        description="Você tem o PDF inteiro do seu receituário. O sistema injeta paciente e medicamentos no meio."
+                        description="Você tem o PDF do receituário pronto. Sistema só injeta o conteúdo."
                         active={draft.headerMode === "letterhead"}
                         disabled={!canEdit}
                         onClick={() => handleSelectMode("letterhead")}
                     />
                     <ModeCard
                         title="Papel pré-impresso"
-                        description="Você já tem receituário físico impresso — sistema só imprime o conteúdo dentro das margens."
+                        description="Você já tem receituário físico. Sistema imprime só dentro das margens."
                         active={draft.headerMode === "preprinted"}
                         disabled={!canEdit}
                         onClick={() => handleSelectMode("preprinted")}
