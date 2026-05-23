@@ -23,15 +23,15 @@ const VISIBLE_LIMIT = 10;
 
 function RequestRow({ request, onReprint, onEdit }: { request: ExamRequestRecord; onReprint: (r: ExamRequestRecord) => void; onEdit: (r: ExamRequestRecord) => void }) {
     return (
-        <div className="p-4 hover:bg-gray-50 transition-colors flex items-center justify-between group">
-            <div className="flex items-start gap-4">
-                <div className="bg-gray-100 text-gray-700 text-xs font-medium px-2 py-1 rounded border border-gray-200">
+        <div className="px-4 py-2.5 hover:bg-gray-50 transition-colors flex items-center justify-between group">
+            <div className="flex items-start gap-3 min-w-0">
+                <div className="bg-gray-100 text-gray-700 text-xs font-medium px-2 py-0.5 rounded border border-gray-200 shrink-0">
                     {format(new Date(request.issueDate), "dd/MM/yyyy", { locale: ptBR })}
                 </div>
-                <div>
-                    <div className="flex items-center gap-2 mb-1">
+                <div className="min-w-0">
+                    <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-gray-900">
-                            {request.exams.length} exames solicitados
+                            {request.exams.length} exame{request.exams.length > 1 ? 's' : ''}
                         </span>
                         {request.status === 'pending' && (
                             <Badge variant="secondary" className="text-[10px] h-4 px-1 bg-yellow-50 text-yellow-700">Pendente</Badge>
@@ -74,23 +74,22 @@ export function ExamRequestHistory({ history, onReprint, onEdit }: ExamRequestHi
     return (
         <>
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+                <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <History className="h-4 w-4 text-gray-500" />
-                        <h3 className="text-sm font-medium text-gray-900">Histórico de Solicitações</h3>
+                        <h3 className="text-sm font-medium text-gray-900">Histórico</h3>
                     </div>
                     {hasMore && (
                         <span className="text-xs text-gray-400">
-                            Mostrando {VISIBLE_LIMIT} de {history.length}
+                            {VISIBLE_LIMIT} de {history.length}
                         </span>
                     )}
                 </div>
 
                 <div className="divide-y divide-gray-100">
                     {history.length === 0 ? (
-                        <div className="p-8 text-center text-gray-400">
-                            <History className="h-10 w-10 mx-auto mb-2 opacity-20" />
-                            <p className="text-sm">Nenhuma solicitação anterior encontrada.</p>
+                        <div className="px-4 py-5 text-center text-gray-400">
+                            <p className="text-xs">Sem solicitações anteriores.</p>
                         </div>
                     ) : (
                         history.slice(0, VISIBLE_LIMIT).map((request) => (
@@ -100,15 +99,15 @@ export function ExamRequestHistory({ history, onReprint, onEdit }: ExamRequestHi
                 </div>
 
                 {hasMore && (
-                    <div className="p-3 border-t border-gray-100 bg-gray-50">
+                    <div className="px-3 py-2 border-t border-gray-100 bg-gray-50">
                         <Button
                             variant="ghost"
                             size="sm"
-                            className="w-full text-gray-600 hover:text-gray-900 hover:bg-gray-100 text-sm"
+                            className="w-full text-gray-600 hover:text-gray-900 hover:bg-gray-100 text-xs"
                             onClick={() => setShowAllDialog(true)}
                         >
                             <ChevronDown className="h-4 w-4 mr-2" />
-                            Ver todas as solicitações ({history.length})
+                            Ver todas ({history.length})
                         </Button>
                     </div>
                 )}
