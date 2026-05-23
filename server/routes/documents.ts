@@ -1,12 +1,87 @@
 import type { Express } from "express";
 import { storage } from "../storage";
-import { insertPrescriptionSchema, insertCertificateSchema, insertExamRequestSchema, insertExamProtocolSchema } from "@shared/schema";
+import { insertPrescriptionSchema, insertCertificateSchema, insertExamRequestSchema, insertExamProtocolSchema, type Prescription, type User } from "@shared/schema";
 import { z } from "zod";
 import { createHash } from "crypto";
 
 function ensureAuthenticated(req: any, res: any, next: any) {
     if (req.isAuthenticated()) return next();
     res.status(401).json({ message: "Unauthorized" });
+}
+
+const PRESCRIPTION_TYPE_LABELS: Record<string, string> = {
+    padrao: "padrão",
+    especial: "controle especial",
+    antimicrobiano: "antimicrobiano",
+    A: "Notificação A (amarela)",
+    A1: "Notificação A1",
+    A2: "Notificação A2",
+    A3: "Notificação A3",
+    B: "Notificação B (azul)",
+    B1: "Notificação B1",
+    B2: "Notificação B2",
+    C: "controle especial (branca)",
+    C1: "controle especial C1",
+    C2: "controle especial C2",
+    C3: "controle especial C3 (talidomida)",
+};
+
+function prescriptionTypeLabel(type: unknown): string | null {
+    if (!type || typeof type !== "string") return null;
+    return PRESCRIPTION_TYPE_LABELS[type] ?? type;
+}
+
+function formatDateBR(date: Date | string | null | undefined): string {
+    if (!date) return "—";
+    const d = date instanceof Date ? date : new Date(date);
+    if (Number.isNaN(d.getTime())) return "—";
+    return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+/** CFM 2.217/2018 art. 87 §1º: registro cronológico dos atos clínicos no prontuário. */
+function buildPrescriptionEvolutionText(prescription: Prescription, user: User | undefined): string {
+    const isRenewal = typeof prescription.observations === "string"
+        && /renova[cç][aã]o|uso\s+cont[ií]nuo/i.test(prescription.observations);
+
+    const header = isRenewal
+        ? `Renovação de receita (uso contínuo) — Receita #${prescription.id}.`
+        : `Prescrição emitida — Receita #${prescription.id}.`;
+
+    const lines: string[] = [header];
+
+    const crmState = (user as any)?.crmState;
+    const crm = prescription.doctorCrm || (user as any)?.crm;
+    const crmLabel = crmState ? `CRM ${crmState} ${crm}` : `CRM ${crm}`;
+    lines.push(`Médico: ${prescription.doctorName} — ${crmLabel}.`);
+
+    if (prescription.doctorSpecialty) {
+        const rqe = (user as any)?.rqe;
+        lines.push(`Especialidade: ${prescription.doctorSpecialty}${rqe ? ` — RQE ${rqe}` : ""}.`);
+    }
+
+    lines.push(`Validade: ${formatDateBR(prescription.issueDate)} a ${formatDateBR(prescription.validUntil)}.`);
+
+    const meds = Array.isArray(prescription.medications) ? (prescription.medications as any[]) : [];
+    if (meds.length > 0) {
+        lines.push("Medicamentos prescritos:");
+        meds.forEach((m, idx) => {
+            const parts: string[] = [];
+            if (m?.name) parts.push(String(m.name));
+            if (m?.dosage) parts.push(String(m.dosage));
+            if (m?.frequency) parts.push(String(m.frequency));
+            if (m?.quantity) parts.push(`quantidade: ${m.quantity}`);
+            const typeLabel = prescriptionTypeLabel(m?.prescriptionType ?? m?.prescription_type);
+            const tag = typeLabel ? ` [${typeLabel}]` : "";
+            const notes = m?.notes ? ` — ${m.notes}` : "";
+            lines.push(`  ${idx + 1}. ${parts.join(", ")}${tag}${notes}.`);
+        });
+    }
+
+    if (prescription.observations) {
+        lines.push(`Observações: ${prescription.observations}`);
+    }
+
+    return lines.join("\n");
 }
 
 export function registerDocumentRoutes(app: Express) {
@@ -80,6 +155,24 @@ export function registerDocumentRoutes(app: Express) {
                 severity: "INFO",
                 complianceFlags: { cfm: true, lgpd: true }
             });
+
+            // CFM 2.217/2018 art. 87 §1º + CFM 1.638/2002: registrar o ato clínico
+            // no prontuário do paciente sempre que uma receita for finalizada.
+            try {
+                const finalPrescription = updatedPrescription ?? prescription;
+                const doctorUser = await storage.getUser(finalPrescription.userId);
+                const evolutionText = buildPrescriptionEvolutionText(finalPrescription, doctorUser);
+                await storage.createEvolution({
+                    userId: finalPrescription.userId,
+                    profileId: finalPrescription.profileId ?? null,
+                    text: evolutionText,
+                    professionalName: finalPrescription.doctorName,
+                    date: new Date(),
+                });
+            } catch (evoError) {
+                console.error("Erro ao registrar evolução da prescrição:", evoError);
+                // Não falha a finalização se o registro do prontuário falhar.
+            }
 
             res.json(updatedPrescription);
         } catch (error) {
