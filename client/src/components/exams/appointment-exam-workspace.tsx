@@ -194,68 +194,52 @@ export function AppointmentExamWorkspace({
 
   return (
     <Card className="overflow-hidden border-border/70 shadow-sm">
-      <CardHeader className="space-y-4 border-b border-border/70 bg-gradient-to-br from-background via-background to-muted/20">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-1">
-            <CardTitle className="text-lg text-foreground">Central de resultados no atendimento</CardTitle>
-            <CardDescription className="max-w-3xl">
-              Acompanhe o que acabou de entrar, veja o status da análise e revise os principais achados sem sair da consulta.
-            </CardDescription>
-          </div>
+      <CardHeader className="space-y-3 border-b border-border/70 bg-gradient-to-br from-background via-background to-muted/20 py-3">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+          <CardTitle className="text-base text-foreground">Resultados</CardTitle>
 
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" className="gap-2" onClick={onOpenEvolution}>
-              <BarChart3 className="h-4 w-4" />
-              Ver evolução
+            <Button variant="outline" size="sm" className="gap-1.5 h-8" onClick={onOpenEvolution}>
+              <BarChart3 className="h-3.5 w-3.5" />
+              Evolução
             </Button>
-            <Button variant="outline" size="sm" className="gap-2" onClick={onOpenHistory} disabled={showEmptyState}>
-              <ArrowUpRight className="h-4 w-4" />
-              Histórico de resultados
+            <Button variant="outline" size="sm" className="gap-1.5 h-8" onClick={onOpenHistory} disabled={showEmptyState}>
+              <ArrowUpRight className="h-3.5 w-3.5" />
+              Histórico
             </Button>
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Exames</p>
-            <p className="mt-2 text-2xl font-semibold text-foreground">{sortedExams.length}</p>
-            <p className="mt-1 text-sm text-muted-foreground">Resultados já vinculados ao paciente</p>
+        <div className="grid gap-2 grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-xl border border-border/70 bg-card px-3 py-2 shadow-sm">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Exames</p>
+            <p className="mt-0.5 text-xl font-semibold text-foreground leading-tight">{sortedExams.length}</p>
           </div>
 
-          <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Prontos</p>
-            <p className="mt-2 text-2xl font-semibold text-foreground">{analyzedCount}</p>
-            <p className="mt-1 text-sm text-muted-foreground">Exames com leitura disponível</p>
+          <div className="rounded-xl border border-border/70 bg-card px-3 py-2 shadow-sm">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Prontos</p>
+            <p className="mt-0.5 text-xl font-semibold text-foreground leading-tight">{analyzedCount}</p>
           </div>
 
-          <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Em andamento</p>
-            <p className="mt-2 text-2xl font-semibold text-foreground">{pendingCount}</p>
-            <p className="mt-1 text-sm text-muted-foreground">Upload ou extração ainda em andamento</p>
+          <div className="rounded-xl border border-border/70 bg-card px-3 py-2 shadow-sm">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Em análise</p>
+            <p className="mt-0.5 text-xl font-semibold text-foreground leading-tight">{pendingCount}</p>
           </div>
 
-          <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Alertas</p>
-            <p className="mt-2 text-2xl font-semibold text-foreground">{abnormalMetricCount}</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {latestAnalyzedExam ? `Último pronto em ${formatExamDate(latestAnalyzedExam.examDate || latestAnalyzedExam.uploadDate)}` : "Sem alertas estruturados ainda"}
-            </p>
+          <div className="rounded-xl border border-border/70 bg-card px-3 py-2 shadow-sm">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Alertas</p>
+            <p className="mt-0.5 text-xl font-semibold text-foreground leading-tight">{abnormalMetricCount}</p>
           </div>
         </div>
 
         {scopedUploads.length > 0 && (
-          <div className="rounded-2xl border border-blue-200/80 bg-blue-50/70 p-4 dark:border-blue-900/60 dark:bg-blue-950/20">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="space-y-1">
-                <p className="text-sm font-semibold text-blue-950 dark:text-blue-100">Uploads em fila para este atendimento</p>
-                <p className="text-sm text-blue-800 dark:text-blue-200">
-                  A IA atualiza esta área automaticamente assim que os arquivos terminarem de ser estruturados.
-                </p>
-              </div>
+          <div className="rounded-xl border border-blue-200/80 bg-blue-50/70 px-3 py-2 dark:border-blue-900/60 dark:bg-blue-950/20">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+              <p className="text-xs font-medium text-blue-950 dark:text-blue-100">Uploads em fila</p>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5">
                 {scopedUploads.slice(0, 4).map((upload) => (
-                  <Badge key={upload.id} variant="outline" className="border-blue-300/70 bg-white/80 text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
+                  <Badge key={upload.id} variant="outline" className="border-blue-300/70 bg-white/80 text-[10px] text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
                     {upload.name}
                   </Badge>
                 ))}
@@ -265,21 +249,16 @@ export function AppointmentExamWorkspace({
         )}
       </CardHeader>
 
-      <CardContent className="p-5">
+      <CardContent className="p-4">
         {showEmptyState ? (
-          <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 px-6 py-12 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-border/70 bg-card shadow-sm">
-              <FlaskConical className="h-6 w-6 text-muted-foreground" />
-            </div>
-            <h3 className="mt-4 text-lg font-semibold text-foreground">Nenhum exame analisado neste atendimento</h3>
-            <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
-              Envie um laudo na central acima. Assim que o upload terminar, esta área passa a mostrar o status e os principais achados clínicos.
-            </p>
+          <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-4 py-6 text-center">
+            <p className="text-sm text-muted-foreground">Nenhum exame analisado neste atendimento.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Envie um laudo na central acima.</p>
           </div>
         ) : (
-          <div className="rounded-3xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/15 p-5 shadow-sm">
+          <div className="rounded-xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/15 p-3 shadow-sm">
               {isSelectedExamLoading ? (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <Skeleton className="h-6 w-40" />
                   <Skeleton className="h-24 w-full" />
                   <div className="grid gap-3 md:grid-cols-2">
@@ -289,9 +268,9 @@ export function AppointmentExamWorkspace({
                   <Skeleton className="h-16 w-full" />
                 </div>
               ) : previewExam ? (
-                <div className="space-y-5">
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="space-y-2">
+                <div className="space-y-3">
+                  <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="space-y-1.5">
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge variant={previewStatus.badgeVariant} className="gap-1.5">
                           <PreviewStatusIcon className="h-3.5 w-3.5" />
@@ -301,118 +280,96 @@ export function AppointmentExamWorkspace({
                         <Badge variant="outline">{formatExamDate(previewExam.examDate || previewExam.uploadDate)}</Badge>
                       </div>
 
-                      <div>
-                        <h3 className="text-xl font-semibold tracking-tight text-foreground">
-                          {previewExam.name || "Exame sem título"}
-                        </h3>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {showProcessingState
-                            ? "O exame já está vinculado ao prontuário. Assim que a análise concluir, o resumo aparece aqui."
-                            : "Resumo clínico condensado para apoiar a decisão durante a consulta."}
-                        </p>
-                      </div>
+                      <h3 className="text-lg font-semibold tracking-tight text-foreground">
+                        {previewExam.name || "Exame sem título"}
+                      </h3>
                     </div>
 
                     <div className="flex flex-wrap gap-2">
                       {isReady(previewExam.status) && (
-                        <Button size="sm" className="gap-2" onClick={() => onOpenExam(previewExam.id)}>
-                          <FileText className="h-4 w-4" />
-                          Abrir análise completa
+                        <Button size="sm" className="gap-1.5 h-8" onClick={() => onOpenExam(previewExam.id)}>
+                          <FileText className="h-3.5 w-3.5" />
+                          Abrir análise
                         </Button>
                       )}
-                      <Button variant="outline" size="sm" className="gap-2" onClick={onOpenEvolution}>
-                        <Activity className="h-4 w-4" />
-                        Ver evolução
+                      <Button variant="outline" size="sm" className="gap-1.5 h-8" onClick={onOpenEvolution}>
+                        <Activity className="h-3.5 w-3.5" />
+                        Evolução
                       </Button>
                     </div>
                   </div>
 
                   {showErrorState ? (
-                    <div className="rounded-2xl border border-red-200/80 bg-red-50/80 p-4 text-red-900 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-100">
-                      <div className="flex items-start gap-3">
+                    <div className="rounded-xl border border-red-200/80 bg-red-50/80 px-3 py-2.5 text-red-900 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-100">
+                      <div className="flex items-start gap-2">
                         <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-                        <div className="space-y-1">
-                          <p className="font-medium">Falha no processamento do exame</p>
-                          <p className="text-sm">
-                            {previewExam.processingError || "A IA não conseguiu concluir a leitura deste documento."}
+                        <div>
+                          <p className="text-sm font-medium">Falha no processamento</p>
+                          <p className="text-xs">
+                            {previewExam.processingError || "A IA não conseguiu concluir a leitura."}
                           </p>
                         </div>
                       </div>
                     </div>
                   ) : showProcessingState ? (
-                    <div className="space-y-4">
-                      <div className="rounded-2xl border border-blue-200/80 bg-blue-50/80 p-4 dark:border-blue-900/60 dark:bg-blue-950/20">
-                        <div className="flex items-start gap-3">
-                          <Sparkles className="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-700 dark:text-blue-300" />
-                          <div className="space-y-1">
-                            <p className="font-medium text-blue-950 dark:text-blue-100">Análise em andamento</p>
-                            <p className="text-sm text-blue-800 dark:text-blue-200">
-                              Continue o atendimento normalmente. A leitura rápida deste exame entra aqui assim que a estruturação terminar.
-                            </p>
-                          </div>
+                    <div className="space-y-3">
+                      <div className="rounded-xl border border-blue-200/80 bg-blue-50/80 px-3 py-2 dark:border-blue-900/60 dark:bg-blue-950/20">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="h-3.5 w-3.5 flex-shrink-0 text-blue-700 dark:text-blue-300" />
+                          <p className="text-sm font-medium text-blue-950 dark:text-blue-100">Análise em andamento</p>
                         </div>
                       </div>
 
-                      <div className="grid gap-3 md:grid-cols-3">
+                      <div className="grid gap-2 md:grid-cols-3">
                         {[
                           {
-                            title: "Arquivo recebido",
+                            title: "Recebido",
                             done: true,
                           },
                           {
-                            title: "Extração do laudo",
+                            title: "Extração",
                             done: ["processing", "analyzing", "extracted", "analyzed", "extraction_only"].includes(normalizeStatus(previewExam.status)),
                           },
                           {
-                            title: "Resumo clínico",
+                            title: "Resumo",
                             done: isReady(previewExam.status),
                           },
                         ].map((step) => (
                           <div
                             key={step.title}
                             className={cn(
-                              "rounded-2xl border p-4",
+                              "rounded-lg border px-3 py-1.5 text-xs",
                               step.done
-                                ? "border-emerald-200/80 bg-emerald-50/80 dark:border-emerald-900/60 dark:bg-emerald-950/20"
-                                : "border-border/70 bg-card"
+                                ? "border-emerald-200/80 bg-emerald-50/80 text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-100"
+                                : "border-border/70 bg-card text-muted-foreground"
                             )}
                           >
-                            <p className="text-sm font-medium text-foreground">{step.title}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              {step.done ? "Etapa concluída" : "Aguardando processamento"}
-                            </p>
+                            {step.done ? "✓ " : ""}{step.title}
                           </div>
                         ))}
-                      </div>
-
-                      <div className="rounded-2xl border border-border/70 bg-card p-4">
-                        <p className="text-sm font-medium text-foreground">Próximo passo do médico</p>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Assim que o status mudar para analisado, revise a leitura rápida aqui e abra o relatório completo apenas se precisar aprofundar os achados.
-                        </p>
                       </div>
                     </div>
                   ) : (
                     <>
-                      <div className="grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-                        <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
-                          <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Leitura rápida</p>
-                          <p className="mt-3 text-sm leading-6 text-foreground">{keySummary}</p>
+                      <div className="grid gap-2 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+                        <div className="rounded-xl border border-border/70 bg-card px-3 py-2.5 shadow-sm">
+                          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Leitura rápida</p>
+                          <p className="mt-1.5 text-sm leading-5 text-foreground">{keySummary}</p>
                         </div>
 
-                        <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
-                          <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Ponto de atenção</p>
-                          <p className="mt-3 text-sm leading-6 text-foreground">{attentionSummary}</p>
+                        <div className="rounded-xl border border-border/70 bg-card px-3 py-2.5 shadow-sm">
+                          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Ponto de atenção</p>
+                          <p className="mt-1.5 text-sm leading-5 text-foreground">{attentionSummary}</p>
                         </div>
                       </div>
 
                       {quickHighlights.length > 1 && (
-                        <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
-                          <p className="text-sm font-semibold text-foreground">Achados-chave do laudo</p>
-                          <div className="mt-3 grid gap-3 md:grid-cols-2">
+                        <div className="rounded-xl border border-border/70 bg-card px-3 py-2.5 shadow-sm">
+                          <p className="text-xs font-semibold text-foreground">Achados</p>
+                          <div className="mt-2 grid gap-2 md:grid-cols-2">
                             {quickHighlights.slice(0, 4).map((highlight, index) => (
-                              <div key={`${highlight}-${index}`} className="rounded-2xl border border-border/70 bg-muted/30 p-3">
-                                <p className="text-sm text-foreground">{highlight}</p>
+                              <div key={`${highlight}-${index}`} className="rounded-lg border border-border/70 bg-muted/30 px-2.5 py-1.5">
+                                <p className="text-xs text-foreground">{highlight}</p>
                               </div>
                             ))}
                           </div>
@@ -420,33 +377,30 @@ export function AppointmentExamWorkspace({
                       )}
 
                       {previewMetrics.length > 0 && (
-                        <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
-                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                            <p className="text-sm font-semibold text-foreground">Parâmetros mais úteis no atendimento</p>
-                            <p className="text-xs text-muted-foreground">Até 4 marcadores estruturados deste exame</p>
-                          </div>
+                        <div className="rounded-xl border border-border/70 bg-card px-3 py-2.5 shadow-sm">
+                          <p className="text-xs font-semibold text-foreground">Parâmetros</p>
 
-                          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                          <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
                             {previewMetrics.slice(0, 4).map((metric: any, index: number) => (
                               <div
                                 key={`${metric?.name || "metric"}-${index}`}
                                 className={cn(
-                                  "rounded-2xl border p-3",
+                                  "rounded-lg border px-2.5 py-1.5",
                                   isMetricAbnormal(metric)
                                     ? "border-amber-200/80 bg-amber-50/80 dark:border-amber-900/60 dark:bg-amber-950/20"
                                     : "border-border/70 bg-muted/25"
                                 )}
                               >
-                                <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                                   {typeof metric?.name === "string" ? formatMetricDisplayName(metric.name) : "Parâmetro"}
                                 </p>
-                                <p className="mt-2 text-lg font-semibold text-foreground">
+                                <p className="mt-0.5 text-base font-semibold text-foreground leading-tight">
                                   {metric?.value ?? "--"} {metric?.unit || ""}
                                 </p>
-                                <p className="mt-1 text-xs text-muted-foreground">
+                                <p className="mt-0.5 text-[10px] text-muted-foreground">
                                   {metric?.referenceMin && metric?.referenceMax
-                                    ? `Referência ${metric.referenceMin}-${metric.referenceMax} ${metric?.unit || ""}`
-                                    : metric?.status || "Sem faixa de referência"}
+                                    ? `Ref ${metric.referenceMin}-${metric.referenceMax}`
+                                    : metric?.status || "Sem referência"}
                                 </p>
                               </div>
                             ))}
@@ -457,8 +411,8 @@ export function AppointmentExamWorkspace({
                   )}
                 </div>
               ) : (
-                <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 px-6 py-12 text-center">
-                  <p className="text-sm text-muted-foreground">Nenhum resultado disponível para leitura rápida no momento.</p>
+                <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-4 py-6 text-center">
+                  <p className="text-xs text-muted-foreground">Nenhum resultado disponível.</p>
                 </div>
               )}
           </div>

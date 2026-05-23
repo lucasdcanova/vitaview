@@ -144,23 +144,15 @@ export function ExamUploadLauncher({
           className
         )}
       >
-        <CardContent className={compact ? "p-4" : "p-5"}>
-          <div className={cn("flex gap-4", compact ? "flex-col" : "items-center justify-between")}>
-            <div className="flex min-w-0 items-start gap-3">
-              <div className="rounded-2xl border border-border/70 bg-muted/55 p-3 text-muted-foreground">
+        <CardContent className={compact ? "p-3" : "p-4"}>
+          <div className={cn("flex gap-3", compact ? "flex-col" : "items-center justify-between")}>
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="rounded-xl border border-border/70 bg-muted/55 p-2.5 text-muted-foreground shrink-0">
                 <Upload className="h-4 w-4" />
               </div>
-              <div className="min-w-0 space-y-2">
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold tracking-tight text-foreground">{title}</p>
-                  <p className="max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Sparkles className="h-3.5 w-3.5 text-muted-foreground/80" />
-                  <p className="leading-5 text-muted-foreground/90">
-                    Voce tambem pode arrastar o exame para a area de upload.
-                  </p>
-                </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold tracking-tight text-foreground">{title}</p>
+                <p className="text-xs leading-5 text-muted-foreground">{description}</p>
               </div>
             </div>
 
