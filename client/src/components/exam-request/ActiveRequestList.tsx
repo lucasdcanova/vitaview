@@ -299,6 +299,7 @@ export function ActiveRequestList({
                                 return (
                                     <button
                                         key={(protocol as any).id}
+                                        title={(protocol as any).name}
                                         className={cn(
                                             "group relative flex items-center gap-2 p-2 rounded-lg border text-left transition-all overflow-hidden",
                                             protocolLogic?.deleteMode
