@@ -39,7 +39,7 @@ export default function VitaReceituariosEspeciais({ patient }: VitaReceituariosE
 
                 {/* Doctor Info */}
                 <div className="w-full md:w-auto min-w-[250px] bg-white px-4 py-2 rounded-lg border border-gray-100 shadow-sm flex flex-col items-end">
-                    <span className="text-[10px] uppercase tracking-wider font-bold text-gray-400 mb-0.5">Médico Prescritor</span>
+                    <span className="text-[10px] uppercase tracking-wider font-bold text-gray-400 mb-0.5">Profissional Prescritor</span>
                     <p className="font-semibold text-gray-900 text-sm">{user?.fullName || user?.username || "Profissional"}</p>
                     {user?.crm && <span className="text-xs text-blue-600 font-medium bg-blue-50 px-1.5 py-0.5 rounded">CRM: {user.crm}</span>}
                 </div>

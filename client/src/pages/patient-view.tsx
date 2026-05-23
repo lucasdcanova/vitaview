@@ -98,6 +98,13 @@ const TabLoadingSkeleton = () => (
 );
 
 // Função para calcular idade
+const formatCrm = (crm: string | null | undefined, crmState: string | null | undefined): string => {
+    if (!crm) return "";
+    const stripped = crm.replace(/[\s\/-]*[A-Za-z]{2}\s*$/, "").trim();
+    const uf = (crmState ?? "").toString().trim().toUpperCase();
+    return uf ? `${stripped}/${uf}` : stripped;
+};
+
 const calculateAge = (birthDate: string | null | undefined): number | null => {
     if (!birthDate) return null;
     try {
@@ -415,7 +422,7 @@ export default function PatientView() {
                                             <button
                                                 type="button"
                                                 onClick={() => setIsDoctorDataDialogOpen(true)}
-                                                title={doctorDataIncomplete ? "Complete os dados do médico prescritor" : "Editar dados do médico prescritor"}
+                                                title={doctorDataIncomplete ? "Complete os dados do profissional prescritor" : "Editar dados do profissional prescritor"}
                                                 className={`hidden md:flex min-w-[200px] px-4 py-2 rounded-lg border shadow-sm flex-col items-end flex-shrink-0 transition-colors text-right hover:bg-muted/50 ${
                                                     doctorDataIncomplete
                                                         ? "bg-amber-50 border-amber-300 hover:bg-amber-100"
@@ -424,12 +431,12 @@ export default function PatientView() {
                                             >
                                                 <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-0.5 flex items-center gap-1">
                                                     {doctorDataIncomplete && <AlertCircle className="h-3 w-3 text-amber-600" />}
-                                                    Médico Prescritor
+                                                    Profissional Prescritor
                                                 </span>
                                                 <p className="font-semibold text-foreground text-sm">{user?.fullName || user?.username || "Profissional"}</p>
                                                 {user?.crm ? (
                                                     <span className="text-xs text-muted-foreground font-medium bg-muted px-1.5 py-0.5 rounded border border-border">
-                                                        CRM: {user.crm}{(user as any)?.crmState ? `/${(user as any).crmState}` : ""}
+                                                        CRM: {formatCrm(user.crm, (user as any)?.crmState)}
                                                     </span>
                                                 ) : (
                                                     <span className="text-xs text-amber-700 font-medium">Cadastrar dados</span>
