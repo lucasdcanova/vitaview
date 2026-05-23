@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { storage } from "../storage";
-import { insertPrescriptionSchema, insertCertificateSchema, insertExamRequestSchema, insertExamProtocolSchema, type Prescription, type User } from "@shared/schema";
+import { insertPrescriptionSchema, insertCertificateSchema, insertExamRequestSchema, insertExamProtocolSchema, type Prescription, type Certificate, type ExamRequest, type User } from "@shared/schema";
 import { z } from "zod";
 import { createHash } from "crypto";
 
@@ -79,6 +79,80 @@ function buildPrescriptionEvolutionText(prescription: Prescription, user: User |
 
     if (prescription.observations) {
         lines.push(`Observações: ${prescription.observations}`);
+    }
+
+    return lines.join("\n");
+}
+
+const CERTIFICATE_TYPE_LABELS: Record<string, string> = {
+    afastamento: "Atestado de afastamento",
+    comparecimento: "Declaração de comparecimento",
+    acompanhamento: "Atestado de acompanhante",
+    aptidao: "Atestado de aptidão",
+};
+
+/** CFM 2.217/2018 art. 87 §1º: o atestado é ato médico e precisa de registro no prontuário. */
+function buildCertificateEvolutionText(certificate: Certificate, user: User | undefined): string {
+    const typeLabel = CERTIFICATE_TYPE_LABELS[certificate.type] ?? `Atestado (${certificate.type})`;
+    const lines: string[] = [`${typeLabel} emitido — Documento #${certificate.id}.`];
+
+    const crmState = (user as any)?.crmState;
+    const crm = certificate.doctorCrm || (user as any)?.crm;
+    const crmLabel = crmState ? `CRM ${crmState} ${crm}` : `CRM ${crm}`;
+    lines.push(`Médico: ${certificate.doctorName} — ${crmLabel}.`);
+
+    lines.push(`Emitido em: ${formatDateBR(certificate.issueDate)}.`);
+
+    if (certificate.daysOff) {
+        lines.push(`Afastamento: ${certificate.daysOff} dia(s).`);
+    }
+    if (certificate.startTime || certificate.endTime) {
+        const range = [certificate.startTime, certificate.endTime].filter(Boolean).join(" às ");
+        if (range) lines.push(`Período: ${range}.`);
+    }
+    if (certificate.cid) {
+        lines.push(`CID: ${certificate.cid}.`);
+    }
+    if (certificate.customText) {
+        lines.push(`Texto do atestado: ${certificate.customText}`);
+    }
+
+    return lines.join("\n");
+}
+
+/** CFM 2.217/2018 art. 87 §1º: solicitação de exames também é ato médico e vai ao prontuário. */
+function buildExamRequestEvolutionText(request: ExamRequest, user: User | undefined): string {
+    const lines: string[] = [`Solicitação de exames emitida — Documento #${request.id}.`];
+
+    const crmState = (user as any)?.crmState;
+    const crm = request.doctorCrm || (user as any)?.crm;
+    const crmLabel = crmState ? `CRM ${crmState} ${crm}` : `CRM ${crm}`;
+    lines.push(`Médico: ${request.doctorName} — ${crmLabel}.`);
+
+    if (request.doctorSpecialty) {
+        const rqe = (user as any)?.rqe;
+        lines.push(`Especialidade: ${request.doctorSpecialty}${rqe ? ` — RQE ${rqe}` : ""}.`);
+    }
+
+    lines.push(`Emitida em: ${formatDateBR(request.issueDate)}.`);
+
+    const exams = Array.isArray(request.exams) ? (request.exams as any[]) : [];
+    if (exams.length > 0) {
+        lines.push("Exames solicitados:");
+        exams.forEach((e, idx) => {
+            const parts: string[] = [];
+            if (e?.name) parts.push(String(e.name));
+            if (e?.type) parts.push(String(e.type));
+            const notes = e?.notes ? ` — ${e.notes}` : "";
+            lines.push(`  ${idx + 1}. ${parts.join(" — ")}${notes}.`);
+        });
+    }
+
+    if (request.clinicalIndication) {
+        lines.push(`Indicação clínica: ${request.clinicalIndication}`);
+    }
+    if (request.observations) {
+        lines.push(`Observações: ${request.observations}`);
     }
 
     return lines.join("\n");
@@ -222,6 +296,21 @@ export function registerDocumentRoutes(app: Express) {
         try {
             const data = insertCertificateSchema.parse(req.body);
             const certificate = await storage.createCertificate(data);
+
+            // CFM 2.217/2018 art. 87 §1º: registrar o ato clínico no prontuário.
+            try {
+                const doctorUser = await storage.getUser(certificate.userId);
+                await storage.createEvolution({
+                    userId: certificate.userId,
+                    profileId: certificate.profileId ?? null,
+                    text: buildCertificateEvolutionText(certificate, doctorUser),
+                    professionalName: certificate.doctorName,
+                    date: new Date(),
+                });
+            } catch (evoError) {
+                console.error("Erro ao registrar evolução do atestado:", evoError);
+            }
+
             res.json(certificate);
         } catch (error) {
             console.error('Error creating certificate:', error);
@@ -302,6 +391,21 @@ export function registerDocumentRoutes(app: Express) {
         try {
             const data = insertExamRequestSchema.parse(req.body);
             const examRequest = await storage.createExamRequest(data);
+
+            // CFM 2.217/2018 art. 87 §1º: registrar o ato clínico no prontuário.
+            try {
+                const doctorUser = await storage.getUser(examRequest.userId);
+                await storage.createEvolution({
+                    userId: examRequest.userId,
+                    profileId: examRequest.profileId ?? null,
+                    text: buildExamRequestEvolutionText(examRequest, doctorUser),
+                    professionalName: examRequest.doctorName,
+                    date: new Date(),
+                });
+            } catch (evoError) {
+                console.error("Erro ao registrar evolução da solicitação de exames:", evoError);
+            }
+
             res.json(examRequest);
         } catch (error) {
             console.error('Error creating exam request:', error);
