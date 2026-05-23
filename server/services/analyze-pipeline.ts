@@ -64,6 +64,52 @@ const isGenericPurposeTitlePart = (value: string) => {
   ].includes(normalized);
 };
 
+const MAX_DISPLAY_NAME_LENGTH = 80;
+
+const MONTH_REGEX_SOURCE =
+  '(jan|janeiro|fev|fevereiro|mar|marco|abr|abril|mai|maio|jun|junho|jul|julho|ago|agosto|set|setembro|out|outubro|nov|novembro|dez|dezembro)';
+
+const stripTrailingDateAndLab = (value: string, laboratoryName?: string | null) => {
+  let out = value;
+  let changed = true;
+  // Iterate so multi-tail suffixes like " - Julho/2025 - LabCruz" get peeled off step by step.
+  while (changed) {
+    changed = false;
+
+    // Trailing "(date)" or "(year)".
+    const parenStripped = out.replace(/\s*\((?:\d{1,2}[/-]\d{2,4}|\d{4})\)\s*$/g, '').trim();
+    if (parenStripped !== out) { out = parenStripped; changed = true; continue; }
+
+    // Trailing month/year or numeric date after separator.
+    const tailNumericDate = out.replace(/\s*[•|\-–—]\s*\d{1,2}[/-]\d{2,4}\s*$/i, '').trim();
+    if (tailNumericDate !== out) { out = tailNumericDate; changed = true; continue; }
+    const tailMonthDate = new RegExp(`\\s*[•|\\-–—]\\s*${MONTH_REGEX_SOURCE}[\\s/-]*\\d{2,4}\\s*$`, 'i');
+    const tailMonth = out.replace(tailMonthDate, '').trim();
+    if (tailMonth !== out) { out = tailMonth; changed = true; continue; }
+    const tailYear = out.replace(/\s*[•|\-–—]\s*\d{4}\s*$/i, '').trim();
+    if (tailYear !== out) { out = tailYear; changed = true; continue; }
+
+    // Trailing "Mês YYYY" / "Mês/YYYY" / "YYYY" without separator (the AI sometimes drops them inline).
+    const tailMonthInline = new RegExp(`\\s+${MONTH_REGEX_SOURCE}[\\s/-]*\\d{2,4}\\s*$`, 'i');
+    const inlineMonth = out.replace(tailMonthInline, '').trim();
+    if (inlineMonth !== out && inlineMonth.length >= 6) { out = inlineMonth; changed = true; continue; }
+    const tailYearInline = out.replace(/\s+\d{4}\s*$/i, '').trim();
+    if (tailYearInline !== out && tailYearInline.length >= 6) { out = tailYearInline; changed = true; continue; }
+
+    // Trailing generic purpose tag (Acompanhamento, Rotina, Controle, etc.).
+    const tailPurpose = out.replace(/\s*[•|\-–—]\s*(acompanhamento|controle|rotina|seguimento|follow[\s-]?up|retorno)\s*$/i, '').trim();
+    if (tailPurpose !== out) { out = tailPurpose; changed = true; continue; }
+
+    // Trailing laboratory name after separator.
+    if (laboratoryName) {
+      const escapedLab = laboratoryName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const tailLab = out.replace(new RegExp(`\\s*[•|\\-–—]\\s*${escapedLab}\\s*$`, 'i'), '').trim();
+      if (tailLab !== out) { out = tailLab; changed = true; continue; }
+    }
+  }
+  return out;
+};
+
 const stripTitleNoise = (value: string, laboratoryName?: string | null) => {
   const lab = laboratoryName ? normalizeComparableText(laboratoryName) : '';
   const parts = normalizeDisplayName(value)
@@ -74,12 +120,15 @@ const stripTitleNoise = (value: string, laboratoryName?: string | null) => {
     .filter(part => !isGenericPurposeTitlePart(part))
     .filter(part => !lab || normalizeComparableText(part) !== lab);
 
-  const title = parts[0] || normalizeDisplayName(value);
-
-  return title
-    .replace(/\s*\((?:\d{1,2}[/-]\d{2,4}|\d{4})\)\s*$/g, '')
+  const candidate = parts[0] || normalizeDisplayName(value);
+  const cleaned = stripTrailingDateAndLab(candidate, laboratoryName)
     .replace(/\s+/g, ' ')
     .trim();
+
+  if (cleaned.length > MAX_DISPLAY_NAME_LENGTH) {
+    return cleaned.slice(0, MAX_DISPLAY_NAME_LENGTH).trimEnd().replace(/[,;:\-–—]+$/, '').trim() + '…';
+  }
+  return cleaned;
 };
 
 const deriveNameFromMetrics = (metrics: any[]) => {
