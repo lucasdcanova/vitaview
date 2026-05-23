@@ -1002,15 +1002,17 @@ nav, .no-drag {
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  
+
   .group:hover .hover-scroll-text {
     overflow: visible;
     text-overflow: clip;
-    animation: scroll-text 4s linear infinite alternate;
+    animation: scroll-text 5s ease-in-out infinite alternate;
   }
-  
+
+  /* Slide leftward to expose the END of the text. min(0px, ...) clamps the
+     translate so short text that already fits never gets pushed to the right. */
   @keyframes scroll-text {
-    0%, 10% { transform: translateX(0); }
-    90%, 100% { transform: translateX(calc(-100% + 110px)); }
+    0%, 15% { transform: translateX(0); }
+    85%, 100% { transform: translateX(min(0px, calc(-100% + 90px))); }
   }
 }
