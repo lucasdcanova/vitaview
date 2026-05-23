@@ -684,7 +684,7 @@ export default function PatientView() {
                                                     <ExamUploadLauncher
                                                         exams={exams}
                                                         title="Enviar resultados"
-                                                        description="Envie exames e laudos deste paciente. O status e a leitura rápida aparecem abaixo sem sair do atendimento."
+                                                        description="Laudos para análise da IA, vinculados ao prontuário."
                                                         buttonLabel="Abrir central"
                                                     />
 
