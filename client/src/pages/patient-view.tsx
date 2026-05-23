@@ -327,7 +327,7 @@ export default function PatientView() {
                                                 <p className="font-bold text-[15px] text-foreground tracking-tight truncate">
                                                     {activeProfile.name}
                                                     {calculateAge(activeProfile.birthDate) !== null && (
-                                                        <span className="font-medium text-muted-foreground text-xs ml-1.5">· {calculateAge(activeProfile.birthDate)} anos</span>
+                                                        <span className="font-medium text-muted-foreground text-xs ml-1.5">· {calculateAge(activeProfile.birthDate)}a</span>
                                                     )}
                                                 </p>
                                                 {activeProfile.insuranceName && (
@@ -374,7 +374,7 @@ export default function PatientView() {
                                                     {calculateAge(activeProfile.birthDate) !== null && (
                                                         <span className="flex items-center gap-1 text-sm text-muted-foreground">
                                                             <User className="h-4 w-4 text-muted-foreground" />
-                                                            {calculateAge(activeProfile.birthDate)} anos
+                                                            {calculateAge(activeProfile.birthDate)}a
                                                         </span>
                                                     )}
                                                     {activeProfile && (
@@ -400,7 +400,7 @@ export default function PatientView() {
                                                     {activeProfile.createdAt && (
                                                         <span className="flex items-center gap-1 text-sm text-gray-600">
                                                             <CalendarDays className="h-4 w-4 text-gray-400" />
-                                                            Paciente desde {format(new Date(activeProfile.createdAt), "MMM 'de' yyyy", { locale: ptBR })}
+                                                            Admissão {format(new Date(activeProfile.createdAt), "MMM/yy", { locale: ptBR })}
                                                         </span>
                                                     )}
                                                     {activeProfile.insuranceName && (
