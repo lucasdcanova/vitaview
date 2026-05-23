@@ -134,18 +134,18 @@ export function ActiveRequestList({
 
     return (
         <Card className="border-border shadow-md h-fit">
-            <CardHeader className="bg-muted/35 border-b border-border py-3">
-                <CardTitle className="text-lg text-foreground flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-muted-foreground" />
-                    {isEditing ? "Editando Solicitação" : "Nova Solicitação"}
+            <CardHeader className="bg-muted/35 border-b border-border py-2.5">
+                <CardTitle className="text-base text-foreground flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    {isEditing ? "Editar solicitação" : "Nova solicitação"}
                 </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
                 {/* Quick Protocols Section - 3 per row */}
                 {onApplyProtocol && protocolLogic && (
-                    <div className="p-3 border-b border-border bg-muted/25">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Protocolos Rápidos</span>
+                    <div className="px-3 py-2 border-b border-border bg-muted/25">
+                        <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Protocolos</span>
                             <div className="flex items-center gap-1">
                                 {!protocolLogic.deleteMode ? (
                                     <>
@@ -155,7 +155,7 @@ export function ActiveRequestList({
                                                 <DialogTrigger asChild>
                                                     <Button variant="ghost" size="sm" className="h-6 text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted px-2">
                                                         <PlusCircle className="mr-1 h-3 w-3" />
-                                                        Criar Novo
+                                                        Criar
                                                     </Button>
                                                 </DialogTrigger>
                                                 <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
@@ -339,16 +339,16 @@ export function ActiveRequestList({
                 )}
 
                 {/* Search Area - Dropdown style */}
-                <div className="p-3 border-b border-gray-100 bg-white">
+                <div className="px-3 py-2 border-b border-gray-100 bg-white">
                     <div className="relative" ref={searchContainerRef}>
-                        <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400 z-10" />
+                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 z-10" />
                         <Input
                             id="exam-search"
                             placeholder="Buscar exames..."
                             value={searchValue}
                             onChange={(e) => setSearchValue(e.target.value)}
                             onFocus={() => setIsSearchOpen(true)}
-                            className="pl-9 h-10 bg-white border-gray-300 focus:border-gray-500 transition-all pr-10"
+                            className="pl-9 h-9 bg-white border-gray-300 focus:border-gray-500 transition-all pr-10"
                         />
                         {isSearchOpen && (
                             <Button
@@ -371,8 +371,8 @@ export function ActiveRequestList({
                                     <ScrollArea className="h-[250px]">
                                         <div className="p-2 space-y-1">
                                             {isLoading && searchValue ? (
-                                                <div className="p-4 text-center text-gray-400">
-                                                    <span className="animate-pulse">Buscando na tabela TUSS...</span>
+                                                <div className="p-3 text-center text-gray-400">
+                                                    <span className="animate-pulse text-xs">Buscando...</span>
                                                 </div>
                                             ) : filteredExams.length > 0 ? (
                                                 filteredExams.map((exam: any, idx: number) => (
@@ -397,11 +397,11 @@ export function ActiveRequestList({
                                                     </button>
                                                 ))
                                             ) : (
-                                                <div className="p-4 text-center text-gray-400">
-                                                    <p>Nenhum exame encontrado.</p>
+                                                <div className="p-3 text-center text-gray-400">
+                                                    <p className="text-xs">Sem resultados.</p>
                                                     <Button
                                                         variant="link"
-                                                        className="mt-2 text-gray-600 h-auto p-0"
+                                                        className="mt-1 text-gray-600 h-auto p-0 text-xs"
                                                         onClick={() => {
                                                             onAddExam({ name: searchValue, type: 'outros' });
                                                             setSearchValue("");
@@ -451,9 +451,9 @@ export function ActiveRequestList({
 
                 {/* Selected Exam List */}
                 <div className="border-b border-gray-100">
-                    <div className="px-3 py-2 bg-gray-50/50 flex items-center justify-between">
+                    <div className="px-3 py-1.5 bg-gray-50/50 flex items-center justify-between">
                         <span className="text-xs text-gray-600">
-                            {selectedExams.length === 0 ? "Nenhum exame selecionado" : `${selectedExams.length} exame(s) selecionado(s)`}
+                            {selectedExams.length === 0 ? "Sem exames" : `${selectedExams.length} exame${selectedExams.length > 1 ? 's' : ''}`}
                         </span>
                         {selectedExams.length > 0 && (
                             <Button
@@ -470,9 +470,8 @@ export function ActiveRequestList({
                 </div>
                 <div className="max-h-[250px] overflow-y-auto">
                     {selectedExams.length === 0 ? (
-                        <div className="p-4 text-center text-gray-400">
-                            <FileText className="h-6 w-6 mx-auto mb-1 opacity-20" />
-                            <p className="text-xs">Utilize a busca ou protocolos acima</p>
+                        <div className="px-4 py-3 text-center text-gray-400">
+                            <p className="text-xs">Use a busca ou um protocolo acima.</p>
                         </div>
                     ) : (
                         <div className="divide-y divide-gray-100">
@@ -512,24 +511,24 @@ export function ActiveRequestList({
                 </div>
 
                 {/* Footer Actions */}
-                <div className="p-3 bg-gray-50 border-t border-gray-100 space-y-3">
-                    <div className="space-y-1.5">
-                        <Label className="text-[10px] text-gray-500 uppercase font-semibold">Observações Gerais</Label>
+                <div className="px-3 py-2.5 bg-gray-50 border-t border-gray-100 space-y-2.5">
+                    <div className="space-y-1">
+                        <Label className="text-[10px] text-gray-500 uppercase font-semibold">Observações</Label>
                         <Textarea
                             value={observations}
                             onChange={(e) => setObservations(e.target.value)}
-                            placeholder="Observações que sairão no rodapé do pedido..."
-                            className="bg-white min-h-[60px] text-sm"
+                            placeholder="Aparecem no rodapé do pedido."
+                            className="bg-white min-h-[52px] text-sm"
                         />
                     </div>
 
                     <Button
-                        className="w-full bg-gray-800 hover:bg-gray-900 text-white h-10 text-sm shadow-sm"
+                        className="w-full bg-gray-800 hover:bg-gray-900 text-white h-9 text-sm shadow-sm"
                         onClick={onSaveAndPrint}
                         disabled={selectedExams.length === 0}
                     >
                         <Printer className="mr-2 h-4 w-4" />
-                        {isEditing ? "Salvar Alterações e Imprimir" : "Salvar Solicitação e Imprimir"}
+                        Salvar e Imprimir
                     </Button>
                 </div>
             </CardContent>
