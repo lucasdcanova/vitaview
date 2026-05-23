@@ -15,6 +15,16 @@ interface ExamSelectorProps {
     onAddExam: (exam: { name: string; type: 'laboratorial' | 'imagem' | 'outros' }) => void;
 }
 
+type ExamSuggestion = { name: string; category?: string; type: 'laboratorial' | 'imagem' | 'outros'; tuss?: string };
+
+const normalize = (s: string): string =>
+    (s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+
+const coerceExamType = (t: unknown): 'laboratorial' | 'imagem' | 'outros' => {
+    if (t === "laboratorial" || t === "imagem") return t;
+    return "outros";
+};
+
 export function ExamSelector({ onAddExam }: ExamSelectorProps) {
     const [searchValue, setSearchValue] = useState("");
 
@@ -27,7 +37,7 @@ export function ExamSelector({ onAddExam }: ExamSelectorProps) {
         return () => clearTimeout(timer);
     }, [searchValue]);
 
-    const { data: searchResults, isLoading } = useQuery({
+    const { data: tussResults, isLoading } = useQuery({
         queryKey: ['tuss-search', debouncedSearch],
         queryFn: async () => {
             if (!debouncedSearch) return [];
@@ -37,18 +47,53 @@ export function ExamSelector({ onAddExam }: ExamSelectorProps) {
         enabled: debouncedSearch.length > 1
     });
 
-    const filteredExams = useMemo(() => {
-        if (!searchValue) return [];
-        if (searchResults && Array.isArray(searchResults)) return searchResults;
-        // Fallback or loading state handled in UI
-        return [];
-    }, [searchValue, searchResults]);
+    const filteredExams = useMemo<ExamSuggestion[]>(() => {
+        if (!debouncedSearch) return [];
+        const q = normalize(debouncedSearch);
+        if (!q) return [];
+
+        const seen = new Set<string>();
+        const out: ExamSuggestion[] = [];
+
+        // Curated catalog first (nice names, TUSS codes attached).
+        for (const exam of ALL_EXAMS) {
+            const haystack = `${normalize(exam.name)} ${normalize(exam.category)}`;
+            if (!haystack.includes(q)) continue;
+            const key = normalize(exam.name);
+            if (seen.has(key)) continue;
+            seen.add(key);
+            out.push({
+                name: exam.name,
+                category: exam.category,
+                type: coerceExamType((exam as any).type),
+                tuss: (exam as any).tuss,
+            });
+        }
+
+        // TUSS DB hits second (covers entries the curated catalog hasn't reached yet).
+        if (Array.isArray(tussResults)) {
+            for (const exam of tussResults) {
+                if (!exam?.name) continue;
+                const key = normalize(exam.name);
+                if (seen.has(key)) continue;
+                seen.add(key);
+                out.push({
+                    name: exam.name,
+                    category: exam.category,
+                    type: coerceExamType(exam.type),
+                    tuss: exam.code,
+                });
+            }
+        }
+
+        return out.slice(0, 100);
+    }, [debouncedSearch, tussResults]);
 
 
-    const handleAdd = (exam: typeof ALL_EXAMS[0]) => {
-        onAddExam(exam);
+    const handleAdd = (exam: ExamSuggestion) => {
+        onAddExam({ name: exam.name, type: exam.type });
         // Optional: clear search after add? Keep it for rapid entry.
-        // setSearchValue(""); 
+        // setSearchValue("");
     };
 
     return (
@@ -69,11 +114,7 @@ export function ExamSelector({ onAddExam }: ExamSelectorProps) {
                 {searchValue ? (
                     <ScrollArea className="h-[400px]">
                         <div className="p-2 space-y-1">
-                            {isLoading && searchValue ? (
-                                <div className="p-4 text-center text-gray-400">
-                                    <span className="animate-pulse">Buscando na tabela TUSS...</span>
-                                </div>
-                            ) : filteredExams.length > 0 ? (
+                            {filteredExams.length > 0 ? (
 
                                 filteredExams.map((exam, idx) => (
                                     <button
@@ -96,6 +137,10 @@ export function ExamSelector({ onAddExam }: ExamSelectorProps) {
                                         <Plus className="h-4 w-4 text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity" />
                                     </button>
                                 ))
+                            ) : isLoading ? (
+                                <div className="p-4 text-center text-gray-400">
+                                    <span className="animate-pulse">Buscando exames...</span>
+                                </div>
                             ) : (
                                 <div className="p-8 text-center text-gray-400">
                                     <p>Nenhum exame encontrado.</p>
