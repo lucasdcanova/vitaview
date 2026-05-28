@@ -1,5 +1,8 @@
 import 'dotenv/config';
-console.log("🚀 DATABASE_URL at startup:", process.env.DATABASE_URL ? (process.env.DATABASE_URL.substring(0, 15) + "...") : "NOT SET");
+// Boot log: confirm DATABASE_URL is configured WITHOUT echoing any portion of
+// the connection string. A partial prefix is still enough to fingerprint the
+// host/provider in shared logs, so we only emit a boolean.
+console.log("🚀 DATABASE_URL at startup:", process.env.DATABASE_URL ? "configured" : "NOT SET");
 console.log("🚀 Server is starting/restarting with new promotional logic...");
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
