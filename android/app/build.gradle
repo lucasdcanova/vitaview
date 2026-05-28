@@ -18,12 +18,31 @@ android {
     }
     signingConfigs {
         release {
-            def keystoreFile = file("../../secrets/vitaview-release.keystore")
+            // The keystore must live OUTSIDE the repository — see
+            // docs/SECURITY_REMEDIATION_PLAN.md for the rotation plan that
+            // followed the historical commit of secrets/vitaview-release.keystore.
+            // Override the path with -PvitaviewKeystorePath=... or the
+            // VITAVIEW_KEYSTORE_PATH env var on CI; locally the legacy in-tree
+            // path is used only if it still exists.
+            def keystorePath = project.findProperty("vitaviewKeystorePath") \
+                ?: System.getenv("VITAVIEW_KEYSTORE_PATH") \
+                ?: "../../secrets/vitaview-release.keystore"
+            def keystoreFile = file(keystorePath)
             if (keystoreFile.exists()) {
+                def storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                def keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+                if (!storePassword || !keyPassword) {
+                    throw new GradleException(
+                        "Refusing to sign release: ANDROID_KEYSTORE_PASSWORD " +
+                        "and ANDROID_KEY_PASSWORD must be set in the environment. " +
+                        "Hardcoded fallback passwords were removed — see " +
+                        "docs/SECURITY_REMEDIATION_PLAN.md."
+                    )
+                }
                 storeFile keystoreFile
-                storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD") ?: "REDACTED_KEYSTORE_PASSWORD_ROTATED"
+                storePassword storePassword
                 keyAlias "vitaview"
-                keyPassword System.getenv("ANDROID_KEY_PASSWORD") ?: "REDACTED_KEYSTORE_PASSWORD_ROTATED"
+                keyPassword keyPassword
             }
         }
     }
