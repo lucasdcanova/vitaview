@@ -1,21 +1,71 @@
+# Dependencies
 node_modules
-dist
-.DS_Store
-server/public
-vite.config.ts.*
-*.tar.gz
-.env
-.env.local
-.env.production
-secrets/
 desktop/node_modules
+
+# Build output
+dist
 desktop/dist
 desktop/release
+server/public
+.next
+out
+build
 
-# iOS / Xcode
-ios/App/build/
-*.xcarchive
-*.xcresult
+# Env / secrets — never commit
+.env
+.env.local
+.env.development
+.env.production
+.env.*.local
+secrets/
+*.pem
+*.p8
+*.p12
+*.keystore
+*.jks
+keystore.properties
+GoogleService-Info.plist
+google-services.json
+
+# Healthcare / PHI — never commit real patient data or exam outputs
+# These are placeholders to ensure ad-hoc clinical artifacts never reach git.
+*.dcm
+laudos/
+exames/
+attached_assets/laudo*.pdf
+attached_assets/Resultado*.pdf
+attached_assets/*.jpeg
+attached_assets/*.jpg
+# Root-level lab-report PDFs (typical Brazilian lab filename patterns: YYYYMMDD_*, Resultado*).
+/[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_*.pdf
+/Resultado*.pdf
+/laudo*.pdf
+
+# Cookies and auth dumps
+cookies.txt
+test-cookies.txt
+*.cookies
+
+# OS / editor noise
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/*.local
+
+# Agent / Claude Code local settings — per-machine workflow, not portable.
+.claude/settings.local.json
+.claude/projects/
+.agent/
+.agents/
+
+# One-off browser scratch pages that historically held literal pk_* keys.
+client/test-stripe.html
+client/test-*.html
+
+# macOS Finder duplicates ("foo 2.ts", "foo 3.ts")
+* 2.*
+* 3.*
 
 # Logs
 logs/
@@ -23,4 +73,41 @@ logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+
+# Test artifacts
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Vite / TS scratch
+vite.config.ts.*
+
+# iOS / Xcode
+ios/App/build/
+ios/App/Pods/
+ios/DerivedData/
+*.xcarchive
+*.xcresult
+*.ipa
+
+# Android / Capacitor
+android/app/build/
+android/.gradle/
+android/build/
+android/local.properties
+*.apk
+*.aab
+
+# Electron / desktop builds
+desktop/out/
+
+# Archives & backups
+*.tar.gz
+*.zip
 .git.broken/
+.git.bak/
+
+# Replit / scratch
+.replit.local
