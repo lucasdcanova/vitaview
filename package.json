@@ -96,7 +96,7 @@
     "multer-s3": "^3.0.1",
     "next-themes": "^0.4.6",
     "node-cron": "^4.2.1",
-    "nodemailer": "^7.0.12",
+    "nodemailer": "^9.0.1",
     "openai": "^4.97.0",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
